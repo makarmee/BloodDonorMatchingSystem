@@ -94,7 +94,11 @@
                         @php
                             $routeExists = Route::has($item['route']);
                             $href = $routeExists ? route($item['route'], $item['params'] ?? []) : '#';
-                            $isActive = $routeExists && request()->routeIs($item['route']);
+                            $routePrefix = \Illuminate\Support\Str::before($item['route'], '.');
+                            $isActive = $routeExists && (
+                                request()->routeIs($item['route'])
+                                || ($routePrefix !== 'dashboard' && request()->routeIs($routePrefix . '.*'))
+                            );
                         @endphp
 
                         <a

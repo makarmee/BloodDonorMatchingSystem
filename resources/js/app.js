@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { donorForm, donorsDirectory } from './modules/donors';
 import { inventoryManager } from './modules/inventory';
 
 const THEME_STORAGE_KEY = 'bdms-theme';
@@ -41,6 +42,8 @@ document.addEventListener('alpine:init', () => {
     });
 
     Alpine.data('inventoryManager', inventoryManager);
+    Alpine.data('donorsDirectory', donorsDirectory);
+    Alpine.data('donorForm', donorForm);
 });
 
 window.Alpine = Alpine;

@@ -268,6 +268,25 @@
         </svg>
         @break
 
+    @case('phone')
+        <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5.5 4h3l1.5 4-2 1.5a11 11 0 0 0 6.5 6.5L16 14l4 1.5v3a1.5 1.5 0 0 1-1.6 1.5A14.5 14.5 0 0 1 4 5.6 1.5 1.5 0 0 1 5.5 4Z" />
+        </svg>
+        @break
+
+    @case('pencil')
+        <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5Z" />
+        </svg>
+        @break
+
+    @case('arrow-left')
+        <svg {{ $attributes->merge(['class' => 'size-4 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5" />
+            <path d="m11 6-6 6 6 6" />
+        </svg>
+        @break
+
     @default
         <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
             <circle cx="12" cy="12" r="8" />
