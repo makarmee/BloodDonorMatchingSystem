@@ -1,9 +1,39 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
+@source '../views/**/*.blade.php';
+@source '../js/**/*.js';
 
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-crimson-50: oklch(97.1% 0.016 17.5);
+    --color-crimson-100: oklch(93.5% 0.036 17.8);
+    --color-crimson-200: oklch(88.2% 0.072 18.2);
+    --color-crimson-300: oklch(80.1% 0.128 19.2);
+    --color-crimson-400: oklch(69.5% 0.196 21.5);
+    --color-crimson-500: oklch(60.5% 0.228 24);
+    --color-crimson-600: oklch(52.5% 0.222 25.2);
+    --color-crimson-700: oklch(45.5% 0.192 25.5);
+    --color-crimson-800: oklch(38.5% 0.155 25.2);
+    --color-crimson-900: oklch(33.5% 0.124 24.5);
+    --color-crimson-950: oklch(21.5% 0.082 24);
+}
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+    }
 }
