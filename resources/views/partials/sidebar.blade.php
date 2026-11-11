@@ -9,11 +9,10 @@
             'badge' => 'crimson',
             'sections' => [
                 'Donor Services' => [
-                    ['label' => 'My Overview', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'params' => ['role' => 'donor'], 'active' => true],
-                    ['label' => 'Book Appointment', 'icon' => 'calendar', 'route' => 'appointments.create', 'active' => false],
-                    ['label' => 'Donation History', 'icon' => 'heart-pulse', 'route' => 'donations.history', 'active' => false],
-                    ['label' => 'Eligibility & Card', 'icon' => 'shield-check', 'route' => 'donor.eligibility', 'active' => false],
-                    ['label' => 'Nearby Blood Camps', 'icon' => 'map-pin', 'route' => 'camps.index', 'active' => false],
+                    ['label' => 'Overview', 'icon' => 'squares-2x2', 'route' => 'donor-portal.dashboard', 'match' => 'donor-portal.dashboard', 'active' => true],
+                    ['label' => 'My Appointments', 'icon' => 'calendar', 'route' => 'donor-portal.appointments.index', 'match' => 'donor-portal.appointments.*', 'active' => false],
+                    ['label' => 'Donation History', 'icon' => 'heart-pulse', 'route' => 'donor-portal.history', 'match' => 'donor-portal.history', 'active' => false],
+                    ['label' => 'Eligibility', 'icon' => 'shield-check', 'route' => 'donor-portal.eligibility', 'match' => 'donor-portal.eligibility', 'active' => false],
                 ],
             ],
         ],
@@ -95,9 +94,11 @@
                             $routeExists = Route::has($item['route']);
                             $href = $routeExists ? route($item['route'], $item['params'] ?? []) : '#';
                             $routePrefix = \Illuminate\Support\Str::before($item['route'], '.');
+                            $matchPattern = $item['match'] ?? null;
                             $isActive = $routeExists && (
-                                request()->routeIs($item['route'])
-                                || ($routePrefix !== 'dashboard' && request()->routeIs($routePrefix . '.*'))
+                                $matchPattern
+                                    ? request()->routeIs($matchPattern)
+                                    : (request()->routeIs($item['route']) || ($routePrefix !== 'dashboard' && request()->routeIs($routePrefix . '.*')))
                             );
                         @endphp
 

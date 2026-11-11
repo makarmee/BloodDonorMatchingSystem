@@ -131,7 +131,7 @@ class DonorsController extends Controller
      *     donationHistory: array<int, array{reference: string, date: string, center: string, component: string, volume: string, status: string}>
      * }>
      */
-    private function sampleDonors(): array
+    public function sampleDonors(): array
     {
         return [
             [

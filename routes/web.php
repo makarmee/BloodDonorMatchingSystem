@@ -4,6 +4,7 @@ use App\Http\Controllers\BloodRequestsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DonationCampsController;
 use App\Http\Controllers\DonationsController;
+use App\Http\Controllers\DonorPortalController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventoryController;
@@ -42,3 +43,9 @@ Route::get('/camps', [DonationCampsController::class, 'index'])->name('camps.ind
 Route::get('/camps/create', [DonationCampsController::class, 'create'])->name('camps.create');
 Route::get('/camps/{camp}', [DonationCampsController::class, 'show'])->name('camps.show');
 Route::get('/camps/{camp}/edit', [DonationCampsController::class, 'edit'])->name('camps.edit');
+
+Route::get('/donor-portal', [DonorPortalController::class, 'dashboard'])->name('donor-portal.dashboard');
+Route::get('/donor-portal/appointments', [DonorPortalController::class, 'appointments'])->name('donor-portal.appointments.index');
+Route::get('/donor-portal/appointments/create', [DonorPortalController::class, 'createAppointment'])->name('donor-portal.appointments.create');
+Route::get('/donor-portal/history', [DonorPortalController::class, 'history'])->name('donor-portal.history');
+Route::get('/donor-portal/eligibility', [DonorPortalController::class, 'eligibility'])->name('donor-portal.eligibility');

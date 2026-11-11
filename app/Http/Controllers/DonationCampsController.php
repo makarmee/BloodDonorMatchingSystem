@@ -178,7 +178,7 @@ class DonationCampsController extends Controller
      *     history: array<int, array{date: string, event: string, actor: string, notes: string}>
      * }>
      */
-    private function sampleCamps(): array
+    public function sampleCamps(): array
     {
         $donors = collect($this->sampleDonors())->keyBy('id');
 

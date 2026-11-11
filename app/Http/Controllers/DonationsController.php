@@ -249,7 +249,7 @@ class DonationsController extends Controller
      *     collectionNotes: string
      * }>
      */
-    private function sampleDonations(): array
+    public function sampleDonations(): array
     {
         $donors = $this->sampleDonorsById();
 

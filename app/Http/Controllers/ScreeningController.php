@@ -319,7 +319,7 @@ class ScreeningController extends Controller
      *     resultRecordedAt: string
      * }>
      */
-    private function sampleScreenings(): array
+    public function sampleScreenings(): array
     {
         $donations = $this->sampleDonationsById();
 
