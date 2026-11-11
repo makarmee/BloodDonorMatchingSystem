@@ -10,6 +10,7 @@ import {
 } from './modules/donor-portal';
 import { donorForm, donorsDirectory } from './modules/donors';
 import { inventoryManager } from './modules/inventory';
+import { publicBloodStock, publicCampsDirectory } from './modules/public-portal';
 import { requestForm, requestFulfillment, requestsDirectory } from './modules/requests';
 import { screeningDirectory, screeningForm } from './modules/screening';
 
@@ -71,6 +72,8 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('appointmentForm', appointmentForm);
     Alpine.data('donationHistory', donationHistory);
     Alpine.data('donorEligibility', donorEligibility);
+    Alpine.data('publicBloodStock', publicBloodStock);
+    Alpine.data('publicCampsDirectory', publicCampsDirectory);
 });
 
 window.Alpine = Alpine;

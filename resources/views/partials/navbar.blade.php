@@ -3,7 +3,7 @@
     class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/90"
 >
     <div class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <a href="{{ route('home') }}" class="flex items-center gap-2.5">
+        <a href="{{ route('home') }}" class="flex items-center gap-2.5 shrink-0">
             <span class="flex size-9 items-center justify-center rounded-xl bg-crimson-600 text-white shadow-xs">
                 <x-icons.icon name="droplet" class="size-5" />
             </span>
@@ -17,14 +17,33 @@
             </div>
         </a>
 
-        <nav class="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300" aria-label="Main navigation">
-            <a href="{{ route('home') }}#blood-stock" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Blood Stock</a>
-            <a href="{{ route('home') }}#portals" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Portals</a>
-            <a href="{{ route('home') }}#camps" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Donation Camps</a>
-            <a href="{{ route('dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Dashboard Preview</a>
+        <nav class="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300" aria-label="Main navigation">
+            <a
+                href="{{ route('home') }}"
+                @class([
+                    'transition hover:text-crimson-600 dark:hover:text-crimson-400',
+                    'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('home'),
+                ])
+            >Home</a>
+            <a
+                href="{{ route('public.stock') }}"
+                @class([
+                    'transition hover:text-crimson-600 dark:hover:text-crimson-400',
+                    'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('public.stock'),
+                ])
+            >Blood Stock</a>
+            <a
+                href="{{ route('public.camps.index') }}"
+                @class([
+                    'transition hover:text-crimson-600 dark:hover:text-crimson-400',
+                    'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('public.camps.*'),
+                ])
+            >Donation Camps</a>
+            <a href="{{ route('home') }}#faq-contact" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">FAQ &amp; Contact</a>
+            <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Donor Portal</a>
         </nav>
 
-        <div class="hidden md:flex items-center gap-2.5">
+        <div class="hidden lg:flex items-center gap-2.5 shrink-0">
             <x-ui.theme-toggle />
 
             @auth
@@ -41,7 +60,7 @@
             @endauth
         </div>
 
-        <div class="flex items-center gap-2 md:hidden">
+        <div class="flex items-center gap-2 lg:hidden">
             <x-ui.theme-toggle />
             <button
                 type="button"
@@ -64,13 +83,15 @@
         x-show="mobileOpen"
         x-cloak
         x-transition
-        class="border-t border-slate-200 bg-white px-4 py-4 md:hidden dark:border-slate-800 dark:bg-slate-950"
+        class="border-t border-slate-200 bg-white px-4 py-4 lg:hidden dark:border-slate-800 dark:bg-slate-950"
     >
-        <nav class="flex flex-col gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
-            <a href="{{ route('home') }}#blood-stock" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Blood Stock</a>
-            <a href="{{ route('home') }}#portals" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Portals</a>
-            <a href="{{ route('home') }}#camps" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donation Camps</a>
-            <a href="{{ route('dashboard') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Dashboard Preview</a>
+        <nav class="flex flex-col gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200" aria-label="Mobile navigation">
+            <a href="{{ route('home') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Home</a>
+            <a href="{{ route('public.stock') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Blood Stock</a>
+            <a href="{{ route('public.camps.index') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donation Camps</a>
+            <a href="{{ route('home') }}#faq-contact" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">FAQ &amp; Contact</a>
+            <a href="{{ route('donor-portal.dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donor Portal</a>
+            <a href="{{ route('dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Dashboard Preview</a>
         </nav>
 
         <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
@@ -79,4 +100,3 @@
         </div>
     </div>
 </header>
-

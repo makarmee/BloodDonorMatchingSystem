@@ -8,10 +8,14 @@ use App\Http\Controllers\DonorPortalController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ScreeningController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
+Route::get('/blood-stock', [PublicPortalController::class, 'bloodStock'])->name('public.stock');
+Route::get('/blood-camps', [PublicPortalController::class, 'camps'])->name('public.camps.index');
+Route::get('/blood-camps/{camp}', [PublicPortalController::class, 'showCamp'])->name('public.camps.show');
 
 Route::view('/login', 'auth.login')->name('login');
 Route::view('/register', 'auth.register')->name('register');

@@ -55,7 +55,7 @@ class InventoryController extends Controller
      *     lastUpdated: string
      * }>
      */
-    private function sampleBloodGroups(): array
+    public function sampleBloodGroups(): array
     {
         $definitions = [
             ['group' => 'A+', 'available' => 64, 'reserved' => 8, 'minLevel' => 30, 'capacity' => 100, 'lastUpdated' => 'Nov 11, 2026 • 13:45'],
@@ -78,7 +78,7 @@ class InventoryController extends Controller
     /**
      * Derive the inventory stock status from available units and minimum threshold.
      */
-    private function resolveStatus(int $available, int $minLevel): string
+    public function resolveStatus(int $available, int $minLevel): string
     {
         $criticalThreshold = (int) floor($minLevel * 0.6);
 

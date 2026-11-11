@@ -46,8 +46,11 @@
                         <span>— Blood Donation Management System</span>
                     </div>
 
-                    <div class="flex items-center gap-5">
-                        <a href="{{ route('home') }}#blood-stock" class="hover:text-slate-900 dark:hover:text-white">Availability</a>
+                    <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+                        <a href="{{ route('public.stock') }}" class="hover:text-slate-900 dark:hover:text-white">Blood Stock</a>
+                        <a href="{{ route('public.camps.index') }}" class="hover:text-slate-900 dark:hover:text-white">Donation Camps</a>
+                        <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">Donor Portal</a>
+                        <a href="{{ route('home') }}#faq-contact" class="hover:text-slate-900 dark:hover:text-white">FAQ &amp; Contact</a>
                         <a href="{{ route('login') }}" class="hover:text-slate-900 dark:hover:text-white">Sign in</a>
                         <a href="{{ route('register') }}" class="hover:text-slate-900 dark:hover:text-white">Register</a>
                         <a href="{{ route('dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">Portal Preview</a>
