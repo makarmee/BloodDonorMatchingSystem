@@ -5,6 +5,7 @@ use App\Http\Controllers\DonationsController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\ScreeningController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -25,3 +26,7 @@ Route::get('/donations', [DonationsController::class, 'index'])->name('donations
 Route::get('/donations/create', [DonationsController::class, 'create'])->name('donations.create');
 Route::get('/donations/{donation}', [DonationsController::class, 'show'])->name('donations.show');
 Route::get('/donations/{donation}/edit', [DonationsController::class, 'edit'])->name('donations.edit');
+
+Route::get('/screening', [ScreeningController::class, 'index'])->name('screening.index');
+Route::get('/screening/create', [ScreeningController::class, 'create'])->name('screening.create');
+Route::get('/screening/{screening}', [ScreeningController::class, 'show'])->name('screening.show');

@@ -2,6 +2,7 @@ import Alpine from 'alpinejs';
 import { donationForm, donationsDirectory } from './modules/donations';
 import { donorForm, donorsDirectory } from './modules/donors';
 import { inventoryManager } from './modules/inventory';
+import { screeningDirectory, screeningForm } from './modules/screening';
 
 const THEME_STORAGE_KEY = 'bdms-theme';
 
@@ -47,6 +48,8 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('donorForm', donorForm);
     Alpine.data('donationsDirectory', donationsDirectory);
     Alpine.data('donationForm', donationForm);
+    Alpine.data('screeningDirectory', screeningDirectory);
+    Alpine.data('screeningForm', screeningForm);
 });
 
 window.Alpine = Alpine;
