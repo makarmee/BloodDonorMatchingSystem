@@ -5,7 +5,7 @@ This specification details all **31 tables** (3 existing Laravel baseline auth/s
 - **Dual-Key Strategy**: Core operational entities pair a compact `BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY` (`id`) with a `UNIQUE` indexed human-readable business code (e.g., `DNR-1041`, `DON-4405`, `REQ-1044`, `CMP-308`, `APT-2041`).
 - **Immutability & Archival Policy**: Clinical, screening, unit-provenance, fulfillment, and ledger tables do **not** use `SoftDeletes` (`ON DELETE RESTRICT`); accounts deactivate via `is_active` / `account_status`.
 - **MySQL 8.4.3 & SQLite `:memory:` Compatibility Rule**:
-  - `STORED` generated guard columns (`active_slot_guard`, `active_unit_guard`, `active_registration_guard`) + `UNIQUE` indexes AND table `CHECK` constraints compile cleanly via Laravel 13 `Schema::create(...)` on both **MySQL 8.4.3** and **SQLite 3.40+**.
+  - `STORED` generated guard columns (`current_record_guard`, `active_slot_guard`, `active_unit_guard`, `active_registration_guard`) + `UNIQUE` indexes AND table `CHECK` constraints compile cleanly via Laravel 13 `Schema::create(...)` on both **MySQL 8.4.3** and **SQLite 3.40+**.
   - In SQLite, `STORED` columns and inline `CHECK` constraints **must** be declared inside `CREATE TABLE` (`Schema::create(...)`), not appended via `ALTER TABLE` (`Schema::table(...)`).
   - Driver-specific concurrency (`->lockForUpdate()`) runs natively under MySQL 8.4.3 row locking and executes safely without errors inside SQLite `:memory:` transactions.
 
@@ -107,15 +107,17 @@ This specification details all **31 tables** (3 existing Laravel baseline auth/s
 | `address` | `TEXT` | YES | `NULL` | — | Residential address |
 | `emergency_contact` | `VARCHAR(150)` | YES | `NULL` | — | Emergency contact details |
 | `availability_status` | `ENUM('Available','Temporarily Unavailable','Inactive')` | NO | `'Available'` | — | Outreach availability |
-| `eligibility_status` | `ENUM('Eligible','Not Eligible','Pending Review','Unknown')` | NO | `'Pending Review'` | `INDEX (eligibility_status)` | Synchronized with current eligibility record |
+| `eligibility_status` | `ENUM('Eligible','Not Eligible','Pending Review','Unknown')` | NO | `'Pending Review'` | `INDEX (eligibility_status)` | Read-only system-synchronized cache from active `donor_eligibility_records` (`is_current = 1`); never edited directly |
 | `account_status` | `ENUM('Active','Inactive')` | NO | `'Active'` | `INDEX (account_status)` | Administrative status |
 | `last_donation_date` | `DATE` | YES | `NULL` | — | Latest `Completed` donation date |
-| `next_eligible_date` | `DATE` | YES | `NULL` | — | Medical deferral lift date |
+| `next_eligible_date` | `DATE` | YES | `NULL` | — | Read-only synchronized projection from active `donor_eligibility_records` row |
 | `total_completed_donations` | `INT UNSIGNED` | NO | `0` | `CHECK (total_completed_donations >= 0)` | Lifetime completed count |
-| `profile_completed` | `TINYINT(1)` | NO | `0` | — | Must equal `1` before completing a real donation |
+| `profile_completed` | `TINYINT(1)` | NO | `0` | — | `1` iff all 8 required profile fields are complete; backend-required before appointment booking or completed donation |
 | `registered_at` | `DATE` | NO | — | `INDEX (registered_at)` | `"New Donors This Month"` reporting |
 | `created_at` | `TIMESTAMP` | YES | `NULL` | — | — |
 | `updated_at` | `TIMESTAMP` | YES | `NULL` | — | — |
+
+> **Required Fields for `profile_completed = 1`**: `full_name`, `email`, `phone`, `gender`, `date_of_birth`, `blood_group`, `address`, and `emergency_contact`. Incomplete accounts (`profile_completed = 0`) can still view Donor Portal pages, while backend validation blocks appointment booking until `profile_completed = 1`. Physical donation additionally requires verified `'Eligible'` status.
 
 ### 2.2 `donor_medical_profiles`
 
@@ -143,9 +145,12 @@ This specification details all **31 tables** (3 existing Laravel baseline auth/s
 | `reviewed_at` | `DATE` | YES | `NULL` | — | Review date |
 | `next_eligible_date` | `DATE` | YES | `NULL` | — | Deferral lift date |
 | `reviewed_by_user_id` | `BIGINT UNSIGNED` | YES | `NULL` | `FK → users(id) ON DELETE SET NULL` | Authorizing medical officer |
-| `is_current` | `TINYINT(1)` | NO | `1` | — | Active status indicator |
+| `is_current` | `TINYINT(1)` | NO | `1` | — | Marks authoritative active record |
+| `current_record_guard` | `TINYINT(1)` | YES | `GENERATED ALWAYS AS (CASE WHEN is_current = 1 THEN 1 ELSE NULL END) STORED` | `UNIQUE (donor_id, current_record_guard)` | Enforces at most one active (`is_current = 1`) record per donor while retaining history |
 | `created_at` | `TIMESTAMP` | YES | `NULL` | — | — |
 | `updated_at` | `TIMESTAMP` | YES | `NULL` | — | — |
+
+> **Authoritative Eligibility Rule**: `donor_eligibility_records` (`is_current = 1`) is the single source of truth. `donors.eligibility_status` and `donors.next_eligible_date` are read-only projections synchronized atomically inside the same `DB::transaction()` whenever a new current eligibility record is inserted.
 
 ---
 
@@ -184,11 +189,13 @@ This specification details all **31 tables** (3 existing Laravel baseline auth/s
 | `id` | `BIGINT UNSIGNED` | NO | `AUTO_INCREMENT` | `PRIMARY KEY` | Configurable requirement PK |
 | `blood_component_id` | `BIGINT UNSIGNED` | NO | — | `FK → blood_components(id) ON DELETE RESTRICT`, `UNIQUE (blood_component_id, test_type_id)` | Target blood component |
 | `test_type_id` | `BIGINT UNSIGNED` | NO | — | `FK → screening_test_types(id) ON DELETE RESTRICT`, `INDEX (test_type_id)` | Required screening assay |
-| `is_required` | `TINYINT(1)` | NO | `1` | — | Controls release gate without code hardcoding |
+| `is_required` | `TINYINT(1)` | NO | `1` | — | Mandatory before unit release (all 5 baseline tests seeded `1` across all components) |
 | `is_active` | `TINYINT(1)` | NO | `1` | — | Active rule flag |
 | `notes` | `VARCHAR(255)` | YES | `NULL` | — | Protocol note |
 | `created_at` | `TIMESTAMP` | YES | `NULL` | — | — |
 | `updated_at` | `TIMESTAMP` | YES | `NULL` | — | — |
+
+> **Baseline Five-Panel Seeding & Release Gate**: Initial seeders populate `component_screening_requirements` with `is_required = 1, is_active = 1` for all **5 existing BDMS screening tests** (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) across every blood component. All five tests must record `'Passed'` (with zero `'Pending'`/`'Failed'` records) and explicit officer approval (`approved_by_user_id` + `released_to_inventory_at`) before unit release, while keeping the table extensible for future medically approved component-specific policies.
 
 ### 3.4 `donations`
 

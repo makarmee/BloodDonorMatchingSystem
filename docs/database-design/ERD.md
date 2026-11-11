@@ -181,6 +181,7 @@ erDiagram
         date next_eligible_date
         bigint reviewed_by_user_id FK
         boolean is_current
+        tinyint current_record_guard
     }
 
     users ||--o{ role_user : "has"
@@ -526,11 +527,11 @@ erDiagram
 | `users` → `password_reset_tokens` / `sessions` | 1:N | `password_reset_tokens.email` (PK) / `sessions.user_id` | Optional → Optional | Application / Session GC | — | Existing Laravel 13 auth & session tables. |
 | `users` → `donors` | 1:0..1 | `donors.user_id` (`UNIQUE`) | Optional → Optional | `SET NULL` | `CASCADE` | Walk-in donors may lack logins; unlinking a login keeps clinical donor history intact. |
 | `donors` → `donor_medical_profiles` | 1:0..1 | `donor_medical_profiles.donor_id` (`UNIQUE`) | Mandatory → Optional | `RESTRICT` | `CASCADE` | Isolates confidential clinical notes from public/portal queries. |
-| `donors` → `donor_eligibility_records` | 1:N | `donor_eligibility_records.donor_id` | Mandatory → Mandatory | `RESTRICT` | `CASCADE` | Auditable clinical clearance & deferral log. |
+| `donors` → `donor_eligibility_records` | 1:N | `donor_eligibility_records.donor_id` | Mandatory → Mandatory | `RESTRICT` | `CASCADE` | Authoritative eligibility source of truth (`UNIQUE (donor_id, current_record_guard)` enforces one active row; `donors.eligibility_status` is a read-only synced cache). |
 | `donors` → `donations` | 1:N | `donations.donor_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | Preserves immutable donation provenance; donors deactivate via `account_status`. |
 | `donor_appointments` → `donations` | 1:0..1 | `donations.appointment_id` (`UNIQUE`) | Optional → Optional | `SET NULL` | `CASCADE` | Connects completed visits (e.g., `APT-2012` → `DON-4310`); walk-ins leave `NULL`. |
 | `donation_camps` / `donation_centers` → `donations` | 1:N | `donations.camp_id`, `donations.center_id` | Optional → Optional | `RESTRICT` | `CASCADE` | Traces collection facilities without blocking ad-hoc legacy location labels. |
-| `blood_components` → `component_screening_requirements` ← `screening_test_types` | M:N | `blood_component_id`, `test_type_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | Makes required screening panels configurable per blood component without code hardcoding. |
+| `blood_components` → `component_screening_requirements` ← `screening_test_types` | M:N | `blood_component_id`, `test_type_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | Seeded mandatory for all 5 current assays (`HIV`, `HBV`, `HCV`, `Syphilis`, `Compatibility`) across all components; extensible for future policies. |
 | `donations` → `screening_records` | 1:N | `screening_records.donation_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | One donation carries multiple assay panels (`HIV`, `HBV`, `HCV`, `Syphilis`, `Compatibility`). |
 | `screening_test_types` → `screening_records` | 1:N | `screening_records.test_type_id` | Mandatory → Mandatory | `RESTRICT` | `CASCADE` | Controlled panel taxonomy. |
 | `donations` → `blood_units` | 1:N | `blood_units.donation_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | Supports both 1-donation-to-1-unit and future multi-component fractionation (`parent_unit_id`). |
@@ -548,6 +549,6 @@ erDiagram
 | `request_fulfillments` → `inventory_allocations` | 1:N | `inventory_allocations.fulfillment_id` | Optional → Optional | `RESTRICT` | `CASCADE` | Connects physical courier batch to specific dispatched `blood_units`. |
 | `donation_camps` → `camp_registrations` ← `donors` | 1:N / 1:N | `camp_id`, `donor_id` | Mandatory → Optional | `RESTRICT` | `CASCADE` | Guarded by `UNIQUE (camp_id, donor_id, active_registration_guard)` so `'Cancelled'` rows stay archived while re-registration works. |
 | `donation_camps` → `camp_status_histories` | 1:N | `camp_status_histories.camp_id` | Mandatory → Mandatory | `RESTRICT` | `CASCADE` | Camp status & roster audit events. |
-| `donors` / `donation_centers` / `donation_camps` → `donor_appointments` | 1:N | `donor_id`, `donation_center_id`, `donation_camp_id` | Mandatory/Optional → Optional | `RESTRICT` | `CASCADE` | Guarded by XOR location check + `UNIQUE (donor_id, appointment_date, slot_time, active_slot_guard)`. |
+| `donors` / `donation_centers` / `donation_camps` → `donor_appointments` | 1:N | `donor_id`, `donation_center_id`, `donation_camp_id` | Mandatory/Optional → Optional | `RESTRICT` | `CASCADE` | Booking requires `donors.profile_completed = 1`; guarded by XOR location check + `UNIQUE (donor_id, appointment_date, slot_time, active_slot_guard)`. |
 | `donor_appointments` → `camp_registrations` | 1:0..1 | `camp_registrations.appointment_id` (`UNIQUE`) | Optional → Optional | `SET NULL` | `CASCADE` | Syncs Donor Portal camp bookings (`APT-2041` ↔ `REG-801`). |
 | `donor_appointments` → `appointment_status_histories` | 1:N | `appointment_status_histories.appointment_id` | Mandatory → Mandatory | `RESTRICT` | `CASCADE` | Booking status audit trail. |

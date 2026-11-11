@@ -32,17 +32,22 @@ This document records the architectural rationale, final resolutions to all **8 
 - **Why Chosen**: Supports walk-in donors without portal credentials (`user_id = NULL`), ensures Public Portal pages never touch PHI tables, keeps confidential notes hidden from standard Donor Portal views, and protects clinical records behind `donors.view_medical`.
 
 ### Decision 6: Engine-Enforced Generated Partial-Unique Guards (`STORED`)
-- **Choice**: Prevent concurrent double-booked active donor appointments (`active_slot_guard`), duplicate active camp registrations (`active_registration_guard`), and double-allocated blood units (`active_unit_guard`) using `GENERATED ALWAYS AS (...) STORED` columns combined with `UNIQUE` indexes.
+- **Choice**: Prevent concurrent double-booked active donor appointments (`active_slot_guard`), duplicate active camp registrations (`active_registration_guard`), duplicate active donor eligibility rows (`current_record_guard`), and double-allocated blood units (`active_unit_guard`) using `GENERATED ALWAYS AS (...) STORED` columns combined with `UNIQUE` indexes.
 - **Alternative Considered**: Application-only `EXISTS` checks or complex MySQL triggers.
-- **Why Chosen**: Eliminates TOCTOU race conditions at the storage engine level while letting `'Cancelled'` or `'Released'` rows evaluate to `NULL` (so historical rows remain auditable without blocking re-registration, re-booking, or re-allocation).
+- **Why Chosen**: Eliminates TOCTOU race conditions at the storage engine level while letting `'Cancelled'`, `'Released'`, or `is_current = 0` historical rows evaluate to `NULL` (preserving full history without blocking re-registration, re-booking, re-allocation, or new eligibility evaluations).
 
 ### Decision 7: Status-Based Archival & `ON DELETE RESTRICT` Over Global `SoftDeletes`
 - **Choice**: Disallow hard deletion on regulated clinical/operational records (`ON DELETE RESTRICT`) and avoid `deleted_at` on `donations`, `screening_records`, `blood_units`, `inventory_transactions`, `request_fulfillments`, and `*_status_histories`, using lifecycle statuses (`account_status = 'Inactive'`, `'Cancelled'`, `is_active = 0`) instead.
 - **Why Chosen**: Preserves complete regulatory audit trails and avoids `UNIQUE` index collisions on `email` or business codes (`*_code`) after soft-deletion.
 
 ### Decision 8: Component-Configurable Screening & Compatibility Matrices in Database Tables
-- **Choice**: Parameterize per-component release screening rules (`component_screening_requirements`) and component-specific ABO/Rh compatibility substitution rules (`blood_compatibility_rules`) in database tables rather than frontend/service hardcoding.
+- **Choice**: Parameterize per-component release screening rules (`component_screening_requirements`, seeded immediately with all 5 mandatory baseline tests across all components) and component-specific ABO/Rh compatibility substitution rules (`blood_compatibility_rules`) in database tables rather than frontend/service hardcoding.
 - **Why Chosen**: Blood components invert compatibility (e.g., `O-` vs `AB` plasma) and require component-appropriate assay gating. Modeling both matrices declaratively lets medical directors govern policies safely with full auditability.
+
+### Decision 9: Single Authoritative Source of Truth for Donor Eligibility (`donor_eligibility_records`)
+- **Choice**: Designate `donor_eligibility_records` (`is_current = 1`, guarded by `current_record_guard` + `UNIQUE (donor_id, current_record_guard)`) as the single authoritative source of truth for donor eligibility, while maintaining `donors.eligibility_status` and `donors.next_eligible_date` strictly as read-only system-synchronized projections updated exclusively by `DonorEligibilityService` inside `DB::transaction()`.
+- **Alternative Considered**: Allowing direct edits to `donors.eligibility_status` alongside separate inserts into `donor_eligibility_records`, or joining `donor_eligibility_records` dynamically on every directory filter query.
+- **Why Chosen**: Maintaining two independently mutable copies of current eligibility causes silent drift in safety-critical donation clearance. Locking `donors FOR UPDATE`, retiring `is_current = 0`, inserting the authoritative `is_current = 1` row, and updating the read-only cached columns in one atomic transaction eliminates drift while preserving `O(1)` directory indexing.
 
 ---
 
@@ -80,14 +85,14 @@ All **8 domain ambiguities** identified in the initial design review have been e
 - **Schema / Doc Impact**: Removed `UNIQUE (camp_id, donor_id)` from `camp_registrations`; added `active_registration_guard` (`STORED`), `UNIQUE (camp_id, donor_id, active_registration_guard)`, and `cancelled_at`.
 
 ### Question 4: Mandatory Screening Panel Gate Before Unit Release
-- **Existing Behavior**: `ScreeningController` displays single or multi-panel screening rows per donation (`DON-4403` has 1 `Hepatitis C` row; `DON-4405` has `HIV` + `Hepatitis B`). The initial schema put a single global boolean `is_mandatory_for_release` on `screening_test_types`.
+- **Existing Behavior**: `ScreeningController` currently uses **five standard laboratory tests** (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) and renders sample screening rows per donation (`DON-4403`, `DON-4405`). The initial schema placed a single global boolean on `screening_test_types`.
 - **Alternatives Considered**:
-  1. Hardcode required test IDs in PHP services.
-  2. Keep global `screening_test_types.is_mandatory_for_release`.
-  3. Model mandatory tests per component via a configurable join table.
-- **Selected Decision**: **Option 3 — Replace `screening_test_types.is_mandatory_for_release` with `component_screening_requirements` (`(blood_component_id, test_type_id) UNIQUE`, `is_required`, `is_active`).**
-- **Why Chosen**: Different blood products can carry distinct release assay requirements without modifying application code. Releasing a donation to inventory requires `collection_status = 'Completed'`, zero `'Failed'`/`'Pending'` `screening_records`, `'Passed'` results for every active `is_required = 1` requirement for `donations.blood_component_id`, and explicit sign-off (`approved_by_user_id` + `released_to_inventory_at`).
-- **Schema / Doc Impact**: Added table `component_screening_requirements`; removed `is_mandatory_for_release` from `screening_test_types`.
+  1. Hardcode the 5 test names in PHP services.
+  2. Keep a global boolean on `screening_test_types`.
+  3. Preserve `component_screening_requirements` and seed all 5 standard tests as active and required across every blood component.
+- **Selected Decision**: **Option 3 — Preserve `component_screening_requirements` and seed all five existing BDMS tests (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) as `is_required = 1, is_active = 1` across every blood component for the baseline workflow.**
+- **Why Chosen**: Enforces the approved rule that **all five mandatory screening tests must pass before any unit can exit `'Quarantined'` inventory** immediately out of the box—without leaving the initial 5-test rule dependent on future clinical approval—while keeping the table extensible for future medically approved component-specific policies. Releasing a unit requires `'Passed'` on every required test, zero `'Pending'` or `'Failed'` records on the donation, and explicit officer approval (`approved_by_user_id` + `released_to_inventory_at`).
+- **Schema / Doc Impact**: `component_screening_requirements` + baseline 5-test seeder specification documented in `SCHEMA.md`, `DATA-DICTIONARY.md`, and `BUSINESS-RULES.md`.
 
 ### Question 5: Unit Yield Mapping (`quantity_ml` vs. Multi-Component Splitting)
 - **Existing Behavior**: `donations` collects volume (`150`–`800` ml), whereas inventory and requests track integer `units`.
@@ -98,14 +103,15 @@ All **8 domain ambiguities** identified in the initial design review have been e
 - **Why Chosen**: Current UI workflows (`DonationsController`, `ScreeningController`) treat one donation as producing one primary unit (`parent_unit_id = NULL`). Allowing non-unique `donation_id` plus nullable `parent_unit_id -> blood_units(id)` gives immediate compatibility today while enabling `Whole Blood -> PRBC + Plasma + Platelets` splitting tomorrow with zero schema breaking changes.
 - **Schema / Doc Impact**: Added `parent_unit_id` (`FK -> blood_units(id) ON DELETE SET NULL`, `INDEX`) on `blood_units`.
 
-### Question 6: Self-Registered Donor Profile Completion & Clinical Eligibility Gate
-- **Existing Behavior**: `auth/register.blade.php` requires only `name`, `email`, and `password` for donors (optional `blood_group` and `date_of_birth`), whereas staff `donors/_form.blade.php` requires `phone`, `gender`, `date_of_birth`, `blood_group`, and `address`. Meanwhile `donor-portal.js` allows scheduling with an eligibility notice.
+### Question 6: Self-Registered Donor Profile Completion & Appointment Booking Gate
+- **Existing Behavior**: `auth/register.blade.php` collects only `name`, `email`, and `password` (with `blood_group` and `date_of_birth` optional), whereas staff `donors/_form.blade.php` and `donors.js` require all **8 core profile fields**: `full_name`, `email`, `phone`, `gender`, `date_of_birth`, `blood_group`, `address`, and `emergency_contact`.
 - **Alternatives Considered**:
-  1. Require full clinical demographics at `/register`, adding high signup friction.
-  2. Allow donors with missing demographics or `'Pending Review'` eligibility to complete physical blood donations.
-- **Selected Decision**: **Option 3 (Split Onboarding vs Clinical Gate) — `/register` creates `donors` with `profile_completed = 0` and `eligibility_status = 'Pending Review'` (nullable demographics).** Donors may access the Donor Portal and book appointments with advisory prompts, while transitioning a `donations` row to `collection_status = 'Completed'` is strictly blocked until demographics are completed (`profile_completed = 1`) and medical clearance records `'Eligible'`.
-- **Why Chosen**: Matches both `auth/register.blade.php` and `donor-portal.js` cleanly while guaranteeing clinical safety before any blood draw occurs.
-- **Schema / Doc Impact**: Retained nullable onboarding fields + `profile_completed` (`DEFAULT 0`) + `'Pending Review'` default on `donors`; added explicit completion gate to `BUSINESS-RULES.md`.
+  1. Block self-registration unless all 8 demographic/emergency fields are filled upfront at `/register`.
+  2. Allow `profile_completed = 0` accounts to book appointments with only frontend UI warnings.
+  3. Keep lightweight `/register` (`profile_completed = 0`) and Donor Portal browsing accessible, but strictly block appointment creation via backend validation until `profile_completed = 1` (and require verified `'Eligible'` status before physical donation).
+- **Selected Decision**: **Option 3 — Donor Portal viewing stays accessible when `profile_completed = 0`, while backend validation strictly requires `profile_completed = 1` (all 8 required fields populated) before booking any `donor_appointments` record; physical donation additionally requires verified `'Eligible'` clearance.**
+- **Why Chosen**: Preserves low-friction onboarding on `/register` while enforcing the approved rule that a donor must complete all required profile fields (`full_name`, `email`, `phone`, `gender`, `date_of_birth`, `blood_group`, `address`, `emergency_contact`) before booking an appointment. Backend `FormRequest` and transactional service locks guarantee incomplete profiles cannot bypass frontend warnings.
+- **Schema / Doc Impact**: Retained nullable onboarding fields + `profile_completed` (`DEFAULT 0`) on `donors`; explicitly documented all 8 required fields and backend booking block across `SCHEMA.md`, `DATA-DICTIONARY.md`, `BUSINESS-RULES.md`, and `ERD.md`.
 
 ### Question 7: Self-Registered Hospital Verification Gate
 - **Existing Behavior**: `auth/register.blade.php` allows public signup with `role = 'hospital'` (`organization_name`, optional `facility_code`).
@@ -137,7 +143,8 @@ All **8 domain ambiguities** identified in the initial design review have been e
 - **RBAC Enforcement**: Administrative actions (`hospitals.verify`, `requests.override_compatibility`, `screening.release_inventory`, `inventory.adjust`) map to explicit permission slugs rather than coarse role checks alone.
 
 ### 3.2 Concurrency & Integrity Verification
-- **No Unscreened Stock Release**: `blood_units` originate in `'Quarantined'` state and transition to `'Available'` only inside an atomic `DB::transaction()` verifying `collection_status = 'Completed'`, zero `'Failed'`/`'Pending'` screens, all active required panels in `component_screening_requirements` `'Passed'`, and explicit approval (`approved_by_user_id`).
+- **No Unscreened Stock Release**: `blood_units` originate in `'Quarantined'` state and transition to `'Available'` only inside an atomic `DB::transaction()` verifying `collection_status = 'Completed'`, zero `'Failed'`/`'Pending'` screens, `'Passed'` results for all required panels in `component_screening_requirements` (seeded initially with all 5 active assays across every component), and explicit officer approval (`approved_by_user_id` + `released_to_inventory_at`).
+- **Single-Source Eligibility Synchronization**: `donor_eligibility_records.current_record_guard` enforces a unique active (`is_current = 1`) record per donor; `DonorEligibilityService` atomically locks `donors`, demotes old records (`is_current = 0`), inserts the authoritative record, and synchronizes read-only `donors.eligibility_status` / `next_eligible_date`.
 - **Deadlock-Free Locking Order**: Fulfillment transactions consistently acquire row locks in deterministic order: `blood_requests` -> `inventory_stocks` -> FIFO `blood_units` / `inventory_allocations`.
 - **Table Check Constraints Enforced at Engine Level**:
   - `blood_requests`: `requested_units >= 1`, `fulfilled_units >= 0`, `fulfilled_units <= requested_units`, `fulfilled_units + reserved_units <= requested_units`.
@@ -163,8 +170,8 @@ While the relational architecture is complete and implementation-ready, the foll
 
 1. **Per-Component Clinical Compatibility Matrix (`blood_compatibility_rules`)**:
    - Medical Director / Transfusion Committee must formally approve the exact donor-to-recipient pairs allowed as `'Compatible Substitution'` vs `'Emergency Only'` (requiring medical officer override) separately for `Whole Blood`, `Packed RBC`, `Platelets`, `Plasma`, and `Double Red Cells` before seeding production rules.
-2. **Per-Component Mandatory Screening Assay Panels (`component_screening_requirements`)**:
-   - Laboratory Director must sign off on whether all 5 assays (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) are required prior to release for every component, or if specific component types use subsets or confirmatory protocols.
+2. **Future Expansions Beyond the Approved Five-Panel Screening Baseline (`component_screening_requirements`)**:
+   - The baseline requirement of passing all **5 existing BDMS assays (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`)** across all components is **already finalized and seeded as mandatory out of the box**. Future Lab Director sign-off is required only when introducing additional region-specific infectious assays or specialized component-level panel expansions later.
 3. **Component Fractionation Yield & Volume Losses (`blood_units` with `parent_unit_id`)**:
    - Clinical lab SOP must define acceptable derivative bag volume ranges (`volume_ml` sums vs centrifuge separation loss) when splitting a `Whole Blood` draw into multiple component bags.
 4. **UI Component Adoption Timing & 8-Group Threshold Semantics**:
