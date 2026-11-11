@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BloodRequestsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DonationsController;
 use App\Http\Controllers\DonorsController;
@@ -30,3 +31,8 @@ Route::get('/donations/{donation}/edit', [DonationsController::class, 'edit'])->
 Route::get('/screening', [ScreeningController::class, 'index'])->name('screening.index');
 Route::get('/screening/create', [ScreeningController::class, 'create'])->name('screening.create');
 Route::get('/screening/{screening}', [ScreeningController::class, 'show'])->name('screening.show');
+
+Route::get('/requests', [BloodRequestsController::class, 'index'])->name('requests.index');
+Route::get('/requests/create', [BloodRequestsController::class, 'create'])->name('requests.create');
+Route::get('/requests/{request}', [BloodRequestsController::class, 'show'])->name('requests.show');
+Route::get('/requests/{request}/edit', [BloodRequestsController::class, 'edit'])->name('requests.edit');
