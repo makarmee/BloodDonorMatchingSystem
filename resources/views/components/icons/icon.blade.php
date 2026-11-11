@@ -244,6 +244,30 @@
         </svg>
         @break
 
+    @case('chevron-left')
+        <svg {{ $attributes->merge(['class' => 'size-4 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m15 6-6 6 6 6" />
+        </svg>
+        @break
+
+    @case('adjustments')
+        <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h9" />
+            <path d="M17 7h3" />
+            <circle cx="15" cy="7" r="2" />
+            <path d="M4 17h3" />
+            <path d="M11 17h9" />
+            <circle cx="9" cy="17" r="2" />
+            <path d="M4 12h16" />
+        </svg>
+        @break
+
+    @case('funnel')
+        <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3.75 5.25h16.5l-6.25 7.5v5l-4 2v-7l-6.25-7.5Z" />
+        </svg>
+        @break
+
     @default
         <svg {{ $attributes->merge(['class' => 'size-5 shrink-0']) }} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
             <circle cx="12" cy="12" r="8" />

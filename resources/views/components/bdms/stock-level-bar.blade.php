@@ -29,6 +29,7 @@
     $statusLabel = match ($resolvedStatus) {
         'critical' => 'Critical',
         'low' => 'Low Stock',
+        'normal' => 'Normal',
         default => 'Adequate',
     };
 @endphp

@@ -5,6 +5,7 @@
     'trendTone' => 'neutral',
     'icon' => 'droplet',
     'accent' => 'crimson',
+    'valueBind' => null,
 ])
 
 @php
@@ -28,7 +29,10 @@
             <p class="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {{ $label }}
             </p>
-            <p class="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
+            <p
+                @if ($valueBind) x-text="{{ $valueBind }}" @endif
+                class="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white"
+            >
                 {{ $value }}
             </p>
         </div>

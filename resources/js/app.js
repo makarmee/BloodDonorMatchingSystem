@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { inventoryManager } from './modules/inventory';
 
 const THEME_STORAGE_KEY = 'bdms-theme';
 
@@ -38,6 +39,8 @@ document.addEventListener('alpine:init', () => {
             applyThemeClass(this.dark);
         },
     });
+
+    Alpine.data('inventoryManager', inventoryManager);
 });
 
 window.Alpine = Alpine;

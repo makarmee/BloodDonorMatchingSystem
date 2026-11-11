@@ -25,7 +25,7 @@
                     ['label' => 'Requester Overview', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'params' => ['role' => 'hospital'], 'active' => true],
                     ['label' => 'Request Blood Units', 'icon' => 'plus', 'route' => 'requests.create', 'active' => false],
                     ['label' => 'Track Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index', 'active' => false],
-                    ['label' => 'Regional Stock', 'icon' => 'droplet', 'route' => 'inventory.index', 'active' => false],
+                    ['label' => 'Regional Stock', 'icon' => 'droplet', 'route' => 'inventory.index', 'params' => ['role' => 'hospital'], 'active' => false],
                 ],
             ],
         ],
@@ -94,7 +94,7 @@
                         @php
                             $routeExists = Route::has($item['route']);
                             $href = $routeExists ? route($item['route'], $item['params'] ?? []) : '#';
-                            $isActive = $item['active'] ?? false;
+                            $isActive = $routeExists && request()->routeIs($item['route']);
                         @endphp
 
                         <a
