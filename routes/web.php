@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\BloodRequestsController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DonationCampsController;
 use App\Http\Controllers\DonationsController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
@@ -36,3 +37,8 @@ Route::get('/requests', [BloodRequestsController::class, 'index'])->name('reques
 Route::get('/requests/create', [BloodRequestsController::class, 'create'])->name('requests.create');
 Route::get('/requests/{request}', [BloodRequestsController::class, 'show'])->name('requests.show');
 Route::get('/requests/{request}/edit', [BloodRequestsController::class, 'edit'])->name('requests.edit');
+
+Route::get('/camps', [DonationCampsController::class, 'index'])->name('camps.index');
+Route::get('/camps/create', [DonationCampsController::class, 'create'])->name('camps.create');
+Route::get('/camps/{camp}', [DonationCampsController::class, 'show'])->name('camps.show');
+Route::get('/camps/{camp}/edit', [DonationCampsController::class, 'edit'])->name('camps.edit');

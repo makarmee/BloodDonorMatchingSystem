@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { campDetails, campForm, campRegistration, campsDirectory } from './modules/camps';
 import { donationForm, donationsDirectory } from './modules/donations';
 import { donorForm, donorsDirectory } from './modules/donors';
 import { inventoryManager } from './modules/inventory';
@@ -54,6 +55,10 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('requestsDirectory', requestsDirectory);
     Alpine.data('requestForm', requestForm);
     Alpine.data('requestFulfillment', requestFulfillment);
+    Alpine.data('campsDirectory', campsDirectory);
+    Alpine.data('campForm', campForm);
+    Alpine.data('campDetails', campDetails);
+    Alpine.data('campRegistration', campRegistration);
 });
 
 window.Alpine = Alpine;
