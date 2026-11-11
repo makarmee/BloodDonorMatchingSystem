@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DonationsController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\InventoryController;
@@ -19,3 +20,8 @@ Route::get('/donors', [DonorsController::class, 'index'])->name('donors.index');
 Route::get('/donors/create', [DonorsController::class, 'create'])->name('donors.create');
 Route::get('/donors/{donor}', [DonorsController::class, 'show'])->name('donors.show');
 Route::get('/donors/{donor}/edit', [DonorsController::class, 'edit'])->name('donors.edit');
+
+Route::get('/donations', [DonationsController::class, 'index'])->name('donations.index');
+Route::get('/donations/create', [DonationsController::class, 'create'])->name('donations.create');
+Route::get('/donations/{donation}', [DonationsController::class, 'show'])->name('donations.show');
+Route::get('/donations/{donation}/edit', [DonationsController::class, 'edit'])->name('donations.edit');

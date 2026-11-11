@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { donationForm, donationsDirectory } from './modules/donations';
 import { donorForm, donorsDirectory } from './modules/donors';
 import { inventoryManager } from './modules/inventory';
 
@@ -44,6 +45,8 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('inventoryManager', inventoryManager);
     Alpine.data('donorsDirectory', donorsDirectory);
     Alpine.data('donorForm', donorForm);
+    Alpine.data('donationsDirectory', donationsDirectory);
+    Alpine.data('donationForm', donationForm);
 });
 
 window.Alpine = Alpine;
