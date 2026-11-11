@@ -1,92 +1,180 @@
-# BDMS Database Design Decisions, Trade-offs & Open Questions
+# BDMS Database Design Decisions, Resolution of Open Questions & Compatibility Review
 
-This document captures the architectural rationale, alternative approaches considered, security protections, and unresolved domain ambiguities identified by inspecting every BDMS controller, view, route, and JavaScript module.
+This document records the architectural rationale, final resolutions to all **8 outstanding domain questions**, security and concurrency verification, **MySQL 8.4.3** / **SQLite `:memory:`** compatibility engineering notes, and remaining clinical/product sign-offs required before migration implementation.
 
 ---
 
-## 1. Key Architectural Decisions
+## 1. Key Architectural Decisions (Final 31-Table Architecture)
 
 ### Decision 1: Surrogate `BIGINT` Primary Keys + Unique Business Reference Codes
-- **Choice**: Use `BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY` (`id`) on all entities while storing human-readable codes (`donor_code = 'DNR-1041'`, `request_code = 'REQ-1044'`, `camp_code = 'CMP-308'`) as indexed `UNIQUE VARCHAR(32)` columns.
-- **Alternative Considered**: Using string business codes (`DNR-1041`) directly as primary keys across foreign keys, or UUID primary keys.
-- **Why Chosen**: InnoDB clusters rows on the primary key and stores the PK inside every secondary index. Compact 8-byte `BIGINT` keys minimize index bloat, speed joins across `blood_units`, `inventory_allocations`, and `inventory_transactions`, and shield foreign keys from formatting changes while Laravel route model binding (`getRouteKeyName()` -> `'donor_code'`) preserves `/donors/DNR-1041` URLs cleanly.
+- **Choice**: Use `BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY` (`id`) on all operational tables while storing human-readable codes (`donor_code = 'DNR-1041'`, `request_code = 'REQ-1044'`, `camp_code = 'CMP-308'`) as indexed `UNIQUE VARCHAR(32)` columns.
+- **Alternative Considered**: String natural primary keys (`DNR-1041`) or UUID primary keys across foreign keys.
+- **Why Chosen**: InnoDB clusters rows on the PK and duplicates the PK inside every secondary index. Compact 8-byte `BIGINT UNSIGNED` keys minimize index bloat across `blood_units`, `inventory_allocations`, and `inventory_transactions`, shield foreign keys from code-prefix changes, and pair cleanly with Laravel `getRouteKeyName()` route binding (`/donors/DNR-1041`).
 
-### Decision 2: Dual-Layer Inventory Model (`inventory_stocks` + `blood_units` + `inventory_transactions`)
-- **Choice**: Track aggregated stock balances (`inventory_stocks` keyed by `(blood_group, blood_component_id)`), serialized individual blood bags (`blood_units`), and an immutable append-only movement ledger (`inventory_transactions`).
-- **Alternative Considered**: Storing only `available` and `reserved` integer counters per blood group (like the current frontend `InventoryController` preview).
-- **Why Chosen**: A simple quantity table cannot enforce donation-to-bag provenance, prevent unscreened/quarantined units from entering stock, track per-bag expiration dates for 7-day expiry alerts (`DashboardController`), perform FIFO allocation, or trace recalls back to `DON-xxxx`. Meanwhile, keeping `inventory_stocks` alongside `blood_units` provides an `O(1)` read summary for the Public Portal and acts as the single deterministic row lock target (`SELECT ... FOR UPDATE`) to serialize concurrent reservations and dispatches cleanly.
+### Decision 2: Component-Granular Dual-Layer Inventory (`inventory_stocks` + `blood_units` + `inventory_transactions`)
+- **Choice**: Track component-level stock balances (`inventory_stocks` keyed by `(blood_group, blood_component_id)`), serialized bags (`blood_units` with optional self-referential `parent_unit_id`), and an immutable append-only ledger (`inventory_transactions`).
+- **Alternative Considered**: Flat 8-row `blood_group` counter table lacking unit serialization or component separation.
+- **Why Chosen**: Flat counters cannot prevent unscreened quarantine stock from entering circulation, cannot track bag expiration (`7`-day alerts in `DashboardController`), cannot support FIFO bag picking or recalls back to `DON-xxxx`, and cannot track individual components (`Whole Blood`, `Packed RBC`, `Platelets`, `Plasma`, `Double Red Cells`). Storing `(blood_group, blood_component_id)` rows supports both component-level custody and deterministic `SUM(...) GROUP BY blood_group` SQL rollups for 8-group views and the Public Portal.
 
 ### Decision 3: Separating `inventory_allocations` (Holds & Unit Mapping) from `request_fulfillments` (Dispatches)
-- **Choice**: Maintain `inventory_allocations` (bag-level `Reserved` / `Dispatched` / `Released` states) separately from `request_fulfillments` (delivery batches with courier code `#TR-208` and delivery sign-off).
-- **Alternative Considered**: Decrementing inventory immediately on request approval without an intermediate allocation table.
-- **Why Chosen**: Approved orders such as `REQ-1038` (*"B+ units reserved pending courier departure"*) hold stock before physical dispatch, and partially fulfilled orders (`REQ-1043`) need multiple dispatch batches over time. Keeping `inventory_allocations` distinguishes unallocated `available_units`, held `reserved_units`, and physically couriered `Dispatched` units—and cleanly releases holds back to available stock if a request is cancelled (`REQ-1036`).
+- **Choice**: Track unit-level holds (`inventory_allocations`: `'Reserved'`, `'Dispatched'`, `'Released'`, `'Cancelled'`) separately from delivery batches (`request_fulfillments` with courier code `#TR-208`, delivery tracking, and compatibility override audit columns).
+- **Alternative Considered**: Decrementing inventory counters immediately upon request approval without serialized hold rows.
+- **Why Chosen**: Orders in `Approved` status (`REQ-1038`) reserve bags pending courier departure, while `Partially Fulfilled` orders (`REQ-1043`) span multiple dispatches. Explicit allocation rows allow clean release back to `Available` stock when an order is rejected or cancelled (`REQ-1036`).
 
-### Decision 4: Normalizing `hospitals` & `hospital_users` Out of `blood_requests`
-- **Choice**: Extract `hospitals` and `hospital_users` out of flat request rows, while retaining lightweight point-in-time requester snapshots (`contact_person_snapshot`, `contact_phone_snapshot`) on `blood_requests`.
-- **Alternative Considered**: Leaving `hospitalName`, `hospitalAddress`, `contactPerson`, and `email` directly on `blood_requests`.
-- **Why Chosen**: Repeating facility data across requests violates Third Normal Form (3NF) and creates update anomalies when hospital addresses or transfusion lab emails change. Retaining explicit contact snapshot columns on the order ensures historical cold-chain audit logs remain accurate even if a hospital coordinator later changes jobs.
+### Decision 4: Normalizing `hospitals`, `hospital_users` & Facility Verification Gate
+- **Choice**: Extract partner facilities into `hospitals` (with `verification_status`, `verified_by_user_id`, `verified_at`) and login coordinators into `hospital_users`, while preserving point-in-time requester snapshots on `blood_requests`.
+- **Alternative Considered**: Storing hospital names, addresses, and emails redundantly on every `blood_requests` row.
+- **Why Chosen**: Eliminates Third Normal Form (3NF) update anomalies, enforces admin verification before external hospitals place orders, and keeps historical dispatch/cold-chain logs intact if hospital staff later change.
 
-### Decision 5: Separating Sensitive Medical & Auth Data (`users` / `donors` / `donor_medical_profiles` / `donor_eligibility_records`)
-- **Choice**: Split authentication (`users` + RBAC tables), demographic/portal donor data (`donors`), confidential medical notes & biometrics (`donor_medical_profiles`), and audited eligibility decisions (`donor_eligibility_records`).
-- **Alternative Considered**: Storing `medicalNotes`, login credentials, and portal fields in one monolithic `donors` table.
-- **Why Chosen**: Supports BDMS privacy boundaries strictly. Staff walk-in donors (`donors.user_id = NULL`) can donate without portal login credentials; public pages never touch clinical tables; Donor Portal queries mask contacts and omit clinician `medical_notes`; and only users holding `donors.view_medical` permission query `donor_medical_profiles`.
+### Decision 5: Separating Sensitive Clinical & Auth Data (`users` / `donors` / `donor_medical_profiles` / `donor_eligibility_records`)
+- **Choice**: Separate login auth (`users` + RBAC tables), demographic/portal profiles (`donors`), sensitive clinical measurements & clinician notes (`donor_medical_profiles`), and longitudinal clearance outcomes (`donor_eligibility_records`).
+- **Alternative Considered**: Storing biometrics, deferral notes, and login credentials on one monolithic `donors` table.
+- **Why Chosen**: Supports walk-in donors without portal credentials (`user_id = NULL`), ensures Public Portal pages never touch PHI tables, keeps confidential notes hidden from standard Donor Portal views, and protects clinical records behind `donors.view_medical`.
 
-### Decision 6: Generated-Column Partial Unique Guards in MySQL 8
-- **Choice**: Enforce zero double-booked active donor appointments (`active_slot_guard` on `donor_appointments`) and zero double-allocated blood bags (`active_unit_guard` on `inventory_allocations`) using MySQL 8 `GENERATED ALWAYS AS (...) STORED` columns combined with `UNIQUE` indexes.
-- **Alternative Considered**: Relying purely on application-level `EXISTS` queries or complex MySQL triggers.
-- **Why Chosen**: Application-level checks alone suffer from TOCTOU race conditions under concurrent requests, whereas triggers complicate Laravel testing and migrations. Generated columns leverage MySQL's `UNIQUE` index semantics (`NULL` values allowed multiple times) natively, allowing cancelled slots or released units to be re-allocated cleanly while mathematically blocking active conflicts at the engine level.
+### Decision 6: Engine-Enforced Generated Partial-Unique Guards (`STORED`)
+- **Choice**: Prevent concurrent double-booked active donor appointments (`active_slot_guard`), duplicate active camp registrations (`active_registration_guard`), and double-allocated blood units (`active_unit_guard`) using `GENERATED ALWAYS AS (...) STORED` columns combined with `UNIQUE` indexes.
+- **Alternative Considered**: Application-only `EXISTS` checks or complex MySQL triggers.
+- **Why Chosen**: Eliminates TOCTOU race conditions at the storage engine level while letting `'Cancelled'` or `'Released'` rows evaluate to `NULL` (so historical rows remain auditable without blocking re-registration, re-booking, or re-allocation).
 
-### Decision 7: Status-Based Archival & `ON DELETE RESTRICT` Over Unchecked `SoftDeletes`
-- **Choice**: Prohibit physical deletion on operational history (`ON DELETE RESTRICT`) and avoid `deleted_at` on regulated clinical/audit tables (`donations`, `screening_records`, `blood_units`, `inventory_transactions`, `request_fulfillments`, `*_status_histories`), using explicit lifecycle states (`account_status = 'Inactive'`, `is_active = 0`, `'Cancelled'`) instead.
-- **Alternative Considered**: Adding Laravel `SoftDeletes` (`deleted_at`) globally across all tables.
-- **Why Chosen**: Clinical blood-bank records are legally auditable and referenced by downstream provenance chains; soft-deleting a `donations` or `donors` row breaks MySQL `UNIQUE` constraints on `email`/`donor_code` on re-registration and risks orphaned inventory trace queries. Deactivation flags preserve referential integrity cleanly.
+### Decision 7: Status-Based Archival & `ON DELETE RESTRICT` Over Global `SoftDeletes`
+- **Choice**: Disallow hard deletion on regulated clinical/operational records (`ON DELETE RESTRICT`) and avoid `deleted_at` on `donations`, `screening_records`, `blood_units`, `inventory_transactions`, `request_fulfillments`, and `*_status_histories`, using lifecycle statuses (`account_status = 'Inactive'`, `'Cancelled'`, `is_active = 0`) instead.
+- **Why Chosen**: Preserves complete regulatory audit trails and avoids `UNIQUE` index collisions on `email` or business codes (`*_code`) after soft-deletion.
 
-### Decision 8: Optional Profile Fields on `donors` Until Intake Completion
-- **Choice**: Make `donors.phone`, `gender`, `date_of_birth`, `blood_group`, `address`, and `emergency_contact` nullable at the database level paired with `profile_completed` (`TINYINT(1)`), while staff `FormRequest` validation strictly enforces them for clinical intake.
-- **Alternative Considered**: Enforcing `NOT NULL` on all `donors` columns immediately at `auth/register`.
-- **Why Chosen**: Inspection of `auth/register.blade.php` revealed that public self-registration requires only `name`, `email`, and `password` (leaving `blood_group` and `date_of_birth` optional, and omitting `phone`, `gender`, and `address`), whereas staff `donors/_form.blade.php` requires all contact and demographic fields. This design supports both onboarding paths cleanly without failing DB inserts.
+### Decision 8: Component-Configurable Screening & Compatibility Matrices in Database Tables
+- **Choice**: Parameterize per-component release screening rules (`component_screening_requirements`) and component-specific ABO/Rh compatibility substitution rules (`blood_compatibility_rules`) in database tables rather than frontend/service hardcoding.
+- **Why Chosen**: Blood components invert compatibility (e.g., `O-` vs `AB` plasma) and require component-appropriate assay gating. Modeling both matrices declaratively lets medical directors govern policies safely with full auditability.
 
 ---
 
-## 2. Schema Review & Validation Summary
+## 2. Final Resolution of the Eight Outstanding Questions
 
-- **Normalization (3NF/BCNF)**: Facility attributes (`hospitals`, `donation_centers`), lookup taxonomies (`blood_components`, `screening_test_types`, `roles`, `permissions`), and longitudinal event histories (`*_status_histories`, `inventory_transactions`, `donor_eligibility_records`) are cleanly separated with zero repeating groups or transitive dependencies.
-- **Foreign Key Consistency**: All surrogate PKs (`BIGINT UNSIGNED`) match child FK signedness (`UNSIGNED`) across every table for MySQL 8 InnoDB compatibility. `SET NULL` is used strictly on optional user/actor/appointment references; `RESTRICT` protects financial/clinical parent records.
-- **Coverage of Existing Frontend Workflows**:
-  - Inventory adjustments, status thresholds, and history logs -> `inventory_stocks`, `blood_units`, `inventory_transactions`.
-  - Donor registration, clinical review, medical notes, and portal masked summaries -> `donors`, `donor_medical_profiles`, `donor_eligibility_records`.
-  - Multi-panel lab screening per donation -> `screening_test_types`, `screening_records`.
-  - Partial/full request fulfillment & rejection/cancellation -> `hospitals`, `blood_requests`, `inventory_allocations`, `request_fulfillments`, `blood_request_status_histories`.
-  - Camps, walk-ins, attendance updates, donor appointments -> `donation_centers`, `donation_camps`, `camp_registrations`, `camp_status_histories`, `donor_appointments`, `appointment_status_histories`.
-  - Public Portal filtered projections -> `inventory_stocks`, `donation_camps` (strictly `Upcoming`/`Ongoing`, sensitive columns excluded).
+All **8 domain ambiguities** identified in the initial design review have been evaluated against existing controllers, views, and JS modules and are resolved as follows:
+
+### Question 1: Component-Level Inventory Granularity vs. 8-Group Totals
+- **Existing Behavior**: `InventoryController`, `PublicPortalController`, and `BloodRequestsController` display and submit orders strictly across the 8 ABO/Rh blood groups (`A+`..`O-`), whereas `DonationsController`, `ScreeningController`, `DonorPortalController`, `DashboardController`, and sample request notes (`REQ-1044`) track explicit components (`Whole Blood`, `Packed RBC`, `Platelets`, `Plasma`, `Double Red Cells`).
+- **Alternatives Considered**:
+  1. Collapse inventory purely to 8 blood groups and discard component granularity.
+  2. Persist component-level stock in `inventory_stocks` keyed by `(blood_group, blood_component_id)` while deriving 8-group summaries via SQL aggregation.
+- **Selected Decision**: **Option 2 — Persist per `(blood_group, blood_component_id)` with SQL 8-group rollups.** `inventory_stocks` and `blood_units` store both `blood_group` and `blood_component_id`, while `blood_requests.blood_component_id` stays nullable (`BIGINT UNSIGNED NULL`) so existing 8-group request workflows and future component-specific requests work seamlessly side by side.
+- **Why Chosen**: Storing `blood_group` alone makes per-component expiration tracking (`Platelets` `5` days vs `Plasma` `365` days) and transfusion matching impossible. Aggregating up to 8 groups preserves all current Public Portal and Inventory overview cards without rework.
+- **Schema / Doc Impact**: `inventory_stocks` (`UNIQUE (blood_group, blood_component_id)`), `blood_requests.blood_component_id` (`NULL`), `request_fulfillments.blood_component_id` (`NOT NULL`).
+
+### Question 2: Emergency Blood Compatibility Dispatch & Authorized Medical Override
+- **Existing Behavior**: `requests/show.blade.php` and `requests.js` let staff choose any dispatch blood group (for cross-group emergency dispatch like `O-`) with no compatibility validation or clinical override tracking.
+- **Alternatives Considered**:
+  1. Allow arbitrary unvalidated cross-group dispatches from UI dropdowns.
+  2. Restrict to exact group match only (blocking life-saving `O-` emergency substitutions).
+  3. Enforce a component-specific ABO/Rh compatibility lookup table plus explicit medical override accountability on emergencies.
+- **Selected Decision**: **Option 3 — Add component-specific `blood_compatibility_rules` + audited medical override columns on `request_fulfillments`.**
+- **Why Chosen**: ABO/Rh compatibility differs fundamentally by component (e.g., universal RBC donor `O-` vs universal plasma donor `AB`), so `blood_compatibility_rules.blood_component_id` is strictly `NOT NULL`. Dispatches whose `(requested_blood_group, dispatched_blood_group, blood_component_id)` pair fails lookup abort cleanly; `'Emergency Only'` / override-flagged pairs require RBAC permission `requests.override_compatibility` plus `override_approved_by_user_id`, `override_approved_at`, and `override_reason` enforced by database constraint `chk_fulfillment_override_audit`.
+- **Schema / Doc Impact**: New table `blood_compatibility_rules`; added `is_compatibility_override`, `override_approved_by_user_id`, `override_approved_at`, `override_reason`, and `chk_fulfillment_override_audit` on `request_fulfillments`; added `requests.override_compatibility` permission example.
+
+### Question 3: Cancelled Camp Registration History vs. Re-Registration
+- **Existing Behavior**: `camps.js` (`evaluateRegistrationEligibility()`) blocks any `donorId` present in `registrations`—even if `attendanceStatus === 'Cancelled'`—whereas `DonorPortalController::buildDonorCamps()` excludes `'Cancelled'` rows when calculating `donorAlreadyRegistered`. Meanwhile, `camp_registrations` in the initial schema had an unconditional `UNIQUE (camp_id, donor_id)` index.
+- **Alternatives Considered**:
+  1. Keep `UNIQUE (camp_id, donor_id)` and mutate cancelled rows in place (erasing cancellation audit timestamps and history like `REG-805`).
+  2. Drop uniqueness altogether (creating race-condition active duplicates).
+  3. Replace unconditional uniqueness with a generated partial-unique active guard preserving cancelled rows and permitting fresh re-registration.
+- **Selected Decision**: **Option 3 — Generated `active_registration_guard` (`CASE WHEN attendance_status <> 'Cancelled' THEN 1 ELSE NULL END`) + `UNIQUE (camp_id, donor_id, active_registration_guard)` + `cancelled_at`.**
+- **Why Chosen**: Preserves immutable cancelled registration history rows (`REG-805`), removes the mismatch between `camps.js` and `DonorPortalController`, prevents concurrent duplicate active registrations at the database layer, and allows a donor who cancelled to re-register cleanly with a new registration row (`REG-806`) as long as camp capacity remains.
+- **Schema / Doc Impact**: Removed `UNIQUE (camp_id, donor_id)` from `camp_registrations`; added `active_registration_guard` (`STORED`), `UNIQUE (camp_id, donor_id, active_registration_guard)`, and `cancelled_at`.
+
+### Question 4: Mandatory Screening Panel Gate Before Unit Release
+- **Existing Behavior**: `ScreeningController` displays single or multi-panel screening rows per donation (`DON-4403` has 1 `Hepatitis C` row; `DON-4405` has `HIV` + `Hepatitis B`). The initial schema put a single global boolean `is_mandatory_for_release` on `screening_test_types`.
+- **Alternatives Considered**:
+  1. Hardcode required test IDs in PHP services.
+  2. Keep global `screening_test_types.is_mandatory_for_release`.
+  3. Model mandatory tests per component via a configurable join table.
+- **Selected Decision**: **Option 3 — Replace `screening_test_types.is_mandatory_for_release` with `component_screening_requirements` (`(blood_component_id, test_type_id) UNIQUE`, `is_required`, `is_active`).**
+- **Why Chosen**: Different blood products can carry distinct release assay requirements without modifying application code. Releasing a donation to inventory requires `collection_status = 'Completed'`, zero `'Failed'`/`'Pending'` `screening_records`, `'Passed'` results for every active `is_required = 1` requirement for `donations.blood_component_id`, and explicit sign-off (`approved_by_user_id` + `released_to_inventory_at`).
+- **Schema / Doc Impact**: Added table `component_screening_requirements`; removed `is_mandatory_for_release` from `screening_test_types`.
+
+### Question 5: Unit Yield Mapping (`quantity_ml` vs. Multi-Component Splitting)
+- **Existing Behavior**: `donations` collects volume (`150`–`800` ml), whereas inventory and requests track integer `units`.
+- **Alternatives Considered**:
+  1. Enforce a strict 1:1 `UNIQUE (donation_id)` foreign key on `blood_units` (making fractionation require breaking migrations later).
+  2. Enforce multi-component splitting immediately on every draw.
+- **Selected Decision**: **Option 1+ — Maintain `1 donation -> 1 unit` as the standard collection workflow while supporting `1:N` multi-component fractionation via `blood_units.parent_unit_id` (nullable self-FK).**
+- **Why Chosen**: Current UI workflows (`DonationsController`, `ScreeningController`) treat one donation as producing one primary unit (`parent_unit_id = NULL`). Allowing non-unique `donation_id` plus nullable `parent_unit_id -> blood_units(id)` gives immediate compatibility today while enabling `Whole Blood -> PRBC + Plasma + Platelets` splitting tomorrow with zero schema breaking changes.
+- **Schema / Doc Impact**: Added `parent_unit_id` (`FK -> blood_units(id) ON DELETE SET NULL`, `INDEX`) on `blood_units`.
+
+### Question 6: Self-Registered Donor Profile Completion & Clinical Eligibility Gate
+- **Existing Behavior**: `auth/register.blade.php` requires only `name`, `email`, and `password` for donors (optional `blood_group` and `date_of_birth`), whereas staff `donors/_form.blade.php` requires `phone`, `gender`, `date_of_birth`, `blood_group`, and `address`. Meanwhile `donor-portal.js` allows scheduling with an eligibility notice.
+- **Alternatives Considered**:
+  1. Require full clinical demographics at `/register`, adding high signup friction.
+  2. Allow donors with missing demographics or `'Pending Review'` eligibility to complete physical blood donations.
+- **Selected Decision**: **Option 3 (Split Onboarding vs Clinical Gate) — `/register` creates `donors` with `profile_completed = 0` and `eligibility_status = 'Pending Review'` (nullable demographics).** Donors may access the Donor Portal and book appointments with advisory prompts, while transitioning a `donations` row to `collection_status = 'Completed'` is strictly blocked until demographics are completed (`profile_completed = 1`) and medical clearance records `'Eligible'`.
+- **Why Chosen**: Matches both `auth/register.blade.php` and `donor-portal.js` cleanly while guaranteeing clinical safety before any blood draw occurs.
+- **Schema / Doc Impact**: Retained nullable onboarding fields + `profile_completed` (`DEFAULT 0`) + `'Pending Review'` default on `donors`; added explicit completion gate to `BUSINESS-RULES.md`.
+
+### Question 7: Self-Registered Hospital Verification Gate
+- **Existing Behavior**: `auth/register.blade.php` allows public signup with `role = 'hospital'` (`organization_name`, optional `facility_code`).
+- **Alternatives Considered**:
+  1. Auto-approve public hospital signups immediately.
+  2. Remove hospital self-registration entirely.
+  3. Accept signup into `hospitals.verification_status = 'Pending'` and require administrator vetting prior to submitting blood requests.
+- **Selected Decision**: **Option 3 — Public hospital signups start with `verification_status = 'Pending'` (with `verified_by_user_id`, `verified_at` audit columns) and cannot submit live `blood_requests` until verified (`verification_status = 'Verified'` and `is_active = 1`).**
+- **Why Chosen**: Preserves partner onboarding convenience in `auth/register.blade.php` while closing the security gap of unvetted external accounts submitting emergency hospital blood orders.
+- **Schema / Doc Impact**: Added `verified_by_user_id` (`FK -> users(id) ON DELETE SET NULL`) and `verified_at` (`DATETIME NULL`) to `hospitals`.
+
+### Question 8: Camp vs. Fixed Center Slot Capacity Model
+- **Existing Behavior**: `DonorPortalController::sampleTimeSlots()` checks per-slot capacity `3` across fixed centers (`09:00 AM`..`03:30 PM`), whereas `donation_camps` only defines total event `capacity` without per-slot capacities.
+- **Alternatives Considered**:
+  1. Force mobile drives into rigid clinic slot quotas that conflict with overall drive `capacity`.
+  2. Allow nullable `donor_appointments.slot_time` for camps (which would create a MySQL `NULL != NULL` bypass on `UNIQUE (donor_id, appointment_date, slot_time, active_slot_guard)`!).
+  3. Enforce fixed centers per `(donation_center_id, appointment_date, slot_time)` (`default_slot_capacity`), enforce camps primarily by total `donation_camps.capacity`, and keep `donor_appointments.slot_time` `NOT NULL`.
+- **Selected Decision**: **Option 3 — Camp capacity is enforced primarily against total `donation_camps.capacity`; fixed centers enforce `default_slot_capacity` (`3`); `donor_appointments.slot_time` stays `NOT NULL`.**
+- **Why Chosen**: Accurately reflects mobile camp throughput while keeping `uq_donor_active_slot` leak-proof across MySQL and SQLite (`NULL` never neutralizes composite unique indexes).
+- **Schema / Doc Impact**: `donation_camps.capacity` authoritative total active limit; `donation_centers.default_slot_capacity` (`3`) per slot; `donor_appointments.slot_time` `NOT NULL` + `chk_appointment_single_target`.
 
 ---
 
-## 3. Unresolved Requirements & Ambiguities Requiring Product Confirmation
+## 3. Technical, Security & MySQL 8.4.3 / SQLite Compatibility Review
 
-Inspection of existing controllers, views, and JS modules surfaced **8 domain ambiguities** intentionally documented here rather than inventing hidden rules:
+### 3.1 Security & Privacy Verification
+- **PHI Isolation**: `donor_medical_profiles` (hemoglobin, weight, clinical/deferral notes) and detailed serology results (`screening_records`) are decoupled from `donors` and `users`, gated behind permissions (`donors.view_medical`, `screening.record`, `screening.release_inventory`).
+- **Public Portal Safety**: Public routes query only `inventory_stocks` aggregate `available_units` (excluding `reserved_units`) and published `donation_camps` (`Upcoming`/`Ongoing` only, omitting `organizer_name`, `organizer_contact`, `organizer_email`, and `camp_registrations`).
+- **RBAC Enforcement**: Administrative actions (`hospitals.verify`, `requests.override_compatibility`, `screening.release_inventory`, `inventory.adjust`) map to explicit permission slugs rather than coarse role checks alone.
 
-1. **Component-Level Inventory Granularity vs. 8-Group Totals**  
-   `InventoryController`, `PublicPortalController`, and `BloodRequestsController` currently track and request units strictly across the 8 ABO/Rh groups without selecting component type (`Whole Blood`, `Packed RBC`, `Platelets`, `Plasma`), whereas `DonationsController`, `DonorPortalController`, and request clinical notes (`REQ-1044`, `DashboardController`) specify components. **Question**: Should future inventory UI cards and blood request forms require selecting both `(blood_group, blood_component_id)`? *(Schema supports both: `blood_requests.blood_component_id` is nullable while `inventory_stocks` tracks `(blood_group, blood_component_id)`.)*
+### 3.2 Concurrency & Integrity Verification
+- **No Unscreened Stock Release**: `blood_units` originate in `'Quarantined'` state and transition to `'Available'` only inside an atomic `DB::transaction()` verifying `collection_status = 'Completed'`, zero `'Failed'`/`'Pending'` screens, all active required panels in `component_screening_requirements` `'Passed'`, and explicit approval (`approved_by_user_id`).
+- **Deadlock-Free Locking Order**: Fulfillment transactions consistently acquire row locks in deterministic order: `blood_requests` -> `inventory_stocks` -> FIFO `blood_units` / `inventory_allocations`.
+- **Table Check Constraints Enforced at Engine Level**:
+  - `blood_requests`: `requested_units >= 1`, `fulfilled_units >= 0`, `fulfilled_units <= requested_units`, `fulfilled_units + reserved_units <= requested_units`.
+  - `request_fulfillments`: `chk_fulfillment_override_audit` ensures every override batch carries `override_approved_by_user_id`, `override_approved_at`, and `override_reason`.
+  - `donor_appointments`: `chk_appointment_single_target` guarantees XOR target (`donation_center_id` vs `donation_camp_id`).
+  - `donation_camps`: date/time ordering (`end_date >= start_date`, `end_date > start_date OR end_time > start_time`, `registration_deadline <= start_date`, `capacity >= 1`).
 
-2. **Cross-Group Compatibility Dispatch Policy (`requests/show.blade.php`)**  
-   The fulfillment UI allows staff to select a dispatch blood group different from the requested blood group (e.g., emergency `O-` substitution). **Question**: Should the backend enforce a strict clinical ABO/Rh compatibility matrix (and warn or require medical officer override), or mandate exact blood-group matching except in `Critical` emergencies?
+### 3.3 MySQL 8.4.3 & PHPUnit SQLite `:memory:` Compatibility
+- **Inspected Environment**:
+  - Production database configured in `.env` / `config/database.php`: **MySQL `8.4.3`** (`blood_donor_system`, `utf8mb4` / `utf8mb4_unicode_ci`, `strict => true`), currently holding 9 baseline Laravel tables (`users`, `password_reset_tokens`, `sessions`, `cache`, `cache_locks`, `jobs`, `job_batches`, `failed_jobs`, `migrations`).
+  - Test runner configured in `phpunit.xml`: **SQLite `:memory:`** (`SQLite 3.40.0` via PHP `8.3` PDO).
+- **Verified Laravel 13 Grammar Behavior**:
+  - `STORED` generated columns (`->storedAs(...)`) + `->unique(...)` + `->enum(...)` + `CHECK` constraints compile and execute cleanly on **both** MySQL `8.4.3` and SQLite `3.40.0` when defined **inside `Schema::create(...)`**.
+  - **Critical Rule**: Do **not** add `STORED` generated columns or table `CHECK` constraints via `Schema::table(...)` (`ALTER TABLE`), because SQLite rejects `ALTER TABLE ADD COLUMN ... STORED`.
+  - `->lockForUpdate()` emits native `FOR UPDATE` locks under MySQL `8.4.3` InnoDB and degrades safely to transaction serialization without SQL errors on SQLite `:memory:`.
+  - `ENUM` columns on SQLite compile as `VARCHAR` + inline `CHECK ("col" in (...))`, guaranteeing identical domain value enforcement in PHPUnit tests and production MySQL `8.4.3`.
 
-3. **Camp Re-Registration After Prior Cancellation (`camps.js` vs. `DonorPortalController`)**  
-   In `camps.js`, `evaluateRegistrationEligibility()` blocks any `donorId` present in `registrations`—even if their `attendanceStatus` is `'Cancelled'`. Conversely, `DonorPortalController::buildDonorCamps()` excludes `'Cancelled'` rows when computing `donorAlreadyRegistered`. **Question**: If a donor cancels a camp registration, should they be allowed to re-register for that camp (reactivating the `camp_registrations` row) or remain permanently blocked?
+---
 
-4. **Mandatory Screening Panel Gate Before Unit Release**  
-   Sample donation `DON-4403` displays a single `'Passed'` `Hepatitis C` screening record, while `DON-4405` has separate `HIV` and `Hepatitis B` rows. **Question**: Must every donation pass all 5 `screening_test_types` (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) before releasing inventory, or do certain component types (`Plasma` vs `Whole Blood`) use distinct panel subsets?
+## 4. Remaining Decisions Requiring Explicit Human or Clinical Approval
 
-5. **Unit Yield Mapping (`quantity_ml` vs. Integer `units`)**  
-   `donations` collects volume in milliliters (`150`–`800` ml), whereas `inventory_stocks` and `blood_requests` count integer `units` (`bags`). **Question**: Does 1 completed donation always yield `1` blood unit in `blood_units`, or can 1 Whole Blood draw be component-split into multiple derived units (e.g., 1 `Packed RBC` + 1 `Plasma` + 1 `Platelets`)? *(Supporting 1-to-Many `donations → blood_units` already supports either rule cleanly!)*
+While the relational architecture is complete and implementation-ready, the following clinical policy thresholds and product scope items intentionally await sign-off from medical leadership and stakeholders before populating production seeders or changing existing frontend screens:
 
-6. **Incomplete Self-Registered Donors vs. Intake Requirements**  
-   `/register` leaves `blood_group` and `date_of_birth` optional for donor accounts and omits `phone`, `gender`, `address`, and `emergency_contact`, while staff donor forms require all of them. **Question**: Should self-registered donors be routed through an onboarding profile-completion step before booking appointments, or only required to complete clinical intake details on arrival?
+1. **Per-Component Clinical Compatibility Matrix (`blood_compatibility_rules`)**:
+   - Medical Director / Transfusion Committee must formally approve the exact donor-to-recipient pairs allowed as `'Compatible Substitution'` vs `'Emergency Only'` (requiring medical officer override) separately for `Whole Blood`, `Packed RBC`, `Platelets`, `Plasma`, and `Double Red Cells` before seeding production rules.
+2. **Per-Component Mandatory Screening Assay Panels (`component_screening_requirements`)**:
+   - Laboratory Director must sign off on whether all 5 assays (`HIV`, `Hepatitis B`, `Hepatitis C`, `Syphilis`, `Blood Group Compatibility`) are required prior to release for every component, or if specific component types use subsets or confirmatory protocols.
+3. **Component Fractionation Yield & Volume Losses (`blood_units` with `parent_unit_id`)**:
+   - Clinical lab SOP must define acceptable derivative bag volume ranges (`volume_ml` sums vs centrifuge separation loss) when splitting a `Whole Blood` draw into multiple component bags.
+4. **UI Component Adoption Timing & 8-Group Threshold Semantics**:
+   - Product sign-off on when Inventory, Blood Requests, and Public Portal views expand from 8-group rollups to per-component filtering, plus whether 8-group `minimum_level` status indicators sum component thresholds or track a Whole-Blood-equivalent floor.
+5. **Hospital Verification Operational Criteria (`hospitals.verification_status`)**:
+   - Administration sign-off on acceptable regulatory facility codes (`HSP-*`), documentary proof requirements, and turnaround SLA before external `/register` hospitals are promoted from `'Pending'` to `'Verified'`.
 
-7. **Self-Registered Hospital Verification Gate**  
-   `/register` allows selecting `Hospital Requester` and typing an arbitrary `organization_name` and `facility_code` (`HSP-2049`). **Question**: Should self-registered hospital accounts default to `hospitals.verification_status = 'Pending'` (blocking blood request submission until approved by a Blood Bank Administrator), or be provisioned exclusively by staff admins?
+---
 
-8. **Time-Slot Capacity Model for Donation Camps vs. Fixed Centers**  
-   `DonorPortalController::sampleTimeSlots()` enforces per-hour slot capacities (`capacity = 3` at `09:00 AM`..`03:30 PM`), whereas `donation_camps` defines only an overall event `capacity` without per-slot sub-capacities. **Question**: Should camp bookings share the same fixed clinic hourly slot grid, use camp-specific time slots, or reserve strictly against total camp `capacity`?
+## 5. Cross-Document Validation Methodology & Tooling Note
 
+- **Validation Scope**: All 5 design artifacts (`ERD.md`, `SCHEMA.md`, `DATA-DICTIONARY.md`, `BUSINESS-RULES.md`, `DESIGN-DECISIONS.md`) are cross-checked structurally for exact 31-table parity, consistent foreign keys, consistent enum sets, consistent generated partial-unique guards, and absence of superseded 29-table/unconditional-unique references.
+- **Prior Script Failure Explanation**: An earlier validation attempt run via `node -e "..."` exited with code `1` strictly due to PowerShell shell-quoting (`"..."` / backtick interpolation inside the inline command string causing a Node `SyntaxError`), **not** a schema defect. Subsequent validation runs pipe scripts cleanly over standard input (`@' ... '@ | node`) so zero shell interpolation interferes with Markdown/SQL string scanning.
