@@ -399,6 +399,12 @@ class FulfillmentServiceTest extends TestCase
         $this->assertTrue($adminSelfDispatch->is_compatibility_override);
         $this->assertSame($admin->id, $adminSelfDispatch->override_approved_by_user_id);
         $this->assertSame($admin->id, $adminSelfDispatch->dispatched_by_user_id);
+
+        // Both cross-group buckets pass full ledger reconciliation after compatible & override dispatches.
+        $oMinusStock = InventoryStock::query()->forBloodGroup('O-')->forComponent($rbc->id)->firstOrFail();
+        $oPlusStock = InventoryStock::query()->forBloodGroup('O+')->forComponent($rbc->id)->firstOrFail();
+        $this->assertTrue($this->inventoryService->reconcileStock($oMinusStock)['is_reconciled']);
+        $this->assertTrue($this->inventoryService->reconcileStock($oPlusStock)['is_reconciled']);
     }
 
     public function test_component_specific_and_component_unspecified_requests(): void
@@ -875,6 +881,391 @@ class FulfillmentServiceTest extends TestCase
         $this->assertValidationError('allocation_status', fn (): BloodRequest => $this->fulfillmentService->releaseReservedAllocations($afterFullRelease, $staff));
 
         $this->assertTrue($this->inventoryService->reconcileStock($bucket['stock']->fresh())['is_reconciled']);
+    }
+
+    public function test_partially_fulfilled_quantity_reduction_guards_and_invariants(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $hospital = Hospital::factory()->create();
+        $rbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        $bucket = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'A-', 'PRBC', 4);
+
+        $request = $this->fulfillmentService->createRequest($hospital, $staff, [
+            'blood_group' => 'A-',
+            'blood_component_id' => $rbc->id,
+            'requested_units' => 5,
+            'request_reason' => 'Partially Fulfilled quantity reduction invariant test.',
+        ]);
+        $request = $this->fulfillmentService->approveRequest($request, $staff);
+
+        // Dispatch 2 units unreserved -> Partially Fulfilled (fulfilled=2, reserved=0, requested=5).
+        $this->fulfillmentService->dispatchUnits($request, $staff, [
+            'quantity' => 2,
+            'dispatched_blood_group' => 'A-',
+        ]);
+
+        $partial = $request->fresh();
+        $this->assertSame('Partially Fulfilled', $partial->status);
+        $this->assertSame(2, $partial->fulfilled_units);
+        $this->assertSame(0, $partial->reserved_units);
+
+        // 1 & 2. Lowering requested_units to equal fulfilled_units (2) when reserved_units === 0 must fail cleanly without altering state.
+        $this->assertRollbackPreservesState($partial, [$bucket['stock']], function () use ($partial, $staff): void {
+            $this->assertValidationError('requested_units', fn (): BloodRequest => $this->fulfillmentService->updateRequest($partial, $staff, [
+                'requested_units' => 2,
+            ]));
+        });
+
+        // 3. Valid reduction remaining strictly above fulfilled_units (5 -> 4) succeeds and stays Partially Fulfilled.
+        $reducedAboveFulfilled = $this->fulfillmentService->updateRequest($partial->fresh(), $staff, [
+            'requested_units' => 4,
+        ]);
+        $this->assertSame(4, $reducedAboveFulfilled->requested_units);
+        $this->assertSame(2, $reducedAboveFulfilled->fulfilled_units);
+        $this->assertSame(0, $reducedAboveFulfilled->reserved_units);
+        $this->assertSame('Partially Fulfilled', $reducedAboveFulfilled->status);
+
+        // 4. Reserve 1 unit (fulfilled=2, reserved=1, requested=4), allow reduction to 3 (fulfilled+reserved), reject 2 (<3).
+        $this->fulfillmentService->reserveUnits($reducedAboveFulfilled, $staff, 1);
+        $withHold = $reducedAboveFulfilled->fresh();
+        $this->assertSame(1, $withHold->reserved_units);
+
+        $this->assertRollbackPreservesState($withHold, [$bucket['stock']], function () use ($withHold, $staff): void {
+            $this->assertValidationError('requested_units', fn (): BloodRequest => $this->fulfillmentService->updateRequest($withHold, $staff, [
+                'requested_units' => 2,
+            ]));
+        });
+
+        $reducedToCapacity = $this->fulfillmentService->updateRequest($withHold->fresh(), $staff, [
+            'requested_units' => 3,
+        ]);
+        $this->assertSame(3, $reducedToCapacity->requested_units);
+        $this->assertSame(2, $reducedToCapacity->fulfilled_units);
+        $this->assertSame(1, $reducedToCapacity->reserved_units);
+        $this->assertSame('Partially Fulfilled', $reducedToCapacity->status);
+
+        $this->assertTrue($this->inventoryService->reconcileStock($bucket['stock']->fresh())['is_reconciled']);
+    }
+
+    public function test_explicit_blood_unit_ids_reservation_validation_and_rollback_integrity(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $hospital = Hospital::factory()->create();
+        $rbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        $targetBucket = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'O+', 'PRBC', 4);
+        $wrongBucket = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'A+', 'PRBC', 1);
+        $units = $targetBucket['units'];
+
+        // Create an unrelated Quarantined unit from a fresh unscreened donation.
+        $quarantinedDonor = $this->createEligibleDonor($admin, 'O+');
+        $quarantinedDonation = $this->donationService->registerDonation($quarantinedDonor, $staff, [
+            'blood_component_id' => $rbc->id,
+            'quantity_ml' => $rbc->default_volume_ml,
+            'center_id' => DonationCenter::factory()->create()->id,
+        ]);
+        $quarantinedUnit = $quarantinedDonation->primaryBloodUnit->fresh();
+
+        // Reserve unit[3] on another request so it is Reserved + has an active allocation.
+        $otherRequest = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'O+',
+                'blood_component_id' => $rbc->id,
+                'requested_units' => 1,
+                'request_reason' => 'Competitor allocation on unit 3.',
+            ]),
+            $staff
+        );
+        $this->fulfillmentService->reserveUnits($otherRequest, $staff, 1, [
+            'blood_unit_ids' => [$units[3]->id],
+        ]);
+
+        $mainRequest = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'O+',
+                'blood_component_id' => $rbc->id,
+                'requested_units' => 3,
+                'request_reason' => 'Explicit unit ID reservation guards.',
+            ]),
+            $staff
+        );
+
+        $stocks = [$targetBucket['stock'], $wrongBucket['stock']];
+
+        // Duplicate explicit IDs rejected without DB mutation.
+        $this->assertRollbackPreservesState($mainRequest, $stocks, function () use ($mainRequest, $staff, $units): void {
+            $this->assertValidationError('blood_unit_ids', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($mainRequest, $staff, 2, [
+                'blood_unit_ids' => [$units[0]->id, $units[0]->id],
+            ]));
+        });
+
+        // Incorrect explicit unit count rejected without DB mutation.
+        $this->assertRollbackPreservesState($mainRequest, $stocks, function () use ($mainRequest, $staff, $units): void {
+            $this->assertValidationError('blood_unit_ids', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($mainRequest, $staff, 2, [
+                'blood_unit_ids' => [$units[0]->id],
+            ]));
+        });
+
+        // Unit from wrong stock bucket fails atomically (even though unit[0] is valid Available).
+        $this->assertRollbackPreservesState($mainRequest, $stocks, function () use ($mainRequest, $staff, $units, $wrongBucket): void {
+            $this->assertValidationError('blood_unit_id', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($mainRequest, $staff, 2, [
+                'blood_unit_ids' => [$units[0]->id, $wrongBucket['units'][0]->id],
+            ]));
+        });
+
+        // Actively allocated / Reserved unit fails atomically without reserving unit[0].
+        $this->assertRollbackPreservesState($mainRequest, $stocks, function () use ($mainRequest, $staff, $units): void {
+            $this->assertValidationError('blood_unit_ids', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($mainRequest, $staff, 2, [
+                'blood_unit_ids' => [$units[0]->id, $units[3]->id],
+            ]));
+        });
+
+        // Non-Available (Quarantined) unit fails atomically without reserving unit[0].
+        $this->assertRollbackPreservesState($mainRequest, $stocks, function () use ($mainRequest, $staff, $units, $quarantinedUnit): void {
+            $this->assertValidationError('blood_unit_ids', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($mainRequest, $staff, 2, [
+                'blood_unit_ids' => [$units[0]->id, $quarantinedUnit->id],
+            ]));
+        });
+
+        // Valid multi-unit explicit blood_unit_ids reservation succeeds atomically.
+        $allocations = $this->fulfillmentService->reserveUnits($mainRequest->fresh(), $staff, 2, [
+            'blood_unit_ids' => [$units[2]->id, $units[0]->id],
+        ]);
+
+        $this->assertCount(2, $allocations);
+        $this->assertSame([$units[0]->id, $units[2]->id], $allocations->pluck('blood_unit_id')->sort()->values()->all());
+        $this->assertSame(2, $mainRequest->fresh()->reserved_units);
+        $this->assertSame('Reserved', $units[0]->fresh()->unit_status);
+        $this->assertSame('Reserved', $units[2]->fresh()->unit_status);
+        $this->assertSame('Available', $units[1]->fresh()->unit_status);
+        $this->assertSame(1, $targetBucket['stock']->fresh()->available_units);
+        $this->assertSame(3, $targetBucket['stock']->fresh()->reserved_units);
+
+        $this->assertTrue($this->inventoryService->reconcileStock($targetBucket['stock']->fresh())['is_reconciled']);
+        $this->assertTrue($this->inventoryService->reconcileStock($wrongBucket['stock']->fresh())['is_reconciled']);
+    }
+
+    public function test_fifo_among_multiple_reserved_units_during_partial_dispatch(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $hospital = Hospital::factory()->create();
+        $rbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        $bucket = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'B-', 'PRBC', 3);
+        $units = $bucket['units'];
+        $asOf = CarbonImmutable::parse('2026-11-12 09:00:00');
+
+        // Stagger expiry across 3 units held simultaneously on the same request: unit[1] < unit[2] < unit[0].
+        $units[0]->update(['expires_at' => $asOf->addDays(12)]);
+        $units[1]->update(['expires_at' => $asOf->addDays(2)]);
+        $units[2]->update(['expires_at' => $asOf->addDays(6)]);
+
+        $request = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'B-',
+                'blood_component_id' => $rbc->id,
+                'requested_units' => 3,
+                'request_reason' => 'FIFO dispatch order across multiple Reserved holds.',
+            ]),
+            $staff
+        );
+
+        $this->fulfillmentService->reserveUnits($request, $staff, 3, ['as_of' => $asOf]);
+
+        // First partial dispatch (1 unit) must consume earliest-expiring Reserved hold (unit[1]).
+        $batch1 = $this->fulfillmentService->dispatchUnits($request->fresh(), $staff, [
+            'quantity' => 1,
+            'dispatched_blood_group' => 'B-',
+            'as_of' => $asOf,
+        ]);
+        $this->assertSame([$units[1]->id], $batch1->allocations->pluck('blood_unit_id')->all());
+        $this->assertSame('Dispatched', $units[1]->fresh()->unit_status);
+        $this->assertSame('Reserved', $units[2]->fresh()->unit_status);
+        $this->assertSame('Reserved', $units[0]->fresh()->unit_status);
+
+        // Second partial dispatch (1 unit) must consume next-earliest Reserved hold (unit[2]).
+        $batch2 = $this->fulfillmentService->dispatchUnits($request->fresh(), $staff, [
+            'quantity' => 1,
+            'dispatched_blood_group' => 'B-',
+            'as_of' => $asOf,
+        ]);
+        $this->assertSame([$units[2]->id], $batch2->allocations->pluck('blood_unit_id')->all());
+        $this->assertSame('Dispatched', $units[2]->fresh()->unit_status);
+        $this->assertSame('Reserved', $units[0]->fresh()->unit_status);
+
+        $this->assertSame(1, $request->fresh()->reserved_units);
+        $this->assertSame(2, $request->fresh()->fulfilled_units);
+        $this->assertTrue($this->inventoryService->reconcileStock($bucket['stock']->fresh())['is_reconciled']);
+    }
+
+    public function test_inactive_rule_inactive_component_and_multi_bucket_release_cancel_rollback(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $hospital = Hospital::factory()->create();
+        $rbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        $bucketA = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'A+', 'PRBC', 2);
+        $bucketB = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'O-', 'PRBC', 2);
+        $stocks = [$bucketA['stock'], $bucketB['stock']];
+
+        // Create an INACTIVE Compatible Substitution rule (O- -> A+) -> both reserve and dispatch must fail cleanly.
+        $inactiveRule = BloodCompatibilityRule::query()->create([
+            'recipient_blood_group' => 'A+',
+            'donor_blood_group' => 'O-',
+            'blood_component_id' => $rbc->id,
+            'compatibility_level' => 'Compatible Substitution',
+            'requires_medical_override' => false,
+            'is_active' => false,
+        ]);
+
+        $request1 = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'A+',
+                'blood_component_id' => $rbc->id,
+                'requested_units' => 3,
+                'request_reason' => 'Inactive compatibility/component & rollback checks.',
+            ]),
+            $staff
+        );
+
+        $this->assertRollbackPreservesState($request1, $stocks, function () use ($request1, $staff): void {
+            $this->assertValidationError('source_blood_group', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($request1, $staff, 1, [
+                'source_blood_group' => 'O-',
+            ]));
+            $this->assertValidationError('dispatched_blood_group', fn (): RequestFulfillment => $this->fulfillmentService->dispatchUnits($request1, $staff, [
+                'quantity' => 1,
+                'dispatched_blood_group' => 'O-',
+            ]));
+        });
+
+        // Activate rule, then deactivate PRBC component -> reserve and dispatch must reject inactive component atomically.
+        $inactiveRule->update(['is_active' => true]);
+        $rbc->update(['is_active' => false]);
+
+        $this->assertRollbackPreservesState($request1, $stocks, function () use ($request1, $staff): void {
+            $this->assertValidationError('blood_component_id', fn (): EloquentCollection => $this->fulfillmentService->reserveUnits($request1, $staff, 1));
+            $this->assertValidationError('blood_component_id', fn (): RequestFulfillment => $this->fulfillmentService->dispatchUnits($request1, $staff, [
+                'quantity' => 1,
+                'dispatched_blood_group' => 'A+',
+            ]));
+        });
+
+        $rbc->update(['is_active' => true]);
+
+        // Set up multi-bucket holds on request1 (1 A+ and 1 O-) and a separate hold on request2 (1 A+).
+        $holdA = $this->fulfillmentService->reserveUnits($request1, $staff, 1, ['source_blood_group' => 'A+'])->first();
+        $holdB = $this->fulfillmentService->reserveUnits($request1->fresh(), $staff, 1, ['source_blood_group' => 'O-'])->first();
+
+        $request2 = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'A+',
+                'blood_component_id' => $rbc->id,
+                'requested_units' => 1,
+                'request_reason' => 'Secondary request hold isolation.',
+            ]),
+            $staff
+        );
+        $foreignHold = $this->fulfillmentService->reserveUnits($request2, $staff, 1, ['source_blood_group' => 'A+'])->first();
+
+        // Failing multi-bucket release (mixing request1's hold with request2's foreign hold) rolls back completely.
+        $this->assertRollbackPreservesState($request1->fresh(), $stocks, function () use ($request1, $staff, $holdA, $holdB, $foreignHold): void {
+            $this->assertValidationError('allocation_ids', fn (): BloodRequest => $this->fulfillmentService->releaseReservedAllocations(
+                $request1->fresh(),
+                $staff,
+                [$holdA->id, $holdB->id, $foreignHold->id]
+            ));
+        });
+
+        // Failing cancelRequest (short reason) rolls back completely with zero effect on multi-bucket holds.
+        $this->assertRollbackPreservesState($request1->fresh(), $stocks, function () use ($request1, $staff): void {
+            $this->assertValidationError('cancellation_reason', fn (): BloodRequest => $this->fulfillmentService->cancelRequest(
+                $request1->fresh(),
+                $staff,
+                'no'
+            ));
+        });
+
+        // Failing cancelRequest after request is already terminal leaves everything unchanged.
+        $this->fulfillmentService->cancelRequest($request2->fresh(), $staff, 'Cancelled secondary request.');
+        $this->assertRollbackPreservesState($request2->fresh(), $stocks, function () use ($request2, $staff): void {
+            $this->assertValidationError('status', fn (): BloodRequest => $this->fulfillmentService->cancelRequest(
+                $request2->fresh(),
+                $staff,
+                'Duplicate cancellation attempt.'
+            ));
+        });
+
+        $this->assertTrue($this->inventoryService->reconcileStock($bucketA['stock']->fresh())['is_reconciled']);
+        $this->assertTrue($this->inventoryService->reconcileStock($bucketB['stock']->fresh())['is_reconciled']);
+    }
+
+    /**
+     * Assert that executing a failing operation leaves request, stock counters, units, allocations, ledger, and history intact.
+     *
+     * @param  list<InventoryStock>  $stocks
+     */
+    private function assertRollbackPreservesState(BloodRequest $request, array $stocks, callable $callback): void
+    {
+        $requestSnapshot = $request->fresh();
+        $stockSnapshots = [];
+
+        foreach ($stocks as $stock) {
+            $freshStock = $stock->fresh();
+            $stockSnapshots[$freshStock->id] = [
+                'available_units' => $freshStock->available_units,
+                'reserved_units' => $freshStock->reserved_units,
+            ];
+        }
+
+        $unitStatusesBefore = BloodUnit::query()->orderBy('id')->pluck('unit_status', 'id')->all();
+        $allocationStatusesBefore = InventoryAllocation::query()->orderBy('id')->pluck('allocation_status', 'id')->all();
+        $txnSnapshotBefore = InventoryTransaction::query()
+            ->orderBy('id')
+            ->get(['id', 'available_before', 'available_after', 'reserved_before', 'reserved_after'])
+            ->toArray();
+        $historyCountBefore = BloodRequestStatusHistory::query()->where('blood_request_id', $requestSnapshot->id)->count();
+
+        $callback();
+
+        $requestAfter = $request->fresh();
+        $this->assertSame($requestSnapshot->status, $requestAfter->status);
+        $this->assertSame($requestSnapshot->requested_units, $requestAfter->requested_units);
+        $this->assertSame($requestSnapshot->reserved_units, $requestAfter->reserved_units);
+        $this->assertSame($requestSnapshot->fulfilled_units, $requestAfter->fulfilled_units);
+
+        foreach ($stockSnapshots as $stockId => $expectedCounters) {
+            $stockAfter = InventoryStock::query()->findOrFail($stockId);
+            $this->assertSame($expectedCounters['available_units'], $stockAfter->available_units);
+            $this->assertSame($expectedCounters['reserved_units'], $stockAfter->reserved_units);
+        }
+
+        $this->assertSame($unitStatusesBefore, BloodUnit::query()->orderBy('id')->pluck('unit_status', 'id')->all());
+        $this->assertSame($allocationStatusesBefore, InventoryAllocation::query()->orderBy('id')->pluck('allocation_status', 'id')->all());
+        $this->assertSame(
+            $txnSnapshotBefore,
+            InventoryTransaction::query()
+                ->orderBy('id')
+                ->get(['id', 'available_before', 'available_after', 'reserved_before', 'reserved_after'])
+                ->toArray()
+        );
+        $this->assertSame($historyCountBefore, BloodRequestStatusHistory::query()->where('blood_request_id', $requestSnapshot->id)->count());
     }
 
     private function seedBaselineCatalogs(): void

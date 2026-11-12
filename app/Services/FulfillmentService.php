@@ -397,6 +397,16 @@ class FulfillmentService
                     ]);
                 }
 
+                if (
+                    $lockedRequest->status === 'Partially Fulfilled'
+                    && $lockedRequest->reserved_units === 0
+                    && $newRequestedUnits === $lockedRequest->fulfilled_units
+                ) {
+                    throw ValidationException::withMessages([
+                        'requested_units' => "Cannot reduce requested_units to {$lockedRequest->fulfilled_units} when the Partially Fulfilled request has no active reservations; cancel the remaining demand instead.",
+                    ]);
+                }
+
                 $lockedRequest->requested_units = $newRequestedUnits;
             }
 
@@ -551,19 +561,19 @@ class FulfillmentService
             }
 
             $sourceBloodGroup = $requestedSourceGroup ?? $lockedRequest->blood_group;
-            $targetComponentId = $this->resolveTargetComponentId($lockedRequest, $componentId, $componentCode);
+            $targetComponentId = $this->resolveTargetComponentId($lockedRequest, $componentId, $componentCode, withLock: true);
 
-            $compat = $this->validateCompatibilityAndOverride(
+            $compat = $this->validateCompatibilityRule(
                 lockedRequest: $lockedRequest,
                 sourceBloodGroup: $sourceBloodGroup,
                 componentId: $targetComponentId,
                 actor: $actingUser,
                 overrideApprover: $overrideApprover,
-                overrideReason: $overrideReason,
                 bloodGroupErrorKey: 'source_blood_group'
             );
 
             $lockedStock = $this->lockExistingStockBucket($sourceBloodGroup, $targetComponentId);
+            $compat = $this->authorizeCompatibilityOverride($compat, $lockedRequest, $overrideReason);
 
             if ($lockedStock->available_units < $quantity) {
                 throw ValidationException::withMessages([
@@ -847,34 +857,70 @@ class FulfillmentService
             }
 
             $dispatchedBloodGroup = $requestedDispatchedGroup ?? $lockedRequest->blood_group;
-            $targetComponentId = $this->resolveTargetComponentId($lockedRequest, $componentId, $componentCode);
+            $targetComponentId = $this->resolveTargetComponentId($lockedRequest, $componentId, $componentCode, withLock: true);
 
-            $compat = $this->validateCompatibilityAndOverride(
+            $compat = $this->validateCompatibilityRule(
                 lockedRequest: $lockedRequest,
                 sourceBloodGroup: $dispatchedBloodGroup,
                 componentId: $targetComponentId,
                 actor: $actingUser,
                 overrideApprover: $overrideApprover,
-                overrideReason: $overrideReason,
                 bloodGroupErrorKey: 'dispatched_blood_group'
             );
 
             $lockedStock = $this->lockExistingStockBucket($dispatchedBloodGroup, $targetComponentId);
+            $compat = $this->authorizeCompatibilityOverride($compat, $lockedRequest, $overrideReason);
 
-            // Identify request-owned Reserved holds for THIS source bucket in FIFO expiry order.
-            $candidateReservedUnitIds = InventoryAllocation::query()
-                ->join('blood_units', 'blood_units.id', '=', 'inventory_allocations.blood_unit_id')
-                ->where('inventory_allocations.blood_request_id', $lockedRequest->id)
-                ->where('inventory_allocations.inventory_stock_id', $lockedStock->id)
-                ->where('inventory_allocations.allocation_status', 'Reserved')
-                ->orderBy('blood_units.expires_at')
-                ->orderBy('blood_units.id')
-                ->limit($quantity)
-                ->pluck('blood_units.id')
+            // Global lock order: blood_requests -> inventory_stocks -> blood_units (id ASC) -> inventory_allocations (id ASC).
+            $lockedBucketUnitsById = BloodUnit::query()
+                ->where('blood_group', $lockedStock->blood_group)
+                ->where('blood_component_id', $lockedStock->blood_component_id)
+                ->whereIn('unit_status', ['Reserved', 'Available'])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $bucketUnitIds = $lockedBucketUnitsById
+                ->keys()
                 ->map(static fn (mixed $id): int => (int) $id)
                 ->all();
 
-            $reservedCountToConsume = count($candidateReservedUnitIds);
+            $lockedActiveAllocations = $bucketUnitIds === []
+                ? new EloquentCollection
+                : InventoryAllocation::query()
+                    ->whereIn('blood_unit_id', $bucketUnitIds)
+                    ->active()
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+            $activeAllocatedUnitIdSet = [];
+            $candidateReservedAllocations = [];
+
+            foreach ($lockedActiveAllocations as $allocation) {
+                $activeAllocatedUnitIdSet[(int) $allocation->blood_unit_id] = true;
+
+                if (
+                    (int) $allocation->blood_request_id === (int) $lockedRequest->id
+                    && (int) $allocation->inventory_stock_id === (int) $lockedStock->id
+                    && $allocation->allocation_status === 'Reserved'
+                ) {
+                    $candidateReservedAllocations[] = $allocation;
+                }
+            }
+
+            usort($candidateReservedAllocations, function (InventoryAllocation $a, InventoryAllocation $b) use ($lockedBucketUnitsById): int {
+                /** @var BloodUnit $unitA */
+                $unitA = $lockedBucketUnitsById->get((int) $a->blood_unit_id);
+                /** @var BloodUnit $unitB */
+                $unitB = $lockedBucketUnitsById->get((int) $b->blood_unit_id);
+
+                return $this->compareUnitsFifo($unitA, $unitB);
+            });
+
+            $selectedReservedAllocations = array_slice($candidateReservedAllocations, 0, $quantity);
+            $reservedCountToConsume = count($selectedReservedAllocations);
             $additionalAvailableNeeded = $quantity - $reservedCountToConsume;
             $unallocatedRemaining = $lockedRequest->requested_units - $lockedRequest->fulfilled_units - $lockedRequest->reserved_units;
 
@@ -884,7 +930,7 @@ class FulfillmentService
                 ]);
             }
 
-            $candidateAvailableUnitIds = [];
+            $selectedAvailableUnits = [];
 
             if ($additionalAvailableNeeded > 0) {
                 if ($lockedStock->available_units < $additionalAvailableNeeded) {
@@ -893,46 +939,37 @@ class FulfillmentService
                     ]);
                 }
 
-                $candidateAvailableUnitIds = BloodUnit::fifoAvailable($lockedStock->blood_group, $lockedStock->blood_component_id, $asOf)
-                    ->whereDoesntHave('allocations', static fn ($query) => $query->active())
-                    ->orderBy('id')
-                    ->limit($additionalAvailableNeeded)
-                    ->pluck('id')
-                    ->map(static fn (mixed $id): int => (int) $id)
-                    ->all();
+                $eligibleAvailableUnits = [];
 
-                if (count($candidateAvailableUnitIds) < $additionalAvailableNeeded) {
+                foreach ($lockedBucketUnitsById as $unit) {
+                    if (
+                        $unit->unit_status === 'Available'
+                        && $unit->expires_at->gt($asOf)
+                        && ! isset($activeAllocatedUnitIdSet[(int) $unit->id])
+                    ) {
+                        $eligibleAvailableUnits[] = $unit;
+                    }
+                }
+
+                if (count($eligibleAvailableUnits) < $additionalAvailableNeeded) {
                     throw ValidationException::withMessages([
                         'available_units' => "Fewer than {$additionalAvailableNeeded} non-expired, unallocated Available unit(s) remain for dispatch.",
                     ]);
                 }
+
+                usort($eligibleAvailableUnits, fn (BloodUnit $a, BloodUnit $b): int => $this->compareUnitsFifo($a, $b));
+                $selectedAvailableUnits = array_slice($eligibleAvailableUnits, 0, $additionalAvailableNeeded);
             }
 
-            // Lock ALL involved BloodUnits together in ascending ID order BEFORE any InventoryAllocation locks.
-            $allUnitIds = array_values(array_unique(array_merge($candidateReservedUnitIds, $candidateAvailableUnitIds)));
-            sort($allUnitIds);
+            usort($selectedReservedAllocations, static fn (InventoryAllocation $a, InventoryAllocation $b): int => (int) $a->id <=> (int) $b->id);
+            usort($selectedAvailableUnits, static fn (BloodUnit $a, BloodUnit $b): int => (int) $a->id <=> (int) $b->id);
 
-            $lockedUnitsById = BloodUnit::query()
-                ->whereIn('id', $allUnitIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get()
-                ->keyBy('id');
+            $lockedReservedAllocations = new EloquentCollection($selectedReservedAllocations);
+            $reservedUnitsList = [];
 
-            if ($lockedUnitsById->count() !== count($allUnitIds)) {
-                throw ValidationException::withMessages([
-                    'blood_unit_id' => 'One or more target blood units could not be locked.',
-                ]);
-            }
-
-            sort($candidateReservedUnitIds);
-            sort($candidateAvailableUnitIds);
-
-            $lockedReservedUnits = new EloquentCollection;
-
-            foreach ($candidateReservedUnitIds as $unitId) {
+            foreach ($selectedReservedAllocations as $allocation) {
                 /** @var BloodUnit $unit */
-                $unit = $lockedUnitsById->get($unitId);
+                $unit = $lockedBucketUnitsById->get((int) $allocation->blood_unit_id);
 
                 if (
                     $unit->blood_group !== $lockedStock->blood_group
@@ -955,15 +992,14 @@ class FulfillmentService
                     ]);
                 }
 
-                $lockedReservedUnits->push($unit);
+                $reservedUnitsList[] = $unit;
             }
 
+            usort($reservedUnitsList, static fn (BloodUnit $a, BloodUnit $b): int => (int) $a->id <=> (int) $b->id);
+            $lockedReservedUnits = new EloquentCollection($reservedUnitsList);
             $lockedAvailableUnits = new EloquentCollection;
 
-            foreach ($candidateAvailableUnitIds as $unitId) {
-                /** @var BloodUnit $unit */
-                $unit = $lockedUnitsById->get($unitId);
-
+            foreach ($selectedAvailableUnits as $unit) {
                 if (
                     $unit->blood_group !== $lockedStock->blood_group
                     || (int) $unit->blood_component_id !== (int) $lockedStock->blood_component_id
@@ -986,41 +1022,6 @@ class FulfillmentService
                 }
 
                 $lockedAvailableUnits->push($unit);
-            }
-
-            // Lock InventoryAllocations last (id ASC): existing holds to consume + active-allocation guard on newly picked units.
-            $lockedReservedAllocations = new EloquentCollection;
-
-            if ($candidateReservedUnitIds !== []) {
-                $lockedReservedAllocations = InventoryAllocation::query()
-                    ->where('blood_request_id', $lockedRequest->id)
-                    ->where('inventory_stock_id', $lockedStock->id)
-                    ->whereIn('blood_unit_id', $candidateReservedUnitIds)
-                    ->where('allocation_status', 'Reserved')
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->get();
-
-                if ($lockedReservedAllocations->count() !== count($candidateReservedUnitIds)) {
-                    throw ValidationException::withMessages([
-                        'allocation_status' => 'One or more reserved request allocations changed concurrently prior to dispatch.',
-                    ]);
-                }
-            }
-
-            if ($candidateAvailableUnitIds !== []) {
-                $hasUnexpectedActiveAllocation = InventoryAllocation::query()
-                    ->whereIn('blood_unit_id', $candidateAvailableUnitIds)
-                    ->active()
-                    ->orderBy('id')
-                    ->lockForUpdate()
-                    ->exists();
-
-                if ($hasUnexpectedActiveAllocation) {
-                    throw ValidationException::withMessages([
-                        'blood_unit_id' => 'One or more selected Available blood units already carry an active allocation.',
-                    ]);
-                }
             }
 
             $now = CarbonImmutable::now();
@@ -1394,33 +1395,52 @@ class FulfillmentService
                 ]);
             }
         } else {
-            $candidateIds = BloodUnit::fifoAvailable($lockedStock->blood_group, $lockedStock->blood_component_id, $asOf)
-                ->whereDoesntHave('allocations', static fn ($query) => $query->active())
+            // Current locking read on bucket units (id ASC), followed by active allocations (id ASC) before FIFO sort.
+            $lockedBucketAvailableUnits = BloodUnit::query()
+                ->where('blood_group', $lockedStock->blood_group)
+                ->where('blood_component_id', $lockedStock->blood_component_id)
+                ->where('unit_status', 'Available')
+                ->where('expires_at', '>', $asOf)
                 ->orderBy('id')
-                ->limit($quantity)
+                ->lockForUpdate()
+                ->get();
+
+            $bucketUnitIds = $lockedBucketAvailableUnits
                 ->pluck('id')
                 ->map(static fn (mixed $id): int => (int) $id)
                 ->all();
 
-            if (count($candidateIds) < $quantity) {
+            $allocatedUnitIdSet = $bucketUnitIds === []
+                ? []
+                : InventoryAllocation::query()
+                    ->whereIn('blood_unit_id', $bucketUnitIds)
+                    ->active()
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->pluck('blood_unit_id')
+                    ->map(static fn (mixed $id): int => (int) $id)
+                    ->flip()
+                    ->all();
+
+            $eligibleUnits = [];
+
+            foreach ($lockedBucketAvailableUnits as $unit) {
+                if (! isset($allocatedUnitIdSet[(int) $unit->id])) {
+                    $eligibleUnits[] = $unit;
+                }
+            }
+
+            if (count($eligibleUnits) < $quantity) {
                 throw ValidationException::withMessages([
                     $errorKey => "Insufficient non-expired, unallocated Available blood units in ({$lockedStock->blood_group}).",
                 ]);
             }
 
-            sort($candidateIds);
+            usort($eligibleUnits, fn (BloodUnit $a, BloodUnit $b): int => $this->compareUnitsFifo($a, $b));
+            $selectedUnits = array_slice($eligibleUnits, 0, $quantity);
+            usort($selectedUnits, static fn (BloodUnit $a, BloodUnit $b): int => (int) $a->id <=> (int) $b->id);
 
-            $lockedUnits = BloodUnit::query()
-                ->whereIn('id', $candidateIds)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            if ($lockedUnits->count() !== $quantity) {
-                throw ValidationException::withMessages([
-                    $errorKey => 'Target blood units changed concurrently during selection.',
-                ]);
-            }
+            $lockedUnits = new EloquentCollection($selectedUnits);
         }
 
         foreach ($lockedUnits as $unit) {
@@ -1457,13 +1477,14 @@ class FulfillmentService
     private function resolveTargetComponentId(
         BloodRequest $lockedRequest,
         ?int $componentId,
-        ?string $componentCode
+        ?string $componentCode,
+        bool $withLock = false
     ): int {
         if ($lockedRequest->blood_component_id !== null) {
-            $requestComponent = $this->resolveActiveComponent((int) $lockedRequest->blood_component_id, null, 'blood_component_id');
+            $requestComponent = $this->resolveActiveComponent((int) $lockedRequest->blood_component_id, null, 'blood_component_id', $withLock);
 
             if ($componentId !== null || $componentCode !== null) {
-                $providedComponent = $this->resolveActiveComponent($componentId, $componentCode, 'blood_component_id');
+                $providedComponent = $this->resolveActiveComponent($componentId, $componentCode, 'blood_component_id', $withLock);
 
                 if ((int) $providedComponent->id !== (int) $requestComponent->id) {
                     throw ValidationException::withMessages([
@@ -1481,11 +1502,14 @@ class FulfillmentService
             ]);
         }
 
-        return (int) $this->resolveActiveComponent($componentId, $componentCode, 'blood_component_id')->id;
+        return (int) $this->resolveActiveComponent($componentId, $componentCode, 'blood_component_id', $withLock)->id;
     }
 
     /**
-     * Validate active component compatibility rule and authorize override accountability when required.
+     * Validate active component compatibility rule using a current locking read and prepare override context.
+     *
+     * Runs before acquiring `inventory_stocks` using `sharedLock()` so InnoDB REPEATABLE READ
+     * never creates a pre-wait consistent-read snapshot; policy gate and rationale checks execute after stock lock.
      *
      * @return array{
      *     rule: BloodCompatibilityRule,
@@ -1494,21 +1518,20 @@ class FulfillmentService
      *     override_reason: ?string
      * }
      *
-     * @throws AuthorizationException
      * @throws ValidationException
      */
-    private function validateCompatibilityAndOverride(
+    private function validateCompatibilityRule(
         BloodRequest $lockedRequest,
         string $sourceBloodGroup,
         int $componentId,
         User $actor,
         ?User $overrideApprover,
-        mixed $overrideReason,
         string $bloodGroupErrorKey
     ): array {
         $rule = BloodCompatibilityRule::query()
             ->active()
             ->forPair($lockedRequest->blood_group, $sourceBloodGroup, $componentId)
+            ->sharedLock()
             ->first();
 
         if (! $rule instanceof BloodCompatibilityRule) {
@@ -1519,31 +1542,52 @@ class FulfillmentService
 
         $requiresOverride = $rule->compatibility_level === 'Emergency Only' || $rule->requires_medical_override;
 
-        if (! $requiresOverride) {
-            return [
-                'rule' => $rule,
-                'is_override' => false,
-                'approver' => null,
-                'override_reason' => null,
-            ];
+        return [
+            'rule' => $rule,
+            'is_override' => $requiresOverride,
+            'approver' => $requiresOverride ? ($overrideApprover ?? $actor) : null,
+            'override_reason' => null,
+        ];
+    }
+
+    /**
+     * Enforce override policy permission and required rationale after acquiring request and stock locks.
+     *
+     * @param  array{
+     *     rule: BloodCompatibilityRule,
+     *     is_override: bool,
+     *     approver: ?User,
+     *     override_reason: ?string
+     * }  $compat
+     * @return array{
+     *     rule: BloodCompatibilityRule,
+     *     is_override: bool,
+     *     approver: ?User,
+     *     override_reason: ?string
+     * }
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    private function authorizeCompatibilityOverride(
+        array $compat,
+        BloodRequest $lockedRequest,
+        mixed $overrideReason
+    ): array {
+        if (! $compat['is_override']) {
+            return $compat;
         }
 
-        $approver = $overrideApprover ?? $actor;
-        Gate::forUser($approver)->authorize('overrideCompatibility', $lockedRequest);
+        Gate::forUser($compat['approver'])->authorize('overrideCompatibility', $lockedRequest);
 
-        $normalizedReason = $this->inputNormalizer->normalizeRequiredText(
+        $compat['override_reason'] = $this->inputNormalizer->normalizeRequiredText(
             $overrideReason,
             2000,
             'override_reason',
             'A non-empty clinical override reason is required for emergency or override-gated compatibility.'
         );
 
-        return [
-            'rule' => $rule,
-            'is_override' => true,
-            'approver' => $approver,
-            'override_reason' => $normalizedReason,
-        ];
+        return $compat;
     }
 
     /**
@@ -1551,9 +1595,17 @@ class FulfillmentService
      *
      * @throws ValidationException
      */
-    private function resolveActiveComponent(?int $componentId, ?string $componentCode, string $errorKey): BloodComponent
-    {
+    private function resolveActiveComponent(
+        ?int $componentId,
+        ?string $componentCode,
+        string $errorKey,
+        bool $withLock = false
+    ): BloodComponent {
         $query = BloodComponent::query();
+
+        if ($withLock) {
+            $query->sharedLock();
+        }
 
         $component = $componentId !== null
             ? $query->whereKey($componentId)->first()
@@ -1566,6 +1618,20 @@ class FulfillmentService
         }
 
         return $component;
+    }
+
+    /**
+     * Compare two BloodUnit models in strict FIFO order (earliest expiry first, then ID ascending).
+     */
+    private function compareUnitsFifo(BloodUnit $a, BloodUnit $b): int
+    {
+        $expiryComparison = $a->expires_at->getPreciseTimestamp(6) <=> $b->expires_at->getPreciseTimestamp(6);
+
+        if ($expiryComparison !== 0) {
+            return $expiryComparison;
+        }
+
+        return (int) $a->id <=> (int) $b->id;
     }
 
     /**
@@ -1741,4 +1807,3 @@ class FulfillmentService
         return $uniqueIds;
     }
 }
-
