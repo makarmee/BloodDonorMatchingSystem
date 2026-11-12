@@ -12,7 +12,11 @@ class InventoryController extends Controller
      */
     public function __invoke(Request $request): View
     {
-        $activeRole = $request->user()?->primaryRoleSlug() ?? 'staff';
+        $activeRole = $request->user()?->primaryRoleSlug();
+
+        if ($activeRole === null) {
+            abort(403);
+        }
 
         $bloodGroups = $this->sampleBloodGroups();
 

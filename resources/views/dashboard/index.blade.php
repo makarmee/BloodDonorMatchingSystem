@@ -22,7 +22,12 @@
                     <x-icons.icon name="calendar" class="size-4" />
                     Book Appointment
                 </x-ui.button>
-            @else
+            @elseif ($activeRole === 'lab_officer')
+                <x-ui.button variant="primary" size="sm" :href="route('screening.index')">
+                    <x-icons.icon name="shield-check" class="size-4" />
+                    Open Screening Queue
+                </x-ui.button>
+            @elseif (in_array($activeRole, ['admin', 'staff'], true))
                 <x-ui.button variant="outline" size="sm" :href="route('home')">
                     Public Stock View
                 </x-ui.button>
@@ -34,22 +39,34 @@
         </div>
     </x-slot:header>
 
-    {{-- KPI Stat Cards --}}
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        @foreach ($portalData['kpis'] as $kpi)
-            <x-bdms.stat-card
-                :label="$kpi['label']"
-                :value="$kpi['value']"
-                :trend="$kpi['trend']"
-                :trend-tone="$kpi['trendTone']"
-                :icon="$kpi['icon']"
-                :accent="$kpi['accent']"
-            />
-        @endforeach
-    </div>
+    @if ($activeRole === null)
+        <x-ui.card>
+            <div class="space-y-2 py-2">
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
+                    No Portal Role Assigned
+                </h3>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                    Your account is authenticated, but you do not currently hold an active BDMS portal role. Please contact an administrator to assign appropriate permissions.
+                </p>
+            </div>
+        </x-ui.card>
+    @else
+        {{-- KPI Stat Cards --}}
+        <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            @foreach ($portalData['kpis'] as $kpi)
+                <x-bdms.stat-card
+                    :label="$kpi['label']"
+                    :value="$kpi['value']"
+                    :trend="$kpi['trend']"
+                    :trend-tone="$kpi['trendTone']"
+                    :icon="$kpi['icon']"
+                    :accent="$kpi['accent']"
+                />
+            @endforeach
+        </div>
 
-    {{-- Main Two-Column Grid --}}
-    <div class="mt-6 grid gap-6 lg:grid-cols-12">
+        {{-- Main Two-Column Grid --}}
+        <div class="mt-6 grid gap-6 lg:grid-cols-12">
         {{-- Recent Activity / Requests Table --}}
         <div class="lg:col-span-8">
             <x-ui.card :padding="false">
@@ -138,6 +155,7 @@
             </x-ui.card>
         </div>
     </div>
+    @endif
 
     <x-ui.modal name="quick-action-preview" title="Module Action Preview" maxWidth="md">
         <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">

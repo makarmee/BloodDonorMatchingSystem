@@ -5,7 +5,7 @@
 
 @php
     $user = auth()->user();
-    $resolvedRole = $user?->primaryRoleSlug() ?? $activeRole;
+    $resolvedRole = $user?->primaryRoleSlug();
     $roleLabels = [
         'admin' => 'Administrator',
         'staff' => 'Blood Bank Staff',

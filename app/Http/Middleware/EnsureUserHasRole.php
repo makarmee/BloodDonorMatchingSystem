@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 class EnsureUserHasRole
 {
     /**
-     * Ensure the authenticated user is active and holds at least one required role.
+     * Ensure the authenticated user holds at least one required role.
      *
      * @param  Closure(Request): (Response)  $next
      */
@@ -18,7 +18,7 @@ class EnsureUserHasRole
     {
         $user = $request->user();
 
-        if (! $user instanceof User || ! $user->is_active) {
+        if (! $user instanceof User) {
             abort(403);
         }
 

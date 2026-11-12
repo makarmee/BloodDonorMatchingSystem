@@ -308,6 +308,103 @@ class AuthenticationTest extends TestCase
             ->assertDontSee('?role=');
     }
 
+    public function test_already_authenticated_user_whose_account_becomes_inactive_cannot_access_protected_get_routes(): void
+    {
+        $user = $this->createUserWithRole('staff', ['is_active' => true]);
+
+        $this->post(route('login.attempt'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->get(route('dashboard'))->assertOk();
+        $sessionBeforeDeactivation = session()->getId();
+
+        $user->forceFill(['is_active' => false])->save();
+
+        // First request on the pre-existing session is rejected and invalidates the session.
+        $this->get(route('dashboard'))->assertForbidden();
+        $this->assertGuest();
+        $this->assertNotSame($sessionBeforeDeactivation, session()->getId());
+
+        // Subsequent requests behave as unauthenticated and redirect to login.
+        $this->get(route('dashboard'))->assertRedirect(route('login'));
+
+        foreach ([
+            route('inventory.index'),
+            route('donors.index'),
+            route('requests.index'),
+        ] as $url) {
+            $this->actingAs($user->fresh())->get($url)->assertForbidden();
+            $this->assertGuest();
+        }
+
+        $this->get(route('home'))->assertOk();
+    }
+
+    public function test_inactive_user_cannot_execute_protected_mutation_routes(): void
+    {
+        $inactiveStaff = $this->createUserWithRole('staff', ['is_active' => false]);
+
+        $this->actingAs($inactiveStaff)
+            ->post(route('requests.store'), [])
+            ->assertForbidden();
+
+        $this->assertGuest();
+    }
+
+    public function test_mixed_case_email_login_works_consistently_with_lowercase_storage(): void
+    {
+        $user = $this->createUserWithRole('staff', [
+            'email' => 'staff.mixed@example.org',
+            'last_login_at' => null,
+        ]);
+
+        $response = $this->post(route('login.attempt'), [
+            'email' => '  Staff.Mixed@EXAMPLE.Org  ',
+            'password' => 'password',
+        ]);
+
+        $response->assertRedirect(route('dashboard'));
+        $this->assertAuthenticatedAs($user);
+        $this->assertNotNull($user->fresh()->last_login_at);
+    }
+
+    public function test_roleless_user_does_not_receive_staff_dashboard_data_or_navigation(): void
+    {
+        $rolelessUser = User::factory()->create(['name' => 'No Role User']);
+
+        $this->assertNull($rolelessUser->primaryRoleSlug());
+
+        $dashboardResponse = $this->actingAs($rolelessUser)->get(route('dashboard'));
+        $dashboardResponse->assertOk()
+            ->assertViewHas('activeRole', null)
+            ->assertSee('No Role User')
+            ->assertSee('Account Overview')
+            ->assertSee('No Portal Role Assigned')
+            ->assertSee('Authenticated User')
+            ->assertDontSee('Blood Bank Operations Dashboard')
+            ->assertDontSee('Blood Bank Staff')
+            ->assertDontSee('Total Available Units')
+            ->assertDontSee('Record Donation')
+            ->assertDontSee(route('inventory.index'), false)
+            ->assertDontSee(route('donors.index'), false)
+            ->assertDontSee(route('requests.index'), false)
+            ->assertDontSee(route('screening.index'), false);
+
+        $this->actingAs($rolelessUser)
+            ->get(route('inventory.index'))
+            ->assertForbidden();
+
+        $donorsShellResponse = $this->actingAs($rolelessUser)->get(route('donors.index'));
+        $donorsShellResponse->assertOk()
+            ->assertSee('Authenticated User')
+            ->assertDontSee('Blood Bank Staff')
+            ->assertDontSee(route('inventory.index'), false)
+            ->assertDontSee(route('requests.index'), false)
+            ->assertDontSee(route('camps.index'), false);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */

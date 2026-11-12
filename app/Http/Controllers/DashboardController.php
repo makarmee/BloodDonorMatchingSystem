@@ -12,7 +12,7 @@ class DashboardController extends Controller
      */
     public function __invoke(Request $request): View
     {
-        $activeRole = $request->user()?->primaryRoleSlug() ?? 'staff';
+        $activeRole = $request->user()?->primaryRoleSlug();
 
         $portalData = $this->portalPayload($activeRole);
 
@@ -33,7 +33,7 @@ class DashboardController extends Controller
      *     recentActivity: array<int, array{reference: string, subject: string, group: string, quantity: string, status: string, time: string}>
      * }
      */
-    private function portalPayload(string $role): array
+    private function portalPayload(?string $role): array
     {
         $inventorySnapshot = [
             ['group' => 'O-', 'units' => 14, 'capacity' => 100],
@@ -238,7 +238,7 @@ class DashboardController extends Controller
                     ],
                 ],
             ],
-            default => [
+            'admin', 'staff' => [
                 'pageTitle' => 'Blood Bank Operations Dashboard',
                 'subtitle' => 'Real-time blood inventory levels, donor intake, and hospital fulfillment queue.',
                 'kpis' => [
@@ -310,6 +310,13 @@ class DashboardController extends Controller
                         'time' => '3 hours ago',
                     ],
                 ],
+            ],
+            default => [
+                'pageTitle' => 'Account Overview',
+                'subtitle' => 'Your account is active, but no portal role has been assigned yet. Contact an administrator to enable role-specific access.',
+                'kpis' => [],
+                'inventorySnapshot' => [],
+                'recentActivity' => [],
             ],
         };
     }

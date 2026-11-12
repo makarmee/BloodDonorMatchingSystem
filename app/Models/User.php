@@ -280,7 +280,7 @@ class User extends Authenticatable
             }
         }
 
-        return $roleSlugs[0] ?? null;
+        return null;
     }
 
     /**

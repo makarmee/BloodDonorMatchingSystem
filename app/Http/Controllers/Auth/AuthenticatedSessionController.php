@@ -38,7 +38,8 @@ class AuthenticatedSessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $throttleKey = $this->throttleKey($credentials['email'], (string) $request->ip());
+        $normalizedEmail = $this->normalizeEmail($credentials['email']);
+        $throttleKey = $this->throttleKey($normalizedEmail, (string) $request->ip());
 
         if (RateLimiter::tooManyAttempts($throttleKey, self::MAX_LOGIN_ATTEMPTS)) {
             $seconds = RateLimiter::availableIn($throttleKey);
@@ -51,7 +52,7 @@ class AuthenticatedSessionController extends Controller
         $remember = $request->boolean('remember');
 
         $authenticated = Auth::attempt([
-            'email' => $credentials['email'],
+            'email' => $normalizedEmail,
             'password' => $credentials['password'],
             'is_active' => true,
         ], $remember);
@@ -92,10 +93,18 @@ class AuthenticatedSessionController extends Controller
     }
 
     /**
+     * Normalize an email address consistently for authentication and rate limiting.
+     */
+    private function normalizeEmail(string $email): string
+    {
+        return Str::lower(trim($email));
+    }
+
+    /**
      * Build the per-email and IP rate-limiting key for login attempts.
      */
     private function throttleKey(string $email, string $ipAddress): string
     {
-        return Str::transliterate(Str::lower(trim($email)).'|'.$ipAddress);
+        return Str::transliterate($this->normalizeEmail($email).'|'.$ipAddress);
     }
 }

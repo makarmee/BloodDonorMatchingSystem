@@ -5,7 +5,7 @@
 @php
     $user = auth()->user();
     $user?->loadMissing('roles.permissions');
-    $resolvedRole = $user?->primaryRoleSlug() ?? $activeRole;
+    $resolvedRole = $user?->primaryRoleSlug();
 
     $roleMeta = match ($resolvedRole) {
         'admin' => [
