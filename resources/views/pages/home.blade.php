@@ -321,9 +321,6 @@
                             Open Donor Portal
                             <x-icons.icon name="arrow-right" class="size-4" />
                         </a>
-                        <a href="{{ route('dashboard', ['role' => 'donor']) }}" class="text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
-                            Role Overview
-                        </a>
                     </div>
                 </x-ui.card>
 
@@ -338,8 +335,8 @@
                         </p>
                     </div>
                     <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <a href="{{ route('dashboard', ['role' => 'hospital']) }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400">
-                            Preview Hospital Portal
+                        <a href="{{ auth()->check() ? route(auth()->user()->dashboardRouteName()) : route('login') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400">
+                            {{ auth()->check() ? 'Open Dashboard' : 'Sign in to Hospital Portal' }}
                             <x-icons.icon name="arrow-right" class="size-4" />
                         </a>
                     </div>
@@ -356,8 +353,8 @@
                         </p>
                     </div>
                     <div class="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <a href="{{ route('dashboard', ['role' => 'staff']) }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
-                            Preview Staff Dashboard
+                        <a href="{{ auth()->check() ? route(auth()->user()->dashboardRouteName()) : route('login') }}" class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+                            {{ auth()->check() ? 'Open Dashboard' : 'Sign in to Staff Portal' }}
                             <x-icons.icon name="arrow-right" class="size-4" />
                         </a>
                     </div>

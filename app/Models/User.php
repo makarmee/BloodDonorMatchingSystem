@@ -265,4 +265,31 @@ class User extends Authenticatable
             ->whereHas('permissions', fn (Builder $query): Builder => $query->where('slug', $permissionSlug))
             ->exists();
     }
+
+    /**
+     * Resolve the user's primary BDMS role slug in operational precedence order.
+     */
+    public function primaryRoleSlug(): ?string
+    {
+        $this->loadMissing('roles');
+        $roleSlugs = $this->roles->pluck('slug')->all();
+
+        foreach (['admin', 'lab_officer', 'staff', 'hospital', 'donor'] as $candidate) {
+            if (in_array($candidate, $roleSlugs, true)) {
+                return $candidate;
+            }
+        }
+
+        return $roleSlugs[0] ?? null;
+    }
+
+    /**
+     * Resolve the default dashboard route name appropriate for the user's assigned roles.
+     */
+    public function dashboardRouteName(): string
+    {
+        return $this->primaryRoleSlug() === 'donor'
+            ? 'donor-portal.dashboard'
+            : 'dashboard';
+    }
 }

@@ -51,9 +51,12 @@
                         <a href="{{ route('public.camps.index') }}" class="hover:text-slate-900 dark:hover:text-white">Donation Camps</a>
                         <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">Donor Portal</a>
                         <a href="{{ route('home') }}#faq-contact" class="hover:text-slate-900 dark:hover:text-white">FAQ &amp; Contact</a>
-                        <a href="{{ route('login') }}" class="hover:text-slate-900 dark:hover:text-white">Sign in</a>
-                        <a href="{{ route('register') }}" class="hover:text-slate-900 dark:hover:text-white">Register</a>
-                        <a href="{{ route('dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">Portal Preview</a>
+                        @auth
+                            <a href="{{ route(auth()->user()->dashboardRouteName()) }}" class="hover:text-slate-900 dark:hover:text-white">Dashboard</a>
+                        @else
+                            <a href="{{ route('login') }}" class="hover:text-slate-900 dark:hover:text-white">Sign in</a>
+                            <a href="{{ route('register') }}" class="hover:text-slate-900 dark:hover:text-white">Register</a>
+                        @endauth
                     </div>
                 </div>
             </footer>

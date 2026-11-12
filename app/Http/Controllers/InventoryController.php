@@ -8,14 +8,11 @@ use Illuminate\Http\Request;
 class InventoryController extends Controller
 {
     /**
-     * Render the Blood Inventory Management page with sample stock and audit history.
+     * Render the Blood Inventory Management page for the authenticated user's role.
      */
     public function __invoke(Request $request): View
     {
-        $requestedRole = $request->string('role')->lower()->toString();
-        $activeRole = in_array($requestedRole, ['staff', 'hospital'], true)
-            ? $requestedRole
-            : 'staff';
+        $activeRole = $request->user()?->primaryRoleSlug() ?? 'staff';
 
         $bloodGroups = $this->sampleBloodGroups();
 

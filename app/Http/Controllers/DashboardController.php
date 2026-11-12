@@ -8,14 +8,11 @@ use Illuminate\Http\Request;
 class DashboardController extends Controller
 {
     /**
-     * Render the role-aware BDMS dashboard shell preview.
+     * Render the role-aware BDMS dashboard for the authenticated user.
      */
     public function __invoke(Request $request): View
     {
-        $requestedRole = $request->string('role')->lower()->toString();
-        $activeRole = in_array($requestedRole, ['staff', 'donor', 'hospital'], true)
-            ? $requestedRole
-            : 'staff';
+        $activeRole = $request->user()?->primaryRoleSlug() ?? 'staff';
 
         $portalData = $this->portalPayload($activeRole);
 
@@ -173,6 +170,71 @@ class DashboardController extends Controller
                         'quantity' => '6 Units Platelets',
                         'status' => 'fulfilled',
                         'time' => '3 hours ago',
+                    ],
+                ],
+            ],
+            'lab_officer' => [
+                'pageTitle' => 'Laboratory Screening Dashboard',
+                'subtitle' => 'Review pending infectious disease screening queues, confirmatory tests, and quarantine releases.',
+                'kpis' => [
+                    [
+                        'label' => 'Pending Screening Queue',
+                        'value' => '14',
+                        'trend' => 'Units awaiting initial serology review',
+                        'trendTone' => 'neutral',
+                        'icon' => 'shield-check',
+                        'accent' => 'amber',
+                    ],
+                    [
+                        'label' => 'Cleared Today',
+                        'value' => '22',
+                        'trend' => 'Ready for verified blood bank stock',
+                        'trendTone' => 'up',
+                        'icon' => 'check-circle',
+                        'accent' => 'emerald',
+                    ],
+                    [
+                        'label' => 'Quarantined Units',
+                        'value' => '3',
+                        'trend' => 'Held pending confirmatory testing',
+                        'trendTone' => 'down',
+                        'icon' => 'activity',
+                        'accent' => 'crimson',
+                    ],
+                    [
+                        'label' => 'Donor Records Accessible',
+                        'value' => '1,284',
+                        'trend' => 'Medical eligibility and screening history',
+                        'trendTone' => 'neutral',
+                        'icon' => 'users',
+                        'accent' => 'sky',
+                    ],
+                ],
+                'inventorySnapshot' => $inventorySnapshot,
+                'recentActivity' => [
+                    [
+                        'reference' => 'SCR-2048',
+                        'subject' => 'TTI Serology Panel — Batch B14',
+                        'group' => 'O+',
+                        'quantity' => '6 Units',
+                        'status' => 'pending',
+                        'time' => '18 mins ago',
+                    ],
+                    [
+                        'reference' => 'SCR-2045',
+                        'subject' => 'Confirmatory NAT Assay',
+                        'group' => 'A-',
+                        'quantity' => '2 Units',
+                        'status' => 'urgent',
+                        'time' => '55 mins ago',
+                    ],
+                    [
+                        'reference' => 'SCR-2041',
+                        'subject' => 'Inventory Release Clearance',
+                        'group' => 'B+',
+                        'quantity' => '8 Units',
+                        'status' => 'completed',
+                        'time' => '2 hours ago',
                     ],
                 ],
             ],

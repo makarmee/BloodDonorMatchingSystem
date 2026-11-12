@@ -25,7 +25,7 @@
             </div>
 
             <div class="relative flex items-center gap-6 text-xs text-slate-400">
-                <span>Role-aware portals: Staff • Donor • Hospital</span>
+                <span>Role-aware portals: Admin • Staff • Lab Officer • Hospital • Donor</span>
             </div>
         </div>
 
@@ -45,29 +45,17 @@
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Sign in to BDMS</h2>
                     <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
-                        Access your Blood Bank Staff, Donor, or Hospital Requester account.
+                        Access your Administrator, Blood Bank Staff, Lab Officer, Hospital Partner, or Donor account.
                     </p>
                 </div>
 
                 <x-ui.card>
                     <form
                         method="POST"
-                        action="{{ Route::has('login.attempt') ? route('login.attempt') : route('login') }}"
-                        @if (! Route::has('login.attempt'))
-                            x-data="{ frontendNotice: false }"
-                            @submit.prevent="frontendNotice = true"
-                        @endif
+                        action="{{ route('login.attempt') }}"
                         class="space-y-4"
                     >
                         @csrf
-
-                        @if (! Route::has('login.attempt'))
-                            <div x-show="frontendNotice" x-cloak>
-                                <x-ui.alert variant="info" :dismissible="false">
-                                    Backend authentication routes are not wired yet. Use the portal preview links below to inspect the authenticated dashboard views.
-                                </x-ui.alert>
-                            </div>
-                        @endif
 
                         <x-ui.input
                             label="Email address"
@@ -104,19 +92,6 @@
                             Sign in
                         </x-ui.button>
                     </form>
-
-                    <x-slot:footer>
-                        <div class="space-y-2.5 text-center">
-                            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                Quick Frontend Role Previews
-                            </p>
-                            <div class="grid grid-cols-3 gap-2">
-                                <x-ui.button :href="route('dashboard', ['role' => 'staff'])" variant="outline" size="sm">Staff</x-ui.button>
-                                <x-ui.button :href="route('dashboard', ['role' => 'donor'])" variant="outline" size="sm">Donor</x-ui.button>
-                                <x-ui.button :href="route('dashboard', ['role' => 'hospital'])" variant="outline" size="sm">Hospital</x-ui.button>
-                            </div>
-                        </div>
-                    </x-slot:footer>
                 </x-ui.card>
 
                 <p class="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">

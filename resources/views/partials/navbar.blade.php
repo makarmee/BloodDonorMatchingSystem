@@ -40,16 +40,24 @@
                 ])
             >Donation Camps</a>
             <a href="{{ route('home') }}#faq-contact" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">FAQ &amp; Contact</a>
-            <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Donor Portal</a>
+            @if (auth()->user()?->hasRole('donor'))
+                <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Donor Portal</a>
+            @endif
         </nav>
 
         <div class="hidden lg:flex items-center gap-2.5 shrink-0">
             <x-ui.theme-toggle />
 
             @auth
-                <x-ui.button :href="route('dashboard')" variant="primary" size="sm">
+                <x-ui.button :href="route(auth()->user()->dashboardRouteName())" variant="primary" size="sm">
                     Dashboard
                 </x-ui.button>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <x-ui.button type="submit" variant="ghost" size="sm">
+                        Sign out
+                    </x-ui.button>
+                </form>
             @else
                 <x-ui.button :href="route('login')" variant="ghost" size="sm">
                     Sign in
@@ -90,13 +98,22 @@
             <a href="{{ route('public.stock') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Blood Stock</a>
             <a href="{{ route('public.camps.index') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donation Camps</a>
             <a href="{{ route('home') }}#faq-contact" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">FAQ &amp; Contact</a>
-            <a href="{{ route('donor-portal.dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donor Portal</a>
-            <a href="{{ route('dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Dashboard Preview</a>
+            @if (auth()->user()?->hasRole('donor'))
+                <a href="{{ route('donor-portal.dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donor Portal</a>
+            @endif
         </nav>
 
         <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-            <x-ui.button :href="route('login')" variant="outline" class="w-full">Sign in</x-ui.button>
-            <x-ui.button :href="route('register')" variant="primary" class="w-full">Become a Donor</x-ui.button>
+            @auth
+                <x-ui.button :href="route(auth()->user()->dashboardRouteName())" variant="primary" class="w-full">Dashboard</x-ui.button>
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <x-ui.button type="submit" variant="outline" class="w-full">Sign out</x-ui.button>
+                </form>
+            @else
+                <x-ui.button :href="route('login')" variant="outline" class="w-full">Sign in</x-ui.button>
+                <x-ui.button :href="route('register')" variant="primary" class="w-full">Become a Donor</x-ui.button>
+            @endauth
         </div>
     </div>
 </header>

@@ -2,13 +2,28 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class InventoryPageTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolePermissionSeeder::class);
+    }
+
     public function test_inventory_page_renders_all_eight_blood_groups_statistics_and_sections(): void
     {
-        $response = $this->get(route('inventory.index'));
+        $staffUser = $this->createUserWithRole('staff');
+
+        $response = $this->actingAs($staffUser)->get(route('inventory.index'));
 
         $response->assertOk();
         $response->assertViewIs('inventory.index');
@@ -34,15 +49,32 @@ class InventoryPageTest extends TestCase
         $response->assertSee('Critical');
     }
 
-    public function test_inventory_page_supports_hospital_portal_preview_and_ignores_invalid_role(): void
+    public function test_inventory_page_derives_role_from_authenticated_user_and_ignores_query_override(): void
     {
-        $this->get(route('inventory.index', ['role' => 'hospital']))
+        $hospitalUser = $this->createUserWithRole('hospital');
+
+        $this->actingAs($hospitalUser)
+            ->get(route('inventory.index'))
             ->assertOk()
             ->assertViewHas('activeRole', 'hospital')
-            ->assertSee('Regional Stock');
+            ->assertSee('Regional Stock')
+            ->assertDontSee('Adjust Inventory');
 
-        $this->get(route('inventory.index', ['role' => 'donor']))
+        $staffUser = $this->createUserWithRole('staff');
+
+        $this->actingAs($staffUser)
+            ->get(route('inventory.index', ['role' => 'hospital']))
             ->assertOk()
-            ->assertViewHas('activeRole', 'staff');
+            ->assertViewHas('activeRole', 'staff')
+            ->assertSee('Adjust Inventory');
+    }
+
+    private function createUserWithRole(string $roleSlug): User
+    {
+        $user = User::factory()->create();
+        $role = Role::where('slug', $roleSlug)->firstOrFail();
+        $user->roles()->attach($role);
+
+        return $user;
     }
 }

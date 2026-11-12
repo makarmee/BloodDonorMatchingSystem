@@ -3,10 +3,28 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\DonorPortalController;
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class DonorPortalPageTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolePermissionSeeder::class);
+
+        $donorUser = User::factory()->create();
+        $donorUser->roles()->attach(Role::where('slug', 'donor')->firstOrFail());
+
+        $this->actingAs($donorUser);
+    }
+
     public function test_donor_portal_dashboard_renders_summary_cards_sections_profile_and_donor_navigation(): void
     {
         $response = $this->get(route('donor-portal.dashboard'));
@@ -234,7 +252,10 @@ class DonorPortalPageTest extends TestCase
 
     public function test_existing_staff_sidebar_navigation_remains_separate_and_intact(): void
     {
-        $staffResponse = $this->get(route('camps.index'));
+        $adminUser = User::factory()->create();
+        $adminUser->roles()->attach(Role::where('slug', 'admin')->firstOrFail());
+
+        $staffResponse = $this->actingAs($adminUser)->get(route('camps.index'));
 
         $staffResponse->assertOk();
         foreach ([

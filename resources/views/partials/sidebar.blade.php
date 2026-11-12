@@ -1,47 +1,87 @@
 @props([
-    'activeRole' => 'staff',
+    'activeRole' => null,
 ])
 
 @php
-    $roleMeta = match ($activeRole) {
+    $user = auth()->user();
+    $user?->loadMissing('roles.permissions');
+    $resolvedRole = $user?->primaryRoleSlug() ?? $activeRole;
+
+    $roleMeta = match ($resolvedRole) {
+        'admin' => [
+            'label' => 'Administrator',
+            'badge' => 'crimson',
+            'sections' => [
+                'Operations' => [
+                    ['label' => 'Dashboard', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
+                    ['label' => 'Blood Inventory', 'icon' => 'archive-box', 'route' => 'inventory.index'],
+                    ['label' => 'Donors', 'icon' => 'users', 'route' => 'donors.index'],
+                    ['label' => 'Donations Log', 'icon' => 'heart-pulse', 'route' => 'donations.index'],
+                ],
+                'Fulfillment & Screening' => [
+                    ['label' => 'Blood Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index'],
+                    ['label' => 'Donation Camps', 'icon' => 'calendar', 'route' => 'camps.index'],
+                    ['label' => 'Lab Screening', 'icon' => 'shield-check', 'route' => 'screening.index'],
+                ],
+            ],
+        ],
+        'staff' => [
+            'label' => 'Blood Bank Staff',
+            'badge' => 'success',
+            'sections' => [
+                'Operations' => [
+                    ['label' => 'Dashboard', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
+                    ['label' => 'Blood Inventory', 'icon' => 'archive-box', 'route' => 'inventory.index'],
+                    ['label' => 'Donors', 'icon' => 'users', 'route' => 'donors.index'],
+                    ['label' => 'Donations Log', 'icon' => 'heart-pulse', 'route' => 'donations.index'],
+                ],
+                'Fulfillment & Drives' => [
+                    ['label' => 'Blood Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index'],
+                    ['label' => 'Donation Camps', 'icon' => 'calendar', 'route' => 'camps.index'],
+                ],
+            ],
+        ],
+        'lab_officer' => [
+            'label' => 'Lab Officer',
+            'badge' => 'warning',
+            'sections' => [
+                'Laboratory' => [
+                    ['label' => 'Dashboard', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
+                    ['label' => 'Lab Screening', 'icon' => 'shield-check', 'route' => 'screening.index'],
+                    ['label' => 'Donors', 'icon' => 'users', 'route' => 'donors.index'],
+                ],
+            ],
+        ],
+        'hospital' => [
+            'label' => 'Hospital Partner',
+            'badge' => 'info',
+            'sections' => [
+                'Hospital Operations' => [
+                    ['label' => 'Requester Overview', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
+                    ['label' => 'Request Blood Units', 'icon' => 'plus', 'route' => 'requests.create', 'match' => 'requests.create'],
+                    ['label' => 'Track Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index', 'match' => ['requests.index', 'requests.show', 'requests.edit']],
+                    ['label' => 'Regional Stock', 'icon' => 'droplet', 'route' => 'inventory.index'],
+                ],
+            ],
+        ],
         'donor' => [
             'label' => 'Donor Portal',
             'badge' => 'crimson',
             'sections' => [
                 'Donor Services' => [
-                    ['label' => 'Overview', 'icon' => 'squares-2x2', 'route' => 'donor-portal.dashboard', 'match' => 'donor-portal.dashboard', 'active' => true],
-                    ['label' => 'My Appointments', 'icon' => 'calendar', 'route' => 'donor-portal.appointments.index', 'match' => 'donor-portal.appointments.*', 'active' => false],
-                    ['label' => 'Donation History', 'icon' => 'heart-pulse', 'route' => 'donor-portal.history', 'match' => 'donor-portal.history', 'active' => false],
-                    ['label' => 'Eligibility', 'icon' => 'shield-check', 'route' => 'donor-portal.eligibility', 'match' => 'donor-portal.eligibility', 'active' => false],
-                ],
-            ],
-        ],
-        'hospital' => [
-            'label' => 'Hospital Requester',
-            'badge' => 'info',
-            'sections' => [
-                'Hospital Operations' => [
-                    ['label' => 'Requester Overview', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'params' => ['role' => 'hospital'], 'active' => true],
-                    ['label' => 'Request Blood Units', 'icon' => 'plus', 'route' => 'requests.create', 'active' => false],
-                    ['label' => 'Track Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index', 'active' => false],
-                    ['label' => 'Regional Stock', 'icon' => 'droplet', 'route' => 'inventory.index', 'params' => ['role' => 'hospital'], 'active' => false],
+                    ['label' => 'Overview', 'icon' => 'squares-2x2', 'route' => 'donor-portal.dashboard', 'match' => 'donor-portal.dashboard'],
+                    ['label' => 'My Appointments', 'icon' => 'calendar', 'route' => 'donor-portal.appointments.index', 'match' => 'donor-portal.appointments.*'],
+                    ['label' => 'Donation History', 'icon' => 'heart-pulse', 'route' => 'donor-portal.history', 'match' => 'donor-portal.history'],
+                    ['label' => 'Eligibility', 'icon' => 'shield-check', 'route' => 'donor-portal.eligibility', 'match' => 'donor-portal.eligibility'],
                 ],
             ],
         ],
         default => [
-            'label' => 'Blood Bank Staff',
-            'badge' => 'success',
+            'label' => 'Authenticated User',
+            'badge' => 'neutral',
             'sections' => [
-                'Operations' => [
-                    ['label' => 'Dashboard', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'params' => ['role' => 'staff'], 'active' => true],
-                    ['label' => 'Blood Inventory', 'icon' => 'archive-box', 'route' => 'inventory.index', 'active' => false],
-                    ['label' => 'Donors', 'icon' => 'users', 'route' => 'donors.index', 'active' => false],
-                    ['label' => 'Donations Log', 'icon' => 'heart-pulse', 'route' => 'donations.index', 'active' => false],
-                ],
-                'Fulfillment & Drives' => [
-                    ['label' => 'Blood Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index', 'active' => false],
-                    ['label' => 'Donation Camps', 'icon' => 'calendar', 'route' => 'camps.index', 'active' => false],
-                    ['label' => 'Lab Screening', 'icon' => 'shield-check', 'route' => 'screening.index', 'active' => false],
+                'Portal' => [
+                    ['label' => 'Dashboard', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
                 ],
             ],
         ],
@@ -139,13 +179,16 @@
             <x-icons.icon name="droplet" class="size-4.5 text-crimson-600 dark:text-crimson-400" />
             <span>Public Portal</span>
         </a>
-        <a
-            href="{{ route('login') }}"
-            class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition"
-        >
-            <x-icons.icon name="arrow-right-on-rectangle" class="size-4.5" />
-            <span>Auth Screen</span>
-        </a>
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button
+                type="submit"
+                class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition cursor-pointer"
+            >
+                <x-icons.icon name="arrow-right-on-rectangle" class="size-4.5" />
+                <span>Sign out</span>
+            </button>
+        </form>
     </div>
 </div>
 

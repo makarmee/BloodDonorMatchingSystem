@@ -2,10 +2,28 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class DonationsPageTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolePermissionSeeder::class);
+
+        $staffUser = User::factory()->create();
+        $staffUser->roles()->attach(Role::where('slug', 'staff')->firstOrFail());
+
+        $this->actingAs($staffUser);
+    }
+
     public function test_donations_overview_displays_summary_statistics_table_columns_and_filters(): void
     {
         $response = $this->get(route('donations.index'));

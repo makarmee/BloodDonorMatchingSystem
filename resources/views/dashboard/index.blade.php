@@ -5,7 +5,6 @@
                 <h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                     {{ $portalData['pageTitle'] }}
                 </h2>
-                <x-ui.badge variant="crimson">UI Preview</x-ui.badge>
             </div>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 {{ $portalData['subtitle'] }}
@@ -133,7 +132,7 @@
 
                 <x-slot:footer>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Switch between <span class="font-semibold text-slate-700 dark:text-slate-200">Staff / Donor / Hospital</span> in the top bar to preview each portal layout.
+                        Role-scoped access for <span class="font-semibold text-slate-700 dark:text-slate-200">{{ auth()->user()?->name ?? 'Authenticated User' }}</span>.
                     </p>
                 </x-slot:footer>
             </x-ui.card>

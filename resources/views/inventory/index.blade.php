@@ -13,18 +13,20 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-            <x-ui.button variant="outline" size="sm" :href="route('dashboard', ['role' => $activeRole])">
+            <x-ui.button variant="outline" size="sm" :href="route('dashboard')">
                 Back to Dashboard
             </x-ui.button>
-            <x-ui.button
-                variant="primary"
-                size="sm"
-                x-data
-                @click="$dispatch('inventory-open-adjust', { group: '' })"
-            >
-                <x-icons.icon name="adjustments" class="size-4" />
-                Adjust Inventory
-            </x-ui.button>
+            @if (auth()->user()?->hasPermission('inventory.adjust'))
+                <x-ui.button
+                    variant="primary"
+                    size="sm"
+                    x-data
+                    @click="$dispatch('inventory-open-adjust', { group: '' })"
+                >
+                    <x-icons.icon name="adjustments" class="size-4" />
+                    Adjust Inventory
+                </x-ui.button>
+            @endif
         </div>
     </x-slot:header>
 
@@ -32,7 +34,7 @@
         x-data="inventoryManager(@js([
             'groups' => $bloodGroups,
             'history' => $history,
-            'actor' => auth()->user()?->name ?? ($activeRole === 'hospital' ? 'Hospital Coordinator' : 'Dr. Maya Lin'),
+            'actor' => auth()->user()?->name ?? 'Authenticated User',
         ]))"
         x-on:inventory-open-adjust.window="openAdjustModal($event.detail?.group || '')"
         class="space-y-6"

@@ -2,10 +2,28 @@
 
 namespace Tests\Feature;
 
+use App\Models\Role;
+use App\Models\User;
+use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ScreeningPageTest extends TestCase
 {
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(RolePermissionSeeder::class);
+
+        $labOfficerUser = User::factory()->create();
+        $labOfficerUser->roles()->attach(Role::where('slug', 'lab_officer')->firstOrFail());
+
+        $this->actingAs($labOfficerUser);
+    }
+
     public function test_lab_screening_overview_renders_summary_cards_columns_filters_and_test_types(): void
     {
         $response = $this->get(route('screening.index'));
