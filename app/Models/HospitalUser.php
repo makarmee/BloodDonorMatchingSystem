@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\HospitalUserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,6 +25,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class HospitalUser extends Model
 {
+    /** @use HasFactory<HospitalUserFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -70,4 +75,3 @@ class HospitalUser extends Model
         return $query->where('is_primary_contact', true);
     }
 }
-

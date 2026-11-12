@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\DonationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -35,6 +37,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Donation extends Model
 {
+    /** @use HasFactory<DonationFactory> */
+    use HasFactory;
+
     /**
      * Valid blood group values.
      *
@@ -178,4 +183,3 @@ class Donation extends Model
         return $query->whereNull('released_to_inventory_at');
     }
 }
-

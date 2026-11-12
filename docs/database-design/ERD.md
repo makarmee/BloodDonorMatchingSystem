@@ -177,7 +177,7 @@ erDiagram
         enum eligibility_status
         text reason
         varchar clearance_source
-        datetime reviewed_at
+        date reviewed_at
         date next_eligible_date
         bigint reviewed_by_user_id FK
         boolean is_current

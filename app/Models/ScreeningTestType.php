@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\ScreeningTestTypeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['code', 'name', 'description', 'is_active'])]
 class ScreeningTestType extends Model
 {
+    /** @use HasFactory<ScreeningTestTypeFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -75,4 +80,3 @@ class ScreeningTestType extends Model
         return $query->where('code', $code);
     }
 }
-

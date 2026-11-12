@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Database\Factories\AppointmentStatusHistoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,6 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class AppointmentStatusHistory extends Model
 {
+    /** @use HasFactory<AppointmentStatusHistoryFactory> */
+    use HasFactory;
+
     /**
      * Valid appointment statuses.
      *
@@ -56,4 +61,3 @@ class AppointmentStatusHistory extends Model
         return $this->belongsTo(User::class, 'actor_user_id');
     }
 }
-

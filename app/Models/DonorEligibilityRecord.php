@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\DonorEligibilityRecordFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class DonorEligibilityRecord extends Model
 {
+    /** @use HasFactory<DonorEligibilityRecordFactory> */
+    use HasFactory;
+
     /**
      * Valid eligibility clearance statuses.
      *
@@ -78,4 +83,3 @@ class DonorEligibilityRecord extends Model
         return $query->where('eligibility_status', $status);
     }
 }
-

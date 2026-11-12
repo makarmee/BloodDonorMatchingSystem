@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\BloodComponentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['code', 'name', 'default_volume_ml', 'shelf_life_days', 'storage_requirements', 'is_active'])]
 class BloodComponent extends Model
 {
+    /** @use HasFactory<BloodComponentFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -125,4 +130,3 @@ class BloodComponent extends Model
         return $query->where('code', $code);
     }
 }
-

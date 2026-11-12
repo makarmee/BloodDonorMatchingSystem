@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\CampRegistrationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -25,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CampRegistration extends Model
 {
+    /** @use HasFactory<CampRegistrationFactory> */
+    use HasFactory;
+
     /**
      * Valid camp registration attendance statuses.
      *
@@ -96,4 +101,3 @@ class CampRegistration extends Model
         return $query->where('attendance_status', '<>', 'Cancelled');
     }
 }
-

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\DonorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +31,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Donor extends Model
 {
+    /** @use HasFactory<DonorFactory> */
+    use HasFactory;
+
     /**
      * Valid ABO/Rh blood group values supported across BDMS.
      *
@@ -201,4 +206,3 @@ class Donor extends Model
         return $query->where('blood_group', $bloodGroup);
     }
 }
-

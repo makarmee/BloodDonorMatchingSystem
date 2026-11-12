@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Carbon\CarbonInterface;
+use Database\Factories\BloodUnitFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -29,6 +31,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class BloodUnit extends Model
 {
+    /** @use HasFactory<BloodUnitFactory> */
+    use HasFactory;
+
     /**
      * Valid blood group values.
      *
@@ -167,4 +172,3 @@ class BloodUnit extends Model
         return $query->where('expires_at', '<=', $cutoff);
     }
 }
-

@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\ComponentScreeningRequirementFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -13,6 +15,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['blood_component_id', 'test_type_id', 'is_required', 'is_active', 'notes'])]
 class ComponentScreeningRequirement extends Model
 {
+    /** @use HasFactory<ComponentScreeningRequirementFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -60,4 +65,3 @@ class ComponentScreeningRequirement extends Model
         return $query->where('is_active', true)->where('is_required', true);
     }
 }
-

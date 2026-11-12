@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Database\Factories\CampStatusHistoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -22,6 +24,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class CampStatusHistory extends Model
 {
+    /** @use HasFactory<CampStatusHistoryFactory> */
+    use HasFactory;
+
     /**
      * Valid camp statuses.
      *
@@ -57,4 +62,3 @@ class CampStatusHistory extends Model
         return $this->belongsTo(User::class, 'actor_user_id');
     }
 }
-

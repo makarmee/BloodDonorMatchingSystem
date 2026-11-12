@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use Database\Factories\RequestFulfillmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +34,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class RequestFulfillment extends Model
 {
+    /** @use HasFactory<RequestFulfillmentFactory> */
+    use HasFactory;
+
     /**
      * Valid blood group values.
      *
@@ -112,4 +117,3 @@ class RequestFulfillment extends Model
         return $query->where('is_compatibility_override', true);
     }
 }
-

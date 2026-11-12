@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use Database\Factories\DonorMedicalProfileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class DonorMedicalProfile extends Model
 {
+    /** @use HasFactory<DonorMedicalProfileFactory> */
+    use HasFactory;
+
     /**
      * Get the attributes that should be cast.
      *
@@ -47,4 +52,3 @@ class DonorMedicalProfile extends Model
         return $this->belongsTo(User::class, 'updated_by_user_id');
     }
 }
-
