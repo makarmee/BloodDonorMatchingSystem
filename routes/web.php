@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\BloodRequestController;
 use App\Http\Controllers\BloodRequestsController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DonationCampsController;
@@ -42,6 +43,17 @@ Route::get('/requests', [BloodRequestsController::class, 'index'])->name('reques
 Route::get('/requests/create', [BloodRequestsController::class, 'create'])->name('requests.create');
 Route::get('/requests/{request}', [BloodRequestsController::class, 'show'])->name('requests.show');
 Route::get('/requests/{request}/edit', [BloodRequestsController::class, 'edit'])->name('requests.edit');
+
+Route::middleware('auth')->group(function (): void {
+    Route::post('/requests', [BloodRequestController::class, 'store'])->name('requests.store');
+    Route::match(['put', 'patch'], '/requests/{bloodRequest}', [BloodRequestController::class, 'update'])->name('requests.update');
+    Route::post('/requests/{bloodRequest}/approve', [BloodRequestController::class, 'approve'])->name('requests.approve');
+    Route::post('/requests/{bloodRequest}/reject', [BloodRequestController::class, 'reject'])->name('requests.reject');
+    Route::post('/requests/{bloodRequest}/reserve', [BloodRequestController::class, 'reserve'])->name('requests.reserve');
+    Route::post('/requests/{bloodRequest}/release', [BloodRequestController::class, 'release'])->name('requests.release');
+    Route::post('/requests/{bloodRequest}/dispatch', [BloodRequestController::class, 'dispatch'])->name('requests.dispatch');
+    Route::post('/requests/{bloodRequest}/cancel', [BloodRequestController::class, 'cancel'])->name('requests.cancel');
+});
 
 Route::get('/camps', [DonationCampsController::class, 'index'])->name('camps.index');
 Route::get('/camps/create', [DonationCampsController::class, 'create'])->name('camps.create');
