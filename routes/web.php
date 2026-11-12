@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\BloodRequestController;
 use App\Http\Controllers\BloodRequestsController;
 use App\Http\Controllers\DashboardController;
@@ -22,7 +23,8 @@ Route::get('/blood-camps/{camp}', [PublicPortalController::class, 'showCamp'])->
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.attempt');
-    Route::view('/register', 'auth.register')->name('register');
+    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+    Route::post('/register', [RegisteredUserController::class, 'store'])->name('register.attempt');
     Route::view('/forgot-password', 'auth.forgot-password')->name('password.request');
 });
 

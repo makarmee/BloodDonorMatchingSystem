@@ -24,22 +24,11 @@
             <x-ui.card>
                 <form
                     method="POST"
-                    action="{{ Route::has('register.attempt') ? route('register.attempt') : route('register') }}"
-                    x-data="{ role: '{{ old('role', 'donor') }}', frontendNotice: false }"
-                    @if (! Route::has('register.attempt'))
-                        @submit.prevent="frontendNotice = true"
-                    @endif
+                    action="{{ route('register.attempt') }}"
+                    x-data="{ role: '{{ old('role', 'donor') }}' }"
                     class="space-y-4"
                 >
                     @csrf
-
-                    @if (! Route::has('register.attempt'))
-                        <div x-show="frontendNotice" x-cloak>
-                            <x-ui.alert variant="info" :dismissible="false">
-                                Frontend UI mode — registration controller &amp; database role fields will be connected when backend auth is added.
-                            </x-ui.alert>
-                        </div>
-                    @endif
 
                     <div class="space-y-1.5">
                         <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Account type</span>
@@ -64,6 +53,9 @@
                                 <span>Hospital Requester</span>
                             </label>
                         </div>
+                        @error('role')
+                            <p class="text-xs font-medium text-rose-600 dark:text-rose-400">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <x-ui.input
@@ -86,27 +78,26 @@
                     />
 
                     {{-- Donor-specific fields --}}
+                    @php
+                        $bloodGroupOptions = array_combine(
+                            $bloodGroups ?? \App\Models\Donor::BLOOD_GROUPS,
+                            $bloodGroups ?? \App\Models\Donor::BLOOD_GROUPS
+                        );
+                    @endphp
                     <div x-show="role === 'donor'" class="grid gap-4 sm:grid-cols-2">
                         <x-ui.select
                             label="Blood group"
                             name="blood_group"
                             placeholder="Select blood group"
-                            :options="[
-                                'A+' => 'A+',
-                                'A-' => 'A-',
-                                'B+' => 'B+',
-                                'B-' => 'B-',
-                                'AB+' => 'AB+',
-                                'AB-' => 'AB-',
-                                'O+' => 'O+',
-                                'O-' => 'O-',
-                            ]"
+                            x-bind:disabled="role !== 'donor'"
+                            :options="$bloodGroupOptions"
                         />
 
                         <x-ui.input
                             label="Date of birth"
                             name="date_of_birth"
                             type="date"
+                            x-bind:disabled="role !== 'donor'"
                             :value="old('date_of_birth')"
                         />
                     </div>
@@ -118,6 +109,7 @@
                             name="organization_name"
                             icon="building-hospital"
                             placeholder="City General Hospital"
+                            x-bind:disabled="role !== 'hospital'"
                             :value="old('organization_name')"
                         />
 
@@ -125,6 +117,7 @@
                             label="License / Facility code"
                             name="facility_code"
                             placeholder="HSP-2049"
+                            x-bind:disabled="role !== 'hospital'"
                             :value="old('facility_code')"
                         />
                     </div>
