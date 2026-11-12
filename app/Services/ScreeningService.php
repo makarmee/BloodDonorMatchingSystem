@@ -136,8 +136,7 @@ class ScreeningService
      *     test_notes?: string|null,
      *     collected_at?: CarbonInterface|string|null,
      *     logged_at?: CarbonInterface|string|null,
-     *     result_recorded_at?: CarbonInterface|string|null,
-     *     next_eligible_date?: CarbonInterface|string|null
+     *     result_recorded_at?: CarbonInterface|string|null
      * }  $attributes
      *
      * @throws AuthorizationException
@@ -177,8 +176,7 @@ class ScreeningService
                     lockedDonation: $lockedDonation,
                     failedRecord: $record,
                     testType: $testType,
-                    actor: $actor,
-                    nextEligibleDate: $validated['next_eligible_date']
+                    actor: $actor
                 );
             }
 
@@ -551,8 +549,7 @@ class ScreeningService
         Donation $lockedDonation,
         ScreeningRecord $failedRecord,
         ScreeningTestType $testType,
-        User $actor,
-        ?string $nextEligibleDate
+        User $actor
     ): void {
         $lockedDonation->screening_status = 'Failed';
         $lockedDonation->save();
@@ -579,7 +576,7 @@ class ScreeningService
                     'inventory_stock_id' => $lockedStock->id,
                     'blood_unit_id' => $unit->id,
                     'operation_type' => 'Discarded',
-                    'units_delta' => -1,
+                    'units_delta' => 0,
                     'available_before' => $lockedStock->available_units,
                     'available_after' => $lockedStock->available_units,
                     'reserved_before' => $lockedStock->reserved_units,
@@ -601,9 +598,7 @@ class ScreeningService
             failedScreeningRecord: $failedRecord,
             triggeredBy: $actor,
             reason: $deferralReason,
-            clearanceSource: 'Automated Failed Screening Deferral',
-            nextEligibleDate: $nextEligibleDate,
-            reviewedAt: $failedRecord->test_date?->toDateString()
+            clearanceSource: 'Automated Failed Screening Deferral'
         );
     }
 
@@ -816,8 +811,7 @@ class ScreeningService
      *     test_notes: ?string,
      *     collected_at: ?CarbonImmutable,
      *     logged_at: ?CarbonImmutable,
-     *     result_recorded_at: ?CarbonImmutable,
-     *     next_eligible_date: ?string
+     *     result_recorded_at: ?CarbonImmutable
      * }
      *
      * @throws ValidationException
@@ -853,7 +847,6 @@ class ScreeningService
             : $this->inputNormalizer->normalizeRequiredText($actor->name, 150, 'lab_staff_name', 'Lab staff name is required.');
 
         $testDate = $this->inputNormalizer->parseOptionalDate($attributes['test_date'] ?? null, 'test_date');
-        $nextEligibleDate = $this->inputNormalizer->parseOptionalDate($attributes['next_eligible_date'] ?? null, 'next_eligible_date');
 
         return [
             'screening_record_id' => $recordId,
@@ -869,7 +862,6 @@ class ScreeningService
             'collected_at' => $this->inputNormalizer->parseOptionalDateTime($attributes['collected_at'] ?? null, 'collected_at'),
             'logged_at' => $this->inputNormalizer->parseOptionalDateTime($attributes['logged_at'] ?? null, 'logged_at'),
             'result_recorded_at' => $this->inputNormalizer->parseOptionalDateTime($attributes['result_recorded_at'] ?? null, 'result_recorded_at'),
-            'next_eligible_date' => $nextEligibleDate,
         ];
     }
 }

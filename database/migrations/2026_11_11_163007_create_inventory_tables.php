@@ -109,7 +109,7 @@ return new class extends Migration
             $table->index('blood_unit_id', 'idx_inv_txn_blood_unit');
             $table->index(['reference_type', 'reference_id'], 'idx_inv_txn_reference');
         }, [
-            'chk_transactions_units_delta' => 'units_delta <> 0',
+            'chk_transactions_units_delta' => "units_delta <> 0 OR (operation_type = 'Discarded' AND available_after = available_before AND reserved_after = reserved_before)",
             'chk_transactions_available_before' => 'available_before >= 0',
             'chk_transactions_available_after' => 'available_after >= 0',
             'chk_transactions_reserved_before' => 'reserved_before >= 0',

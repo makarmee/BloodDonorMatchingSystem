@@ -294,7 +294,7 @@ This specification details all **31 tables** (3 existing Laravel baseline auth/s
 | `inventory_stock_id` | `BIGINT UNSIGNED` | NO | — | `FK → inventory_stocks(id) ON DELETE RESTRICT`, `INDEX (inventory_stock_id, occurred_at)` | Stock bucket affected |
 | `blood_unit_id` | `BIGINT UNSIGNED` | YES | `NULL` | `FK → blood_units(id) ON DELETE RESTRICT`, `INDEX (blood_unit_id)` | Bag-level reference |
 | `operation_type` | `ENUM('Stock In','Reserve','Release Reservation','Dispatch','Removed','Expired','Discarded','Manual Adjustment')` | NO | — | `INDEX (operation_type)` | Traceable action category |
-| `units_delta` | `INT` | NO | — | `CHECK (units_delta <> 0)` | Signed quantity change |
+| `units_delta` | `INT` | NO | — | `CHECK (units_delta <> 0 OR (operation_type = 'Discarded' AND available_after = available_before AND reserved_after = reserved_before))` | Signed quantity change (`0` allowed only when discarding a quarantined unit before inventory release) |
 | `available_before` | `INT UNSIGNED` | NO | — | — | Available units before |
 | `available_after` | `INT UNSIGNED` | NO | — | `CHECK (available_after >= 0)` | Available units after |
 | `reserved_before` | `INT UNSIGNED` | NO | — | — | Reserved units before |

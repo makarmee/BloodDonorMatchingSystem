@@ -25,6 +25,7 @@ use Database\Seeders\ComponentScreeningRequirementSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\ScreeningTestTypeSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -326,6 +327,9 @@ class DonationAndScreeningServiceTest extends TestCase
         $this->assertNotNull($currentEligibility);
         $this->assertSame('Not Eligible', $currentEligibility->eligibility_status);
         $this->assertNull($currentEligibility->reviewed_by_user_id);
+        $this->assertNull($currentEligibility->reviewed_at);
+        $this->assertNull($currentEligibility->next_eligible_date);
+        $this->assertNull($freshDonor->next_eligible_date);
         $this->assertSame('Automated Failed Screening Deferral', $currentEligibility->clearance_source);
         $this->assertStringContainsString($failedRecord->screening_code, $currentEligibility->reason);
 
@@ -335,10 +339,17 @@ class DonationAndScreeningServiceTest extends TestCase
             ->first();
 
         $this->assertNotNull($discardTxn);
-        $this->assertSame(-1, $discardTxn->units_delta);
+        $this->assertSame(0, $discardTxn->units_delta);
         $this->assertSame(0, $discardTxn->available_before);
         $this->assertSame(0, $discardTxn->available_after);
+        $this->assertSame(0, $discardTxn->reserved_before);
+        $this->assertSame(0, $discardTxn->reserved_after);
         $this->assertSame($freshUnit->id, $discardTxn->blood_unit_id);
+
+        $totalLedgerDelta = (int) InventoryTransaction::query()->sum('units_delta');
+        $totalStockBalance = (int) InventoryStock::query()->sum('available_units')
+            + (int) InventoryStock::query()->sum('reserved_units');
+        $this->assertSame($totalStockBalance, $totalLedgerDelta);
 
         // Passing a fake/non-failed record directly to recordFailedScreeningDeferral is blocked.
         $passedRecord = ScreeningRecord::factory()->passed()->create([
@@ -697,6 +708,138 @@ class DonationAndScreeningServiceTest extends TestCase
         $this->assertNotSame($firstHiv->id, $confirmatoryHiv->id);
         $this->assertTrue($confirmatoryHiv->is_confirmatory);
         $this->assertSame(2, ScreeningRecord::query()->where('donation_id', $completed->id)->count());
+    }
+
+    public function test_admin_triggered_failed_screening_keeps_automated_deferral_unreviewed_until_medical_officer_assessment(): void
+    {
+        $this->travelTo('2026-11-12 10:00:00');
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $component = BloodComponent::query()->where('code', 'WB')->firstOrFail();
+        $center = DonationCenter::factory()->create();
+
+        $donor = $this->createEligibleDonor($admin, 'A+');
+        $donation = $this->donationService->registerDonation($donor, $staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'center_id' => $center->id,
+        ]);
+
+        // Even when an admin records the failed lab result, the automated deferral remains unreviewed.
+        $failedRecord = $this->screeningService->recordScreeningResult($donation, $admin, [
+            'test_type_code' => 'HCV',
+            'screening_result' => 'Failed',
+            'specimen_tube_code' => 'EDTA-99102',
+        ]);
+
+        $automatedHold = $this->eligibilityService->getCurrentRecord($donor->fresh());
+
+        $this->assertNotNull($automatedHold);
+        $this->assertSame('Not Eligible', $automatedHold->eligibility_status);
+        $this->assertSame('Automated Failed Screening Deferral', $automatedHold->clearance_source);
+        $this->assertNull($automatedHold->reviewed_by_user_id);
+        $this->assertNull($automatedHold->reviewed_at);
+        $this->assertNull($automatedHold->next_eligible_date);
+        $this->assertStringContainsString($failedRecord->screening_code, $automatedHold->reason);
+
+        // Authorizing medical officer later performs final clinical review and sets deferral end date.
+        $this->travelTo('2026-11-12 15:00:00');
+        $finalDecision = $this->eligibilityService->deferDonor(
+            donor: $donor->fresh(),
+            actor: $admin,
+            reason: "Confirmatory clinical review completed for {$failedRecord->screening_code}.",
+            nextEligibleDate: '2027-05-12',
+        );
+
+        $this->assertSame('Not Eligible', $finalDecision->eligibility_status);
+        $this->assertSame('Medical Officer Deferral', $finalDecision->clearance_source);
+        $this->assertSame($admin->id, $finalDecision->reviewed_by_user_id);
+        $this->assertSame('2026-11-12', $finalDecision->reviewed_at?->toDateString());
+        $this->assertSame('2027-05-12', $finalDecision->next_eligible_date?->toDateString());
+        $this->assertFalse($automatedHold->fresh()->is_current);
+    }
+
+    public function test_inventory_transaction_check_rejects_zero_units_delta_for_non_quarantined_discard_operations_and_reconciles_ledger(): void
+    {
+        $this->travelTo('2026-11-12 11:00:00');
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $component = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+        $center = DonationCenter::factory()->create();
+
+        $stock = InventoryStock::factory()->create([
+            'blood_group' => 'B+',
+            'blood_component_id' => $component->id,
+            'available_units' => 0,
+            'reserved_units' => 0,
+        ]);
+
+        // Zero units_delta for Stock In must still fail chk_transactions_units_delta.
+        try {
+            InventoryTransaction::query()->create([
+                'inventory_stock_id' => $stock->id,
+                'blood_unit_id' => null,
+                'operation_type' => 'Stock In',
+                'units_delta' => 0,
+                'available_before' => 0,
+                'available_after' => 0,
+                'reserved_before' => 0,
+                'reserved_after' => 0,
+                'reference_type' => 'manual',
+                'reference_id' => 1,
+                'performed_by_user_id' => $admin->id,
+                'actor_name' => $admin->name,
+                'description' => 'Invalid zero delta stock in check.',
+                'transacted_at' => now(),
+            ]);
+            $this->fail('Expected QueryException enforcing chk_transactions_units_delta.');
+        } catch (QueryException) {
+            $this->addToAssertionCount(1);
+        }
+
+        // Release one B+ RBC unit and discard another failed-screening B+ RBC unit in the same stock group.
+        $donorOne = $this->createEligibleDonor($admin, 'B+');
+        $donationOne = $this->donationService->registerDonation($donorOne, $staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'center_id' => $center->id,
+        ]);
+
+        foreach (['HIV', 'HBV', 'HCV', 'SYPH', 'COMPAT'] as $code) {
+            $this->screeningService->recordScreeningResult($donationOne, $labOfficer, [
+                'test_type_code' => $code,
+                'screening_result' => 'Passed',
+            ]);
+        }
+
+        $this->screeningService->releaseToInventory($donationOne, $labOfficer);
+
+        $donorTwo = $this->createEligibleDonor($admin, 'B+');
+        $donationTwo = $this->donationService->registerDonation($donorTwo, $staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'center_id' => $center->id,
+        ]);
+
+        $this->screeningService->recordScreeningResult($donationTwo, $labOfficer, [
+            'test_type_code' => 'HIV',
+            'screening_result' => 'Failed',
+        ]);
+
+        $freshStock = $stock->fresh();
+        $ledgerDeltaSum = (int) InventoryTransaction::query()
+            ->where('inventory_stock_id', $freshStock->id)
+            ->sum('units_delta');
+
+        $this->assertSame(1, $freshStock->available_units);
+        $this->assertSame(0, $freshStock->reserved_units);
+        $this->assertSame(1, $ledgerDeltaSum);
+        $this->assertSame($freshStock->available_units + $freshStock->reserved_units, $ledgerDeltaSum);
     }
 
     private function seedBaselineCatalogs(): void

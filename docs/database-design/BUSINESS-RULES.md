@@ -84,7 +84,7 @@ stateDiagram-v2
        - Lock corresponding `inventory_stocks` row `(blood_group, blood_component_id) FOR UPDATE`.
        - Transition associated `blood_units` (`Quarantined` -> `'Available'`, set `released_at`, `released_by_user_id`, and `expires_at = collected_at + INTERVAL shelf_life_days DAY`).
        - Increment `inventory_stocks.available_units += N` and append `'Stock In'` entry to `inventory_transactions`.
-  4. If any screening record is marked `'Failed'`, set `donations.screening_status = 'Failed'`, mark linked `blood_units` as `'Discarded'`, append `'Discarded'` audit event in `inventory_transactions`, and record clinician deferral via `DonorEligibilityService` (inserting a new `is_current = 1` `'Not Eligible'` row in `donor_eligibility_records` and syncing `donors.eligibility_status`).
+  4. If any screening record is marked `'Failed'`, set `donations.screening_status = 'Failed'`, mark linked `blood_units` as `'Discarded'`, append a zero-delta `'Discarded'` audit event in `inventory_transactions` (`units_delta = 0`, `available_after = available_before`, `reserved_after = reserved_before`, since quarantined units are not yet released to `inventory_stocks`), and record an automated protective `'Not Eligible'` deferral via `DonorEligibilityService` (`reviewed_by_user_id = NULL`, `reviewed_at = NULL`, `next_eligible_date = NULL`, inserting a new `is_current = 1` row in `donor_eligibility_records` and syncing `donors.eligibility_status`) pending authorizing medical officer review.
 
 ### 2.3 Inventory Management & Stock Status Lifecycle
 
@@ -98,7 +98,7 @@ stateDiagram-v2
 - **Atomic Adjustment Rules**:
   1. Every stock mutation locks the target `inventory_stocks` row (`SELECT ... FOR UPDATE`).
   2. `'Stock In'` / positive adjustment increments `available_units` (`units_delta > 0`).
-  3. `'Removed'` / `'Expired'` / `'Discarded'` decrements `available_units` (`units <= available_units`) and marks corresponding serialized `blood_units` (`Dispatched` / `Expired` / `Discarded`).
+  3. `'Removed'` / `'Expired'` / `'Discarded'` decrements `available_units` (`units <= available_units`) and marks corresponding serialized `blood_units` (`Dispatched` / `Expired` / `Discarded`); discarding a pre-release `'Quarantined'` unit during failed screening logs `'Discarded'` with `units_delta = 0` and unchanged stock balances.
   4. `'Reserved'` transfers units from `available_units` to `reserved_units` (`units <= available_units`) — total physical stock (`available + reserved`) stays unchanged while usable unallocated stock drops by `units`.
   5. Every adjustment writes a paired immutable `inventory_transactions` row storing `available_before`, `available_after`, `reserved_before`, `reserved_after`, and a mandatory justification `description` (`>= 3` chars).
 

@@ -142,8 +142,8 @@ class DonorEligibilityService
     /**
      * Record an automated `Not Eligible` deferral backed strictly by a persisted `Failed` screening record.
      *
-     * Allows screening workflows run by authorized lab personnel (`screening.record`) to trigger donor
-     * deferral without granting direct clinical eligibility assessment permissions.
+     * Keeps `reviewed_by_user_id`, `reviewed_at`, and `next_eligible_date` null so an automated safety hold
+     * triggered by laboratory result entry is never confused with a final medical officer eligibility decision.
      *
      * @throws AuthorizationException
      * @throws ValidationException
@@ -153,9 +153,7 @@ class DonorEligibilityService
         ScreeningRecord $failedScreeningRecord,
         ?User $triggeredBy,
         ?string $reason = null,
-        string $clearanceSource = 'Automated Failed Screening Deferral',
-        CarbonInterface|string|null $nextEligibleDate = null,
-        CarbonInterface|string|null $reviewedAt = null
+        string $clearanceSource = 'Automated Failed Screening Deferral'
     ): DonorEligibilityRecord {
         if (! $triggeredBy instanceof User || ! $triggeredBy->is_active) {
             throw new AuthorizationException('An authenticated active user is required to record a failed-screening deferral.');
@@ -173,11 +171,11 @@ class DonorEligibilityService
             'eligibility_status' => 'Not Eligible',
             'reason' => $effectiveReason,
             'clearance_source' => $clearanceSource,
-            'reviewed_at' => $reviewedAt,
-            'next_eligible_date' => $nextEligibleDate,
+            'reviewed_at' => null,
+            'next_eligible_date' => null,
         ]);
 
-        return DB::transaction(function () use ($donor, $failedScreeningRecord, $triggeredBy, $validated): DonorEligibilityRecord {
+        return DB::transaction(function () use ($donor, $failedScreeningRecord, $validated): DonorEligibilityRecord {
             $lockedDonor = Donor::query()
                 ->whereKey($donor->getKey())
                 ->lockForUpdate()
@@ -203,16 +201,14 @@ class DonorEligibilityService
                 ]);
             }
 
-            $reviewer = $triggeredBy->hasRole('admin') ? $triggeredBy : null;
-
             return $this->persistAuthoritativeRecord(
                 donor: $lockedDonor,
-                actor: $reviewer,
+                actor: null,
                 status: $validated['eligibility_status'],
                 reason: $validated['reason'],
                 clearanceSource: $validated['clearance_source'],
-                reviewedAt: $validated['reviewed_at'],
-                nextEligibleDate: $validated['next_eligible_date'],
+                reviewedAt: null,
+                nextEligibleDate: null,
                 expectedCurrentRecordId: null,
                 requireEmptyHistory: false,
             );
