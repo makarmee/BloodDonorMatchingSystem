@@ -233,4 +233,36 @@ class User extends Authenticatable
     {
         return $query->whereHas('roles', fn (Builder $roleQuery): Builder => $roleQuery->where('slug', $roleSlug));
     }
+
+    /**
+     * Determine whether this user is assigned the given role slug.
+     */
+    public function hasRole(string $roleSlug): bool
+    {
+        return $this->roles()->where('slug', $roleSlug)->exists();
+    }
+
+    /**
+     * Determine whether this user holds at least one of the specified role slugs.
+     *
+     * @param  list<string>  $roleSlugs
+     */
+    public function hasAnyRole(array $roleSlugs): bool
+    {
+        if ($roleSlugs === []) {
+            return false;
+        }
+
+        return $this->roles()->whereIn('slug', $roleSlugs)->exists();
+    }
+
+    /**
+     * Determine whether this user has been granted the given permission slug via any role.
+     */
+    public function hasPermission(string $permissionSlug): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', fn (Builder $query): Builder => $query->where('slug', $permissionSlug))
+            ->exists();
+    }
 }
