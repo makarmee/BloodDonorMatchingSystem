@@ -16,12 +16,14 @@ class DonorPolicy
             return false;
         }
 
-        return $user->hasAnyRole(['admin', 'staff', 'lab_officer'])
-            || $user->hasPermission('donors.view_medical');
+        return $user->hasRole('admin') || $user->hasPermission('donors.view_medical');
     }
 
     /**
      * Determine whether the user can record a donor eligibility assessment or deferral.
+     *
+     * Until an explicit clinical eligibility permission or medical officer role is added
+     * to documented authorization rules, only active admin users may alter donor eligibility.
      */
     public function assessEligibility(User $user, Donor $donor, ?string $targetStatus = null): bool
     {
@@ -29,11 +31,6 @@ class DonorPolicy
             return false;
         }
 
-        if ($user->hasAnyRole(['admin', 'staff'])) {
-            return true;
-        }
-
-        return $targetStatus === 'Not Eligible' && $user->hasRole('lab_officer');
+        return $user->hasRole('admin');
     }
 }
-

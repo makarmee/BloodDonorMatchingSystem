@@ -43,8 +43,12 @@ class DonorEligibilityService
         array $attributes,
         ?int $expectedCurrentRecordId = null
     ): DonorEligibilityRecord {
+        $requestedStatus = is_string($attributes['eligibility_status'] ?? null)
+            ? $attributes['eligibility_status']
+            : null;
+
+        $this->authorizeAssessment($actor, $donor, $requestedStatus);
         $validated = $this->validateAssessmentAttributes($attributes);
-        $this->authorizeAssessment($actor, $donor, $validated['eligibility_status']);
 
         return $this->persistAuthoritativeRecord(
             donor: $donor,
@@ -60,7 +64,7 @@ class DonorEligibilityService
     }
 
     /**
-     * Clear a donor as Eligible following authorized medical/intake review.
+     * Clear a donor as Eligible following authorized medical review.
      *
      * @throws AuthorizationException
      * @throws ValidationException
@@ -69,7 +73,7 @@ class DonorEligibilityService
         Donor $donor,
         ?User $actor,
         string $reason,
-        string $clearanceSource = 'Staff Medical Review',
+        string $clearanceSource = 'Medical Officer Clearance',
         CarbonInterface|string|null $reviewedAt = null,
         CarbonInterface|string|null $nextEligibleDate = null,
         ?int $expectedCurrentRecordId = null
@@ -136,6 +140,7 @@ class DonorEligibilityService
     /**
      * Initialize the first authoritative unreviewed eligibility record for a newly onboarded donor.
      *
+     * @throws AuthorizationException
      * @throws ValidationException
      */
     public function initializeOnboardingEligibility(
@@ -145,6 +150,10 @@ class DonorEligibilityService
         string $reason = 'Initial donor onboarding awaiting clinical eligibility review.',
         string $clearanceSource = 'Donor Registration Onboarding'
     ): DonorEligibilityRecord {
+        if ($actor instanceof User) {
+            $this->authorizeAssessment($actor, $donor, $status);
+        }
+
         if (! in_array($status, self::ONBOARDING_STATUSES, true)) {
             throw ValidationException::withMessages([
                 'eligibility_status' => 'Initial onboarding eligibility may only start as Pending Review or Unknown.',
@@ -211,6 +220,10 @@ class DonorEligibilityService
      */
     public function isCurrentlyEligible(Donor $donor): bool
     {
+        if ($donor->getKey() === null) {
+            return false;
+        }
+
         return DonorEligibilityRecord::query()
             ->where('donor_id', $donor->getKey())
             ->current()
@@ -223,7 +236,7 @@ class DonorEligibilityService
      *
      * @throws AuthorizationException
      */
-    private function authorizeAssessment(?User $actor, Donor $donor, string $targetStatus): void
+    private function authorizeAssessment(?User $actor, Donor $donor, ?string $targetStatus = null): void
     {
         if (! $actor instanceof User) {
             throw new AuthorizationException('An authenticated and authorized user is required to update donor eligibility.');
@@ -413,4 +426,3 @@ class DonorEligibilityService
         return $persistedRecord->fresh(['donor', 'reviewedBy']) ?? $persistedRecord;
     }
 }
-

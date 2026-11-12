@@ -4,14 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\Donor;
 use App\Models\DonorEligibilityRecord;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Policies\DonorPolicy;
 use App\Services\DonorEligibilityService;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Tests\TestCase;
@@ -29,24 +33,25 @@ class DonorEligibilityServiceTest extends TestCase
         $this->service = app(DonorEligibilityService::class);
     }
 
-    public function test_authorized_staff_records_eligibility_assessment_and_synchronizes_donor_projections(): void
+    public function test_authorized_admin_records_eligibility_assessment_and_synchronizes_donor_projections(): void
     {
         $this->travelTo('2026-11-12 09:00:00');
         $this->seed(RolePermissionSeeder::class);
 
-        $staff = $this->createUserWithRole('staff');
+        $admin = $this->createUserWithRole('admin');
         $donor = Donor::factory()->create();
 
         $initialRecord = $this->service->initializeOnboardingEligibility($donor);
         $this->assertSame('Pending Review', $initialRecord->eligibility_status);
+        $this->assertNull($initialRecord->reviewed_by_user_id);
         $this->assertTrue($initialRecord->is_current);
         $this->assertFalse($this->service->isCurrentlyEligible($donor));
 
         $approvedRecord = $this->service->approveEligibility(
             donor: $donor,
-            actor: $staff,
+            actor: $admin,
             reason: 'Cleared on intake questionnaire, blood pressure, and hemoglobin 13.8 g/dL.',
-            clearanceSource: 'Staff Medical Review',
+            clearanceSource: 'Medical Officer Clearance',
             reviewedAt: '2026-11-12',
             nextEligibleDate: '2027-01-07',
         );
@@ -56,7 +61,7 @@ class DonorEligibilityServiceTest extends TestCase
 
         $this->assertModelExists($approvedRecord);
         $this->assertSame('Eligible', $approvedRecord->eligibility_status);
-        $this->assertSame($staff->id, $approvedRecord->reviewed_by_user_id);
+        $this->assertSame($admin->id, $approvedRecord->reviewed_by_user_id);
         $this->assertSame('2026-11-12', $approvedRecord->reviewed_at?->toDateString());
         $this->assertSame('2027-01-07', $approvedRecord->next_eligible_date?->toDateString());
         $this->assertTrue($approvedRecord->is_current);
@@ -124,14 +129,14 @@ class DonorEligibilityServiceTest extends TestCase
         $this->travelTo('2026-11-12 10:00:00');
         $this->seed(RolePermissionSeeder::class);
 
-        $staff = $this->createUserWithRole('staff');
+        $admin = $this->createUserWithRole('admin');
         $donor = Donor::factory()->create([
             'last_donation_date' => '2025-01-10',
         ]);
 
         $this->service->deferDonor(
             donor: $donor,
-            actor: $staff,
+            actor: $admin,
             reason: 'Pending clinician review despite elapsed calendar interval.',
             nextEligibleDate: null,
         );
@@ -144,34 +149,83 @@ class DonorEligibilityServiceTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
+        $this->assertInstanceOf(DonorPolicy::class, Gate::getPolicyFor(Donor::class));
+
         $donor = Donor::factory()->create();
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
         $donorUser = $this->createUserWithRole('donor');
         $hospitalUser = $this->createUserWithRole('hospital');
         $rolelessUser = User::factory()->create();
         $inactiveAdmin = $this->createUserWithRole('admin', isActive: false);
-        $labOfficer = $this->createUserWithRole('lab_officer');
 
-        foreach ([null, $donorUser, $hospitalUser, $rolelessUser, $inactiveAdmin] as $unauthorizedActor) {
+        // Give a custom non-admin role explicit screening.record and donors.view_medical permissions
+        // to prove those permissions never grant donor eligibility modification rights.
+        $screeningRole = Role::factory()->create(['name' => 'Custom Lab View Role', 'slug' => 'custom_lab_view']);
+        $screeningRecordPerm = Permission::query()->where('slug', 'screening.record')->firstOrFail();
+        $viewMedicalPerm = Permission::query()->where('slug', 'donors.view_medical')->firstOrFail();
+        $screeningRole->permissions()->attach([$screeningRecordPerm->id, $viewMedicalPerm->id]);
+        $customPermittedUser = User::factory()->create(['is_active' => true]);
+        $customPermittedUser->roles()->attach($screeningRole->id, ['assigned_at' => now()]);
+
+        $this->assertTrue(Gate::forUser($admin)->allows('viewMedical', $donor));
+        $this->assertTrue(Gate::forUser($staff)->allows('viewMedical', $donor));
+        $this->assertTrue(Gate::forUser($labOfficer)->allows('viewMedical', $donor));
+        $this->assertTrue(Gate::forUser($customPermittedUser)->allows('viewMedical', $donor));
+        $this->assertFalse(Gate::forUser($donorUser)->allows('viewMedical', $donor));
+        $this->assertFalse(Gate::forUser($hospitalUser)->allows('viewMedical', $donor));
+        $this->assertFalse(Gate::forUser($inactiveAdmin)->allows('viewMedical', $donor));
+
+        $deniedActors = [
+            null,
+            $staff,
+            $labOfficer,
+            $donorUser,
+            $hospitalUser,
+            $rolelessUser,
+            $inactiveAdmin,
+            $customPermittedUser,
+        ];
+
+        foreach ($deniedActors as $unauthorizedActor) {
             try {
                 $this->service->approveEligibility(
                     donor: $donor,
                     actor: $unauthorizedActor,
                     reason: 'Unauthorized clearance attempt.',
                 );
-                $this->fail('Expected AuthorizationException was not thrown.');
+                $this->fail('Expected AuthorizationException for approveEligibility.');
+            } catch (AuthorizationException) {
+                $this->addToAssertionCount(1);
+            }
+
+            try {
+                $this->service->deferDonor(
+                    donor: $donor,
+                    actor: $unauthorizedActor,
+                    reason: 'Unauthorized deferral attempt.',
+                );
+                $this->fail('Expected AuthorizationException for deferDonor.');
+            } catch (AuthorizationException) {
+                $this->addToAssertionCount(1);
+            }
+
+            try {
+                $this->service->recordScreeningDeferral(
+                    donor: $donor,
+                    actor: $unauthorizedActor,
+                    reason: 'Unauthorized screening deferral attempt.',
+                );
+                $this->fail('Expected AuthorizationException for recordScreeningDeferral.');
             } catch (AuthorizationException) {
                 $this->addToAssertionCount(1);
             }
         }
 
-        // Lab officers cannot grant Eligible clearance, only record screening deferrals.
         try {
-            $this->service->approveEligibility(
-                donor: $donor,
-                actor: $labOfficer,
-                reason: 'Attempted Eligible clearance by lab officer.',
-            );
-            $this->fail('Expected AuthorizationException for lab officer Eligible clearance.');
+            $this->service->initializeOnboardingEligibility($donor, $staff);
+            $this->fail('Expected AuthorizationException when non-admin actor is passed to initializeOnboardingEligibility.');
         } catch (AuthorizationException) {
             $this->addToAssertionCount(1);
         }
@@ -180,7 +234,7 @@ class DonorEligibilityServiceTest extends TestCase
 
         $deferral = $this->service->recordScreeningDeferral(
             donor: $donor,
-            actor: $labOfficer,
+            actor: $admin,
             reason: 'Reactive screening assay on DON-4409 requires permanent deferral.',
         );
 
@@ -192,25 +246,25 @@ class DonorEligibilityServiceTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        $staffOne = $this->createUserWithRole('staff');
-        $staffTwo = $this->createUserWithRole('staff');
+        $adminOne = $this->createUserWithRole('admin');
+        $adminTwo = $this->createUserWithRole('admin');
         $donor = Donor::factory()->create();
 
         $initial = $this->service->initializeOnboardingEligibility($donor);
 
-        // Staff Two commits first, superseding $initial.
+        // Admin Two commits first, superseding $initial.
         $winningRecord = $this->service->approveEligibility(
             donor: $donor,
-            actor: $staffTwo,
+            actor: $adminTwo,
             reason: 'Cleared first during concurrent review.',
             expectedCurrentRecordId: $initial->id,
         );
 
-        // Staff One tries to commit using stale $initial->id.
+        // Admin One tries to commit using stale $initial->id.
         try {
             $this->service->deferDonor(
                 donor: $donor,
-                actor: $staffOne,
+                actor: $adminOne,
                 reason: 'Stale conflicting review.',
                 expectedCurrentRecordId: $initial->id,
             );
@@ -239,7 +293,7 @@ class DonorEligibilityServiceTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        $staff = $this->createUserWithRole('staff');
+        $admin = $this->createUserWithRole('admin');
         $donor = Donor::factory()->create();
         $initial = $this->service->initializeOnboardingEligibility($donor);
 
@@ -250,7 +304,7 @@ class DonorEligibilityServiceTest extends TestCase
         try {
             $this->service->approveEligibility(
                 donor: $donor,
-                actor: $staff,
+                actor: $admin,
                 reason: 'Should roll back completely on projection failure.',
             );
             $this->fail('Expected RuntimeException from Donor::saving listener.');
@@ -337,6 +391,54 @@ class DonorEligibilityServiceTest extends TestCase
         $this->assertSame(1, DonorEligibilityRecord::query()->where('donor_id', $donor->id)->count());
     }
 
+    public function test_is_currently_eligible_handles_missing_stale_and_inconsistent_records_safely(): void
+    {
+        $this->travelTo('2026-11-12 10:00:00');
+        $this->seed(RolePermissionSeeder::class);
+
+        $admin = $this->createUserWithRole('admin');
+
+        // Unsaved donor model without primary key.
+        $this->assertFalse($this->service->isCurrentlyEligible(new Donor));
+
+        // Persisted donor without any eligibility record, even with tampered projection column.
+        $donorWithoutRecord = Donor::factory()->create();
+        DB::table('donors')
+            ->where('id', $donorWithoutRecord->id)
+            ->update([
+                'eligibility_status' => 'Eligible',
+                'next_eligible_date' => '2026-01-01',
+            ]);
+        $this->assertFalse($this->service->isCurrentlyEligible($donorWithoutRecord->fresh()));
+
+        // Donor deferred with past next_eligible_date and tampered Eligible projection.
+        $this->service->deferDonor(
+            donor: $donorWithoutRecord,
+            actor: $admin,
+            reason: 'Clinician deferral pending repeat evaluation.',
+            nextEligibleDate: '2026-10-01',
+        );
+        DB::table('donors')
+            ->where('id', $donorWithoutRecord->id)
+            ->update(['eligibility_status' => 'Eligible']);
+        $this->assertFalse($this->service->isCurrentlyEligible($donorWithoutRecord->fresh()));
+
+        // Donor previously Eligible (historical) and later superseded by Pending Review.
+        $this->service->approveEligibility(
+            donor: $donorWithoutRecord,
+            actor: $admin,
+            reason: 'Temporary approval.',
+        );
+        $this->assertTrue($this->service->isCurrentlyEligible($donorWithoutRecord->fresh()));
+
+        $this->service->recordAssessment($donorWithoutRecord, $admin, [
+            'eligibility_status' => 'Pending Review',
+            'reason' => 'Follow-up questionnaire clarification requested.',
+            'clearance_source' => 'Medical Officer Review',
+        ]);
+        $this->assertFalse($this->service->isCurrentlyEligible($donorWithoutRecord->fresh()));
+    }
+
     private function createUserWithRole(string $roleSlug, bool $isActive = true): User
     {
         $user = User::factory()->create(['is_active' => $isActive]);
@@ -346,4 +448,3 @@ class DonorEligibilityServiceTest extends TestCase
         return $user;
     }
 }
-
