@@ -11,6 +11,7 @@ use App\Models\Hospital;
 use App\Models\InventoryAllocation;
 use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
+use App\Models\RequestFulfillment;
 use App\Models\Role;
 use App\Models\User;
 use App\Policies\BloodUnitPolicy;
@@ -25,11 +26,14 @@ use Database\Seeders\ComponentScreeningRequirementSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\ScreeningTestTypeSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -702,6 +706,190 @@ class InventoryServiceTest extends TestCase
         $this->assertSame('Discarded', $discardedB->unit_status);
         $this->assertSame(0, $omStock->fresh()->available_units);
         $this->assertTrue($this->inventoryService->reconcileStock($omStock->fresh())['is_reconciled']);
+    }
+
+    public function test_internal_locked_bucket_primitives_enforce_invariants_and_write_per_unit_dispatch_ledger(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        ['stock' => $stock, 'units' => $units] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'B+', 'WB', 3);
+        $now = CarbonImmutable::parse('2026-11-12 14:30:00');
+
+        $hospital = Hospital::factory()->create();
+        $bloodRequest = BloodRequest::factory()->approved()->create([
+            'hospital_id' => $hospital->id,
+            'blood_group' => 'B+',
+            'blood_component_id' => $stock->blood_component_id,
+            'requested_units' => 3,
+        ]);
+        $fulfillment = RequestFulfillment::factory()->create([
+            'blood_request_id' => $bloodRequest->id,
+            'dispatched_by_user_id' => $staff->id,
+            'dispatched_blood_group' => 'B+',
+            'blood_component_id' => $stock->blood_component_id,
+            'units_dispatched' => 2,
+        ]);
+
+        // Unpersisted stock triggers LogicException even inside a transaction.
+        $this->expectException(LogicException::class);
+        $this->inventoryService->reserveLockedBucketUnits(
+            new InventoryStock(['blood_group' => 'B+', 'blood_component_id' => $stock->blood_component_id]),
+            new EloquentCollection([$units[0]]),
+            $staff,
+            'Unsaved stock guard check.',
+            'blood_request',
+            $bloodRequest->id,
+            $now
+        );
+    }
+
+    public function test_internal_locked_bucket_primitives_execute_reserve_release_and_mixed_dispatch_atomically(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        ['stock' => $stock, 'units' => $units] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'B+', 'WB', 3);
+        ['stock' => $otherStock, 'units' => $otherUnits] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'O+', 'WB', 1);
+        $now = CarbonImmutable::parse('2026-11-12 14:35:00');
+
+        $hospital = Hospital::factory()->create();
+        $bloodRequest = BloodRequest::factory()->approved()->create([
+            'hospital_id' => $hospital->id,
+            'blood_group' => 'B+',
+            'blood_component_id' => $stock->blood_component_id,
+            'requested_units' => 3,
+        ]);
+        $fulfillment = RequestFulfillment::factory()->create([
+            'blood_request_id' => $bloodRequest->id,
+            'dispatched_by_user_id' => $staff->id,
+            'dispatched_blood_group' => 'B+',
+            'blood_component_id' => $stock->blood_component_id,
+            'units_dispatched' => 2,
+        ]);
+
+        // Mismatched bucket unit rejected before mutating.
+        $this->assertValidationError('blood_unit_id', function () use ($stock, $otherUnits, $staff, $bloodRequest, $now): void {
+            DB::transaction(function () use ($stock, $otherUnits, $staff, $bloodRequest, $now): void {
+                $lockedStock = InventoryStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
+                $this->inventoryService->reserveLockedBucketUnits(
+                    $lockedStock,
+                    new EloquentCollection([$otherUnits[0]->fresh()]),
+                    $staff,
+                    'Cross-bucket reservation should reject.',
+                    'blood_request',
+                    $bloodRequest->id,
+                    $now
+                );
+            });
+        });
+
+        // 1. Reserve 2 units via internal locked primitive.
+        DB::transaction(function () use ($stock, $units, $staff, $bloodRequest, $now): void {
+            $lockedStock = InventoryStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
+            $lockedUnits = BloodUnit::query()->whereIn('id', [$units[0]->id, $units[1]->id])->orderBy('id')->lockForUpdate()->get();
+
+            $this->inventoryService->reserveLockedBucketUnits(
+                $lockedStock,
+                $lockedUnits,
+                $staff,
+                "Reserved 2 units for {$bloodRequest->request_code}.",
+                'blood_request',
+                $bloodRequest->id,
+                $now
+            );
+        });
+
+        $this->assertSame(1, $stock->fresh()->available_units);
+        $this->assertSame(2, $stock->fresh()->reserved_units);
+
+        // Overlapping reserved + available unit IDs rejected cleanly.
+        $this->assertValidationError('blood_unit_ids', function () use ($stock, $units, $staff, $fulfillment, $now): void {
+            DB::transaction(function () use ($stock, $units, $staff, $fulfillment, $now): void {
+                $lockedStock = InventoryStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
+                $reservedUnit = BloodUnit::query()->whereKey($units[0]->id)->lockForUpdate()->firstOrFail();
+                $this->inventoryService->dispatchLockedBucketUnits(
+                    $lockedStock,
+                    new EloquentCollection([$reservedUnit]),
+                    new EloquentCollection([$reservedUnit]),
+                    $staff,
+                    'Overlap guard.',
+                    $fulfillment->id,
+                    $now
+                );
+            });
+        });
+
+        // 2. Release 1 reserved unit via internal locked primitive.
+        DB::transaction(function () use ($stock, $units, $staff, $bloodRequest, $now): void {
+            $lockedStock = InventoryStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
+            $lockedUnit = BloodUnit::query()->whereKey($units[1]->id)->lockForUpdate()->get();
+
+            $this->inventoryService->releaseLockedBucketUnits(
+                $lockedStock,
+                $lockedUnit,
+                $staff,
+                "Released hold on {$units[1]->unit_code}.",
+                'blood_request',
+                $bloodRequest->id,
+                $now->addMinutes(1)
+            );
+        });
+
+        $this->assertSame(2, $stock->fresh()->available_units);
+        $this->assertSame(1, $stock->fresh()->reserved_units);
+
+        // 3. Mixed dispatch: 1 Reserved ($units[0]) + 1 Available ($units[2]) -> per-unit -1 Dispatch ledger rows.
+        DB::transaction(function () use ($stock, $units, $staff, $fulfillment, $now): void {
+            $lockedStock = InventoryStock::query()->whereKey($stock->id)->lockForUpdate()->firstOrFail();
+            $reservedUnits = BloodUnit::query()->whereKey($units[0]->id)->lockForUpdate()->get();
+            $availableUnits = BloodUnit::query()->whereKey($units[2]->id)->lockForUpdate()->get();
+
+            $this->inventoryService->dispatchLockedBucketUnits(
+                $lockedStock,
+                $reservedUnits,
+                $availableUnits,
+                $staff,
+                "Dispatched batch {$fulfillment->fulfillment_code}.",
+                $fulfillment->id,
+                $now->addMinutes(2)
+            );
+        });
+
+        $stock->refresh();
+        $this->assertSame(1, $stock->available_units);
+        $this->assertSame(0, $stock->reserved_units);
+        $this->assertSame('Dispatched', $units[0]->fresh()->unit_status);
+        $this->assertSame('Available', $units[1]->fresh()->unit_status);
+        $this->assertSame('Dispatched', $units[2]->fresh()->unit_status);
+
+        $dispatchTxns = InventoryTransaction::query()
+            ->where('reference_type', 'fulfillment')
+            ->where('reference_id', $fulfillment->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(2, $dispatchTxns);
+        $this->assertSame([-1, -1], $dispatchTxns->pluck('units_delta')->all());
+        $this->assertSame([$units[0]->id, $units[2]->id], $dispatchTxns->pluck('blood_unit_id')->all());
+        $this->assertSame('Dispatch', $dispatchTxns[0]->operation_type);
+        $this->assertSame('Dispatch', $dispatchTxns[1]->operation_type);
+        $this->assertSame(1, $dispatchTxns[0]->reserved_before);
+        $this->assertSame(0, $dispatchTxns[0]->reserved_after);
+        $this->assertSame(2, $dispatchTxns[1]->available_before);
+        $this->assertSame(1, $dispatchTxns[1]->available_after);
+
+        $reconciliation = $this->inventoryService->reconcileStock($stock);
+        $this->assertTrue($reconciliation['is_reconciled']);
+        $this->assertSame(1, $reconciliation['stock_available_units']);
+        $this->assertSame(0, $reconciliation['stock_reserved_units']);
+        $this->assertTrue($this->inventoryService->reconcileStock($otherStock)['is_reconciled']);
     }
 
     private function seedBaselineCatalogs(): void

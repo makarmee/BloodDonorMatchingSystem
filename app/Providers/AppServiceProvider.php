@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\BloodRequest;
+use App\Policies\BloodRequestPolicy;
 use Closure;
 use Illuminate\Database\Schema\Builder;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +24,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(BloodRequest::class, BloodRequestPolicy::class);
+
         if (! Builder::hasMacro('createWithChecks')) {
             /**
              * Create a table while enforcing named CHECK constraints identically across MySQL and SQLite.

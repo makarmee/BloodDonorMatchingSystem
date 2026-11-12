@@ -16,6 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 /**
  * Inventory domain service managing stock adjustments, reservations, releases, discards, expirations,
@@ -323,40 +324,14 @@ class InventoryService
 
             $this->ensureNoActiveAllocation($lockedUnit, 'allocation_status');
 
-            if ($lockedStock->reserved_units < 1) {
-                throw ValidationException::withMessages([
-                    'reserved_units' => 'Cannot decrement reserved stock counter below zero.',
-                ]);
-            }
-
-            $occurredAt = CarbonImmutable::now();
-            $availableBefore = $lockedStock->available_units;
-            $reservedBefore = $lockedStock->reserved_units;
-            $availableAfter = $availableBefore + 1;
-            $reservedAfter = $reservedBefore - 1;
-
-            $lockedUnit->unit_status = 'Available';
-            $lockedUnit->save();
-
-            $lockedStock->available_units = $availableAfter;
-            $lockedStock->reserved_units = $reservedAfter;
-            $lockedStock->last_adjusted_at = $occurredAt;
-            $lockedStock->save();
-
-            $this->recordTransaction(
+            $this->releaseLockedBucketUnits(
                 lockedStock: $lockedStock,
-                bloodUnit: $lockedUnit,
-                operationType: 'Release Reservation',
-                unitsDelta: 1,
-                availableBefore: $availableBefore,
-                availableAfter: $availableAfter,
-                reservedBefore: $reservedBefore,
-                reservedAfter: $reservedAfter,
+                lockedReservedUnits: new EloquentCollection([$lockedUnit]),
                 actor: $actor,
                 description: $context['description'],
                 referenceType: $context['reference_type'] ?? 'manual',
                 referenceId: $context['reference_id'],
-                occurredAt: $occurredAt
+                occurredAt: CarbonImmutable::now()
             );
 
             return $lockedUnit;
@@ -730,6 +705,249 @@ class InventoryService
     }
 
     /**
+     * Reserve pre-locked Available units within a caller-managed transaction and lock scope.
+     *
+     * @internal Intended for coordinated domain services such as FulfillmentService.
+     *
+     * @param  EloquentCollection<int, BloodUnit>  $lockedUnits
+     *
+     * @throws LogicException
+     * @throws ValidationException
+     */
+    public function reserveLockedBucketUnits(
+        InventoryStock $lockedStock,
+        EloquentCollection $lockedUnits,
+        User $actor,
+        string $description,
+        string $referenceType,
+        int $referenceId,
+        CarbonImmutable $occurredAt
+    ): void {
+        $this->assertLockedStockAndTransaction($lockedStock);
+        $normalizedDescription = $this->normalizeRequiredJustification(['description' => $description]);
+
+        if ($referenceId < 1) {
+            throw ValidationException::withMessages([
+                'reference_id' => 'A valid positive reference ID is required.',
+            ]);
+        }
+
+        if ($lockedUnits->isEmpty()) {
+            throw ValidationException::withMessages([
+                'blood_unit_ids' => 'At least one Available blood unit is required for reservation.',
+            ]);
+        }
+
+        $this->validateLockedUnitsForTransition($lockedStock, $lockedUnits, 'Available', 'blood_unit_ids');
+
+        if ($lockedStock->available_units < $lockedUnits->count()) {
+            throw ValidationException::withMessages([
+                'available_units' => "Insufficient available stock: requested {$lockedUnits->count()}, available {$lockedStock->available_units}.",
+            ]);
+        }
+
+        $this->reserveLockedUnits(
+            lockedStock: $lockedStock,
+            lockedUnits: $lockedUnits,
+            actor: $actor,
+            description: $normalizedDescription,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            occurredAt: $occurredAt
+        );
+    }
+
+    /**
+     * Release pre-locked Reserved units back to Available within a caller-managed transaction.
+     *
+     * @internal Intended for coordinated domain services such as FulfillmentService.
+     *
+     * @param  EloquentCollection<int, BloodUnit>  $lockedReservedUnits
+     *
+     * @throws LogicException
+     * @throws ValidationException
+     */
+    public function releaseLockedBucketUnits(
+        InventoryStock $lockedStock,
+        EloquentCollection $lockedReservedUnits,
+        User $actor,
+        string $description,
+        string $referenceType,
+        ?int $referenceId,
+        CarbonImmutable $occurredAt
+    ): void {
+        $this->assertLockedStockAndTransaction($lockedStock);
+        $normalizedDescription = $this->normalizeRequiredJustification(['description' => $description]);
+
+        if ($lockedReservedUnits->isEmpty()) {
+            throw ValidationException::withMessages([
+                'blood_unit_ids' => 'At least one Reserved blood unit is required to release reservations.',
+            ]);
+        }
+
+        $this->validateLockedUnitsForTransition($lockedStock, $lockedReservedUnits, 'Reserved', 'blood_unit_ids');
+
+        if ($lockedStock->reserved_units < $lockedReservedUnits->count()) {
+            throw ValidationException::withMessages([
+                'reserved_units' => 'Cannot decrement reserved stock counter below zero.',
+            ]);
+        }
+
+        $runningAvailable = $lockedStock->available_units;
+        $runningReserved = $lockedStock->reserved_units;
+
+        foreach ($lockedReservedUnits as $unit) {
+            $unit->unit_status = 'Available';
+            $unit->save();
+
+            $availableBefore = $runningAvailable;
+            $reservedBefore = $runningReserved;
+            $runningAvailable++;
+            $runningReserved--;
+
+            $this->recordTransaction(
+                lockedStock: $lockedStock,
+                bloodUnit: $unit,
+                operationType: 'Release Reservation',
+                unitsDelta: 1,
+                availableBefore: $availableBefore,
+                availableAfter: $runningAvailable,
+                reservedBefore: $reservedBefore,
+                reservedAfter: $runningReserved,
+                actor: $actor,
+                description: $normalizedDescription,
+                referenceType: $referenceType,
+                referenceId: $referenceId,
+                occurredAt: $occurredAt
+            );
+        }
+
+        $lockedStock->available_units = $runningAvailable;
+        $lockedStock->reserved_units = $runningReserved;
+        $lockedStock->last_adjusted_at = $occurredAt;
+        $lockedStock->save();
+    }
+
+    /**
+     * Dispatch pre-locked Reserved and Available units within a caller-managed transaction.
+     *
+     * Writes one `-1` Dispatch ledger row per serialized unit referencing the fulfillment batch ID.
+     *
+     * @internal Intended for coordinated domain services such as FulfillmentService.
+     *
+     * @param  EloquentCollection<int, BloodUnit>  $lockedReservedUnits
+     * @param  EloquentCollection<int, BloodUnit>  $lockedAvailableUnits
+     *
+     * @throws LogicException
+     * @throws ValidationException
+     */
+    public function dispatchLockedBucketUnits(
+        InventoryStock $lockedStock,
+        EloquentCollection $lockedReservedUnits,
+        EloquentCollection $lockedAvailableUnits,
+        User $actor,
+        string $description,
+        int $fulfillmentId,
+        CarbonImmutable $occurredAt
+    ): void {
+        $this->assertLockedStockAndTransaction($lockedStock);
+        $normalizedDescription = $this->normalizeRequiredJustification(['description' => $description]);
+
+        if ($fulfillmentId < 1) {
+            throw ValidationException::withMessages([
+                'fulfillment_id' => 'A valid positive fulfillment ID is required for dispatch ledger entries.',
+            ]);
+        }
+
+        if ($lockedReservedUnits->isEmpty() && $lockedAvailableUnits->isEmpty()) {
+            throw ValidationException::withMessages([
+                'blood_unit_ids' => 'At least one blood unit is required for dispatch.',
+            ]);
+        }
+
+        $reservedIds = $lockedReservedUnits->isNotEmpty()
+            ? $this->validateLockedUnitsForTransition($lockedStock, $lockedReservedUnits, 'Reserved', 'blood_unit_ids')
+            : [];
+        $availableIds = $lockedAvailableUnits->isNotEmpty()
+            ? $this->validateLockedUnitsForTransition($lockedStock, $lockedAvailableUnits, 'Available', 'blood_unit_ids')
+            : [];
+
+        if (array_intersect($reservedIds, $availableIds) !== []) {
+            throw ValidationException::withMessages([
+                'blood_unit_ids' => 'Duplicate blood units cannot appear in both reserved and available dispatch sets.',
+            ]);
+        }
+
+        if ($lockedStock->reserved_units < count($reservedIds)) {
+            throw ValidationException::withMessages([
+                'reserved_units' => 'Insufficient reserved stock counter for dispatch.',
+            ]);
+        }
+
+        if ($lockedStock->available_units < count($availableIds)) {
+            throw ValidationException::withMessages([
+                'available_units' => 'Insufficient available stock counter for dispatch.',
+            ]);
+        }
+
+        $runningAvailable = $lockedStock->available_units;
+        $runningReserved = $lockedStock->reserved_units;
+
+        foreach ($lockedReservedUnits as $unit) {
+            $unit->unit_status = 'Dispatched';
+            $unit->save();
+
+            $reservedBefore = $runningReserved;
+            $runningReserved--;
+
+            $this->recordTransaction(
+                lockedStock: $lockedStock,
+                bloodUnit: $unit,
+                operationType: 'Dispatch',
+                unitsDelta: -1,
+                availableBefore: $runningAvailable,
+                availableAfter: $runningAvailable,
+                reservedBefore: $reservedBefore,
+                reservedAfter: $runningReserved,
+                actor: $actor,
+                description: $normalizedDescription,
+                referenceType: 'fulfillment',
+                referenceId: $fulfillmentId,
+                occurredAt: $occurredAt
+            );
+        }
+
+        foreach ($lockedAvailableUnits as $unit) {
+            $unit->unit_status = 'Dispatched';
+            $unit->save();
+
+            $availableBefore = $runningAvailable;
+            $runningAvailable--;
+
+            $this->recordTransaction(
+                lockedStock: $lockedStock,
+                bloodUnit: $unit,
+                operationType: 'Dispatch',
+                unitsDelta: -1,
+                availableBefore: $availableBefore,
+                availableAfter: $runningAvailable,
+                reservedBefore: $runningReserved,
+                reservedAfter: $runningReserved,
+                actor: $actor,
+                description: $normalizedDescription,
+                referenceType: 'fulfillment',
+                referenceId: $fulfillmentId,
+                occurredAt: $occurredAt
+            );
+        }
+
+        $lockedStock->available_units = $runningAvailable;
+        $lockedStock->reserved_units = $runningReserved;
+        $lockedStock->last_adjusted_at = $occurredAt;
+        $lockedStock->save();
+    }
+
+    /**
      * Validate a single ledger transaction's operation semantics, unit dimension parity, and uniqueness.
      *
      * @param  array<int, string>  $stockInUnitIds
@@ -937,6 +1155,67 @@ class InventoryService
                 'blood_unit_id' => 'Blood unit group or component does not match target inventory stock bucket.',
             ]);
         }
+    }
+
+    /**
+     * Require an active database transaction and a persisted stock bucket before internal mutations.
+     *
+     * @throws LogicException
+     */
+    private function assertLockedStockAndTransaction(InventoryStock $lockedStock): void
+    {
+        if (DB::transactionLevel() < 1) {
+            throw new LogicException('InventoryService locked bucket operations must execute inside an active database transaction.');
+        }
+
+        if (! $lockedStock->exists || $lockedStock->getKey() === null) {
+            throw new LogicException('InventoryService locked bucket operations require a persisted InventoryStock record.');
+        }
+    }
+
+    /**
+     * Validate dimension parity, uniqueness, and expected status across a pre-locked BloodUnit collection.
+     *
+     * @param  EloquentCollection<int, BloodUnit>  $lockedUnits
+     * @return list<int>
+     *
+     * @throws ValidationException
+     */
+    private function validateLockedUnitsForTransition(
+        InventoryStock $lockedStock,
+        EloquentCollection $lockedUnits,
+        string $expectedStatus,
+        string $errorKey
+    ): array {
+        $seenUnitIds = [];
+
+        foreach ($lockedUnits as $unit) {
+            if (! $unit instanceof BloodUnit || ! $unit->exists || $unit->getKey() === null) {
+                throw ValidationException::withMessages([
+                    $errorKey => 'Every blood unit passed for inventory transition must be a persisted BloodUnit model.',
+                ]);
+            }
+
+            $unitId = (int) $unit->getKey();
+
+            if (isset($seenUnitIds[$unitId])) {
+                throw ValidationException::withMessages([
+                    $errorKey => "Duplicate blood unit ID {$unitId} detected in locked transition batch.",
+                ]);
+            }
+
+            $seenUnitIds[$unitId] = true;
+
+            $this->ensureUnitMatchesStock($unit, $lockedStock);
+
+            if ($unit->unit_status !== $expectedStatus) {
+                throw ValidationException::withMessages([
+                    $errorKey => "Blood unit {$unit->unit_code} must have status '{$expectedStatus}' (found '{$unit->unit_status}').",
+                ]);
+            }
+        }
+
+        return array_keys($seenUnitIds);
     }
 
     /**
