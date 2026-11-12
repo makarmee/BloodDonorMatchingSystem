@@ -366,6 +366,19 @@ class InventoryServiceTest extends TestCase
         $this->assertTrue($reconciliation['is_reconciled']);
         $this->assertSame(1, $reconciliation['quarantined_zero_delta_discards_count']);
         $this->assertSame(1, $reconciliation['stock_total_units']);
+
+        // 5. Direct reserveUnit() on an Available unit linked to an active request allocation is blocked.
+        ['units' => $allocatedCheckUnits] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'AB+', 'WB', 1);
+        $allocatedAvailableUnit = $allocatedCheckUnits[0];
+        InventoryAllocation::factory()->create([
+            'blood_request_id' => $bloodRequest->id,
+            'inventory_stock_id' => $stock->id,
+            'blood_unit_id' => $allocatedAvailableUnit->id,
+            'allocation_status' => 'Reserved',
+            'allocated_by_user_id' => $staff->id,
+        ]);
+
+        $this->assertValidationError('unit_status', fn (): BloodUnit => $this->inventoryService->reserveUnit($allocatedAvailableUnit, $staff));
     }
 
     public function test_marking_expired_units_and_detecting_reconciliation_discrepancies_without_silent_repair(): void
@@ -498,6 +511,197 @@ class InventoryServiceTest extends TestCase
         $mismatchReport = $this->inventoryService->reconcileStock($stock->fresh());
         $this->assertFalse($mismatchReport['is_reconciled']);
         $this->assertStringContainsString('Serialized Available blood_units count', implode(' ', $mismatchReport['discrepancies']));
+    }
+
+    public function test_reconcile_stock_validates_operation_signs_and_detects_duplicates_or_cross_dimension_units(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $wbComponent = BloodComponent::query()->where('code', 'WB')->firstOrFail();
+
+        // 1. Valid complex historical lifecycle including Reserve -> Release -> Reserve -> Dispatch (reserved) -> Stock In -> Quarantined zero-delta Discard.
+        ['stock' => $wbStock, 'units' => $units] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'A+', 'WB', 2);
+        $unitDispatched = $units[0];
+        $unitAvailable = $units[1];
+
+        $this->inventoryService->reserveUnit($unitDispatched, $staff);
+        $this->inventoryService->releaseReservation($unitDispatched, $staff);
+        $this->inventoryService->reserveUnit($unitDispatched, $staff);
+
+        $unitDispatched->forceFill(['unit_status' => 'Dispatched'])->save();
+        InventoryStock::query()->whereKey($wbStock->id)->update(['reserved_units' => 0]);
+        InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-HIST-DISP',
+            'inventory_stock_id' => $wbStock->id,
+            'blood_unit_id' => $unitDispatched->id,
+            'operation_type' => 'Dispatch',
+            'units_delta' => -1,
+            'available_before' => 1,
+            'available_after' => 1,
+            'reserved_before' => 1,
+            'reserved_after' => 0,
+            'reference_type' => 'fulfillment',
+            'reference_id' => 99,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Valid historical reserved unit dispatch.',
+            'occurred_at' => now(),
+        ]);
+
+        $cleanReport = $this->inventoryService->reconcileStock($wbStock->fresh());
+        $this->assertTrue($cleanReport['is_reconciled'], implode(' | ', $cleanReport['discrepancies']));
+
+        // 2. Inverted Reserve sign (+1 instead of -1) is caught even when net physical delta stays zero.
+        $invertedStock = InventoryStock::factory()->create([
+            'blood_group' => 'AB-',
+            'blood_component_id' => $wbComponent->id,
+            'available_units' => 1,
+            'reserved_units' => 0,
+        ]);
+        $abUnit = BloodUnit::factory()->available()->create([
+            'blood_group' => 'AB-',
+            'blood_component_id' => $wbComponent->id,
+        ]);
+        InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-INV-1',
+            'inventory_stock_id' => $invertedStock->id,
+            'blood_unit_id' => $abUnit->id,
+            'operation_type' => 'Reserve',
+            'units_delta' => 1,
+            'available_before' => 0,
+            'available_after' => 1,
+            'reserved_before' => 0,
+            'reserved_after' => 0,
+            'reference_type' => 'manual',
+            'reference_id' => 1,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Corrupted positive Reserve delta.',
+            'occurred_at' => now(),
+        ]);
+        $invertedReport = $this->inventoryService->reconcileStock($invertedStock);
+        $this->assertFalse($invertedReport['is_reconciled']);
+        $this->assertStringContainsString('Reserve transaction TXN-INV-1 has invalid delta', implode(' ', $invertedReport['discrepancies']));
+
+        // 3. Duplicate Stock In, duplicate terminal Discarded, and cross-dimension BloodUnit reference are all detected.
+        InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-DUP-IN',
+            'inventory_stock_id' => $wbStock->id,
+            'blood_unit_id' => $unitAvailable->id,
+            'operation_type' => 'Stock In',
+            'units_delta' => 1,
+            'available_before' => 1,
+            'available_after' => 2,
+            'reserved_before' => 0,
+            'reserved_after' => 0,
+            'reference_type' => 'manual',
+            'reference_id' => 10,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Duplicate Stock In on same unit.',
+            'occurred_at' => now(),
+        ]);
+        InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-DUP-TERM',
+            'inventory_stock_id' => $wbStock->id,
+            'blood_unit_id' => $unitDispatched->id,
+            'operation_type' => 'Discarded',
+            'units_delta' => -1,
+            'available_before' => 2,
+            'available_after' => 1,
+            'reserved_before' => 0,
+            'reserved_after' => 0,
+            'reference_type' => 'manual',
+            'reference_id' => 11,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Duplicate terminal event on already-dispatched unit.',
+            'occurred_at' => now(),
+        ]);
+        InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-XDIM',
+            'inventory_stock_id' => $wbStock->id,
+            'blood_unit_id' => $abUnit->id,
+            'operation_type' => 'Discarded',
+            'units_delta' => 0,
+            'available_before' => 1,
+            'available_after' => 1,
+            'reserved_before' => 0,
+            'reserved_after' => 0,
+            'reference_type' => 'manual',
+            'reference_id' => 12,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Cross-dimension BloodUnit reference.',
+            'occurred_at' => now(),
+        ]);
+
+        $auditReport = $this->inventoryService->reconcileStock($wbStock->fresh());
+        $joined = implode(' ', $auditReport['discrepancies']);
+        $this->assertFalse($auditReport['is_reconciled']);
+        $this->assertStringContainsString('Duplicate Stock In transaction TXN-DUP-IN', $joined);
+        $this->assertStringContainsString('Duplicate terminal transaction TXN-DUP-TERM', $joined);
+        $this->assertStringContainsString('from dimension (AB-/', $joined);
+    }
+
+    public function test_discard_unit_does_not_trust_stale_in_memory_unit_status_or_dimensions(): void
+    {
+        $this->seedBaselineCatalogs();
+
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $component = BloodComponent::query()->where('code', 'PLS')->firstOrFail();
+
+        // Case 1: Quarantined unit with NO stock bucket yet, mutated in memory to look like Available AB-.
+        $donorA = $this->createEligibleDonor($admin, 'O-');
+        $donationA = $this->donationService->registerDonation($donorA, $staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 600,
+            'center_id' => DonationCenter::factory()->create()->id,
+        ]);
+        $tamperedUnit = $donationA->primaryBloodUnit;
+        $tamperedUnit->unit_status = 'Available';
+        $tamperedUnit->blood_group = 'AB-';
+
+        $discardedA = $this->inventoryService->discardUnit($tamperedUnit, $staff, [
+            'description' => 'Discarding quarantined plasma unit despite tampered model attributes.',
+        ]);
+        $this->assertSame('Discarded', $discardedA->unit_status);
+        $this->assertSame('O-', $discardedA->blood_group);
+
+        $omStock = InventoryStock::query()->forBloodGroup('O-')->forComponent($component->id)->firstOrFail();
+        $this->assertSame(0, $omStock->available_units);
+        $this->assertTrue($this->inventoryService->reconcileStock($omStock)['is_reconciled']);
+
+        // Case 2: Stale Quarantined copy held by caller while ScreeningService releases the unit to Available.
+        $donorB = $this->createEligibleDonor($admin, 'O-');
+        $donationB = $this->donationService->registerDonation($donorB, $staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 600,
+            'center_id' => DonationCenter::factory()->create()->id,
+        ]);
+        $staleQuarantinedCopy = $donationB->primaryBloodUnit;
+
+        foreach (['HIV', 'HBV', 'HCV', 'SYPH', 'COMPAT'] as $code) {
+            $this->screeningService->recordScreeningResult($donationB, $labOfficer, [
+                'test_type_code' => $code,
+                'screening_result' => 'Passed',
+            ]);
+        }
+        $this->screeningService->releaseToInventory($donationB, $labOfficer);
+        $this->assertSame(1, $omStock->fresh()->available_units);
+
+        // Passing stale Quarantined copy MUST reload DB state ('Available'), decrement stock (-1), and reconcile cleanly.
+        $discardedB = $this->inventoryService->discardUnit($staleQuarantinedCopy, $staff, [
+            'description' => 'Stale model discard after ScreeningService release.',
+        ]);
+        $this->assertSame('Discarded', $discardedB->unit_status);
+        $this->assertSame(0, $omStock->fresh()->available_units);
+        $this->assertTrue($this->inventoryService->reconcileStock($omStock->fresh())['is_reconciled']);
     }
 
     private function seedBaselineCatalogs(): void

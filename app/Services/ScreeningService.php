@@ -271,12 +271,20 @@ class ScreeningService
             $records = ScreeningRecord::query()
                 ->where('donation_id', $lockedDonation->id)
                 ->with('testType')
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
+
+            // Global lock order: donors -> donations -> screening_records -> inventory_stocks -> blood_units (id ASC).
+            $lockedStock = $this->ensureAndLockInventoryStock(
+                $lockedDonation->blood_group,
+                $lockedDonation->blood_component_id
+            );
 
             $primaryUnits = BloodUnit::query()
                 ->where('donation_id', $lockedDonation->id)
                 ->whereNull('parent_unit_id')
+                ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
@@ -298,10 +306,16 @@ class ScreeningService
                 ]);
             }
 
-            $lockedStock = $this->ensureAndLockInventoryStock(
-                $lockedDonation->blood_group,
-                $lockedDonation->blood_component_id
-            );
+            foreach ($primaryUnits as $unit) {
+                if (
+                    $unit->blood_group !== $lockedStock->blood_group
+                    || (int) $unit->blood_component_id !== (int) $lockedStock->blood_component_id
+                ) {
+                    throw ValidationException::withMessages([
+                        'blood_unit_id' => 'Blood unit group or component does not match donation stock bucket.',
+                    ]);
+                }
+            }
 
             $releaseTimestamp = CarbonImmutable::now();
 
@@ -554,17 +568,20 @@ class ScreeningService
         $lockedDonation->screening_status = 'Failed';
         $lockedDonation->save();
 
+        // Global lock order: donors -> donations -> screening_records -> inventory_stocks -> blood_units (id ASC).
+        $lockedStock = $this->ensureAndLockInventoryStock(
+            $lockedDonation->blood_group,
+            $lockedDonation->blood_component_id
+        );
+
         $discardableUnits = BloodUnit::query()
             ->where('donation_id', $lockedDonation->id)
             ->where('unit_status', 'Quarantined')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get();
 
         if ($discardableUnits->isNotEmpty()) {
-            $lockedStock = $this->ensureAndLockInventoryStock(
-                $lockedDonation->blood_group,
-                $lockedDonation->blood_component_id
-            );
             $occurredAt = CarbonImmutable::now();
 
             foreach ($discardableUnits as $unit) {

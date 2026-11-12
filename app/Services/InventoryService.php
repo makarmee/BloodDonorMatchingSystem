@@ -17,6 +17,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
+/**
+ * Inventory domain service managing stock adjustments, reservations, releases, discards, expirations,
+ * and serialized ledger reconciliation.
+ *
+ * Global pessimistic lock hierarchy shared across Donation/Screening/Inventory and future FulfillmentService:
+ * `blood_requests / donors -> donations -> screening_records -> inventory_stocks -> blood_units (ordered by id) -> inventory_allocations`.
+ */
 class InventoryService
 {
     /**
@@ -178,6 +185,10 @@ class InventoryService
                 throw ValidationException::withMessages([
                     'available_units' => 'Insufficient non-expired, unallocated Available blood units to satisfy this reservation.',
                 ]);
+            }
+
+            foreach ($lockedUnits as $lockedUnit) {
+                $this->ensureNoActiveAllocation($lockedUnit, 'available_units');
             }
 
             $this->reserveLockedUnits(
@@ -380,9 +391,8 @@ class InventoryService
         $referenceId = $this->parseOptionalPositiveInt($attributes['reference_id'] ?? null, 'reference_id');
 
         $discardedUnit = DB::transaction(function () use ($unit, $actor, $description, $referenceType, $referenceId): BloodUnit {
-            $lockedStock = $unit->unit_status === 'Quarantined'
-                ? $this->ensureAndLockInventoryStock($unit->blood_group, $unit->blood_component_id)
-                : $this->lockExistingStockForUnit($unit);
+            $bucket = $this->resolveFreshUnitBucketKey($unit);
+            $lockedStock = $this->ensureAndLockInventoryStock($bucket['blood_group'], $bucket['blood_component_id']);
 
             $lockedUnit = BloodUnit::query()
                 ->whereKey($unit->getKey())
@@ -613,104 +623,222 @@ class InventoryService
      */
     public function reconcileStock(InventoryStock $stock): array
     {
-        $freshStock = InventoryStock::query()->whereKey($stock->getKey())->firstOrFail();
+        return DB::transaction(function () use ($stock): array {
+            // Global lock order: inventory_stocks -> blood_units (id ASC) for a serialized point-in-time view.
+            $freshStock = InventoryStock::query()
+                ->whereKey($stock->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $transactions = InventoryTransaction::query()
-            ->where('inventory_stock_id', $freshStock->id)
-            ->orderBy('id')
-            ->get();
+            $activeUnits = BloodUnit::query()
+                ->where('blood_group', $freshStock->blood_group)
+                ->where('blood_component_id', $freshStock->blood_component_id)
+                ->whereIn('unit_status', ['Available', 'Reserved'])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get(['id', 'unit_status']);
 
-        $discrepancies = [];
-        $expectedAvailable = 0;
-        $expectedReserved = 0;
-        $availableDeltaSum = 0;
-        $reservedDeltaSum = 0;
-        $physicalUnitsDeltaSum = 0;
-        $quarantinedZeroDeltaDiscardsCount = 0;
+            $transactions = InventoryTransaction::query()
+                ->where('inventory_stock_id', $freshStock->id)
+                ->with('bloodUnit:id,unit_code,blood_group,blood_component_id')
+                ->orderBy('id')
+                ->get();
 
-        foreach ($transactions as $txn) {
-            if ($txn->available_before !== $expectedAvailable || $txn->reserved_before !== $expectedReserved) {
-                $discrepancies[] = "Transaction {$txn->transaction_code} (ID {$txn->id}) starting balance ({$txn->available_before}/{$txn->reserved_before}) does not match prior ledger balance ({$expectedAvailable}/{$expectedReserved}).";
+            $discrepancies = [];
+            $expectedAvailable = 0;
+            $expectedReserved = 0;
+            $availableDeltaSum = 0;
+            $reservedDeltaSum = 0;
+            $physicalUnitsDeltaSum = 0;
+            $quarantinedZeroDeltaDiscardsCount = 0;
+            /** @var array<int, string> $stockInUnitIds */
+            $stockInUnitIds = [];
+            /** @var array<int, string> $terminalUnitIds */
+            $terminalUnitIds = [];
+
+            foreach ($transactions as $txn) {
+                if ($txn->available_before !== $expectedAvailable || $txn->reserved_before !== $expectedReserved) {
+                    $discrepancies[] = "Transaction {$txn->transaction_code} (ID {$txn->id}) starting balance ({$txn->available_before}/{$txn->reserved_before}) does not match prior ledger balance ({$expectedAvailable}/{$expectedReserved}).";
+                }
+
+                $availableDelta = $txn->available_after - $txn->available_before;
+                $reservedDelta = $txn->reserved_after - $txn->reserved_before;
+                $availableDeltaSum += $availableDelta;
+                $reservedDeltaSum += $reservedDelta;
+
+                array_push(
+                    $discrepancies,
+                    ...$this->validateReconciliationTransaction(
+                        txn: $txn,
+                        freshStock: $freshStock,
+                        availableDelta: $availableDelta,
+                        reservedDelta: $reservedDelta,
+                        stockInUnitIds: $stockInUnitIds,
+                        terminalUnitIds: $terminalUnitIds,
+                        quarantinedZeroDeltaDiscardsCount: $quarantinedZeroDeltaDiscardsCount,
+                        physicalUnitsDeltaSum: $physicalUnitsDeltaSum
+                    )
+                );
+
+                $expectedAvailable = $txn->available_after;
+                $expectedReserved = $txn->reserved_after;
             }
 
-            $availableDelta = $txn->available_after - $txn->available_before;
-            $reservedDelta = $txn->reserved_after - $txn->reserved_before;
-            $availableDeltaSum += $availableDelta;
-            $reservedDeltaSum += $reservedDelta;
+            if ($availableDeltaSum !== $freshStock->available_units) {
+                $discrepancies[] = "Stock available_units ({$freshStock->available_units}) does not match ledger available delta sum ({$availableDeltaSum}).";
+            }
 
-            if ($txn->operation_type === 'Discarded' && $txn->units_delta === 0) {
-                if ($availableDelta !== 0 || $reservedDelta !== 0) {
-                    $discrepancies[] = "Zero-delta Discarded transaction {$txn->transaction_code} unexpectedly modified balances ({$availableDelta}/{$reservedDelta}).";
-                } else {
-                    $quarantinedZeroDeltaDiscardsCount++;
-                }
-            } elseif (in_array($txn->operation_type, self::INTERNAL_TRANSFER_OPERATIONS, true)) {
-                if ($availableDelta + $reservedDelta !== 0 || $txn->units_delta !== $availableDelta) {
-                    $discrepancies[] = "Transfer transaction {$txn->transaction_code} ({$txn->operation_type}) has mismatched delta ({$txn->units_delta}) vs balance changes ({$availableDelta}/{$reservedDelta}).";
-                }
-            } else {
+            if ($reservedDeltaSum !== $freshStock->reserved_units) {
+                $discrepancies[] = "Stock reserved_units ({$freshStock->reserved_units}) does not match ledger reserved delta sum ({$reservedDeltaSum}).";
+            }
+
+            $stockTotalUnits = $freshStock->available_units + $freshStock->reserved_units;
+
+            if ($physicalUnitsDeltaSum !== $stockTotalUnits) {
+                $discrepancies[] = "Total physical stock ({$stockTotalUnits}) does not match net physical units_delta sum ({$physicalUnitsDeltaSum}).";
+            }
+
+            $unitAvailableCount = $activeUnits->where('unit_status', 'Available')->count();
+            $unitReservedCount = $activeUnits->where('unit_status', 'Reserved')->count();
+
+            if ($unitAvailableCount !== $freshStock->available_units) {
+                $discrepancies[] = "Serialized Available blood_units count ({$unitAvailableCount}) does not match stock available_units ({$freshStock->available_units}).";
+            }
+
+            if ($unitReservedCount !== $freshStock->reserved_units) {
+                $discrepancies[] = "Serialized Reserved blood_units count ({$unitReservedCount}) does not match stock reserved_units ({$freshStock->reserved_units}).";
+            }
+
+            return [
+                'inventory_stock_id' => $freshStock->id,
+                'blood_group' => $freshStock->blood_group,
+                'blood_component_id' => $freshStock->blood_component_id,
+                'is_reconciled' => $discrepancies === [],
+                'discrepancies' => $discrepancies,
+                'stock_available_units' => $freshStock->available_units,
+                'stock_reserved_units' => $freshStock->reserved_units,
+                'stock_total_units' => $stockTotalUnits,
+                'ledger_available_delta_sum' => $availableDeltaSum,
+                'ledger_reserved_delta_sum' => $reservedDeltaSum,
+                'ledger_physical_units_delta_sum' => $physicalUnitsDeltaSum,
+                'quarantined_zero_delta_discards_count' => $quarantinedZeroDeltaDiscardsCount,
+                'unit_available_count' => $unitAvailableCount,
+                'unit_reserved_count' => $unitReservedCount,
+                'transaction_count' => $transactions->count(),
+            ];
+        }, 3);
+    }
+
+    /**
+     * Validate a single ledger transaction's operation semantics, unit dimension parity, and uniqueness.
+     *
+     * @param  array<int, string>  $stockInUnitIds
+     * @param  array<int, string>  $terminalUnitIds
+     * @return list<string>
+     */
+    private function validateReconciliationTransaction(
+        InventoryTransaction $txn,
+        InventoryStock $freshStock,
+        int $availableDelta,
+        int $reservedDelta,
+        array &$stockInUnitIds,
+        array &$terminalUnitIds,
+        int &$quarantinedZeroDeltaDiscardsCount,
+        int &$physicalUnitsDeltaSum
+    ): array {
+        $errors = [];
+
+        switch ($txn->operation_type) {
+            case 'Stock In':
                 $physicalUnitsDeltaSum += $txn->units_delta;
+                if ($txn->units_delta <= 0 || $availableDelta !== $txn->units_delta || $reservedDelta !== 0) {
+                    $errors[] = "Stock In transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
 
-                if ($txn->units_delta !== ($availableDelta + $reservedDelta)) {
-                    $discrepancies[] = "Transaction {$txn->transaction_code} ({$txn->operation_type}) units_delta ({$txn->units_delta}) does not equal net balance change (".($availableDelta + $reservedDelta).').';
+            case 'Reserve':
+                if ($txn->units_delta >= 0 || $availableDelta !== $txn->units_delta || $reservedDelta !== -$txn->units_delta) {
+                    $errors[] = "Reserve transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
+
+            case 'Release Reservation':
+                if ($txn->units_delta <= 0 || $availableDelta !== $txn->units_delta || $reservedDelta !== -$txn->units_delta) {
+                    $errors[] = "Release Reservation transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
+
+            case 'Manual Adjustment':
+                $physicalUnitsDeltaSum += $txn->units_delta;
+                if ($txn->units_delta === 0 || $availableDelta !== $txn->units_delta || $reservedDelta !== 0) {
+                    $errors[] = "Manual Adjustment transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
+
+            case 'Removed':
+            case 'Expired':
+                $physicalUnitsDeltaSum += $txn->units_delta;
+                if ($txn->units_delta >= 0 || $availableDelta !== $txn->units_delta || $reservedDelta !== 0) {
+                    $errors[] = "{$txn->operation_type} transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
+
+            case 'Dispatch':
+                $physicalUnitsDeltaSum += $txn->units_delta;
+                if ($txn->units_delta >= 0 || $availableDelta > 0 || $reservedDelta > 0 || ($availableDelta + $reservedDelta) !== $txn->units_delta) {
+                    $errors[] = "Dispatch transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                }
+                break;
+
+            case 'Discarded':
+                if ($txn->units_delta === 0) {
+                    if ($availableDelta !== 0 || $reservedDelta !== 0) {
+                        $errors[] = "Zero-delta Discarded transaction {$txn->transaction_code} unexpectedly modified balances ({$availableDelta}/{$reservedDelta}).";
+                    } else {
+                        $quarantinedZeroDeltaDiscardsCount++;
+                    }
+                } else {
+                    $physicalUnitsDeltaSum += $txn->units_delta;
+                    if ($txn->units_delta > 0 || $availableDelta > 0 || $reservedDelta > 0 || ($availableDelta + $reservedDelta) !== $txn->units_delta) {
+                        $errors[] = "Discarded transaction {$txn->transaction_code} has invalid delta ({$txn->units_delta}) or balance changes ({$availableDelta}/{$reservedDelta}).";
+                    }
+                }
+                break;
+
+            default:
+                $errors[] = "Transaction {$txn->transaction_code} has unsupported operation_type '{$txn->operation_type}'.";
+        }
+
+        if ($txn->blood_unit_id !== null) {
+            if (! $txn->bloodUnit instanceof BloodUnit) {
+                $errors[] = "Transaction {$txn->transaction_code} references missing BloodUnit ID {$txn->blood_unit_id}.";
+            } else {
+                if (
+                    $txn->bloodUnit->blood_group !== $freshStock->blood_group
+                    || (int) $txn->bloodUnit->blood_component_id !== (int) $freshStock->blood_component_id
+                ) {
+                    $errors[] = "Transaction {$txn->transaction_code} references BloodUnit {$txn->bloodUnit->unit_code} from dimension ({$txn->bloodUnit->blood_group}/{$txn->bloodUnit->blood_component_id}) instead of ({$freshStock->blood_group}/{$freshStock->blood_component_id}).";
+                }
+
+                if ($txn->operation_type === 'Stock In') {
+                    if (isset($stockInUnitIds[$txn->blood_unit_id])) {
+                        $errors[] = "Duplicate Stock In transaction {$txn->transaction_code} for BloodUnit ID {$txn->blood_unit_id} (prior: {$stockInUnitIds[$txn->blood_unit_id]}).";
+                    } else {
+                        $stockInUnitIds[$txn->blood_unit_id] = $txn->transaction_code;
+                    }
+                }
+
+                if (in_array($txn->operation_type, ['Dispatch', 'Removed', 'Expired', 'Discarded'], true)) {
+                    if (isset($terminalUnitIds[$txn->blood_unit_id])) {
+                        $errors[] = "Duplicate terminal transaction {$txn->transaction_code} ({$txn->operation_type}) for BloodUnit ID {$txn->blood_unit_id} (prior: {$terminalUnitIds[$txn->blood_unit_id]}).";
+                    } else {
+                        $terminalUnitIds[$txn->blood_unit_id] = $txn->transaction_code;
+                    }
                 }
             }
-
-            $expectedAvailable = $txn->available_after;
-            $expectedReserved = $txn->reserved_after;
         }
 
-        if ($availableDeltaSum !== $freshStock->available_units) {
-            $discrepancies[] = "Stock available_units ({$freshStock->available_units}) does not match ledger available delta sum ({$availableDeltaSum}).";
-        }
-
-        if ($reservedDeltaSum !== $freshStock->reserved_units) {
-            $discrepancies[] = "Stock reserved_units ({$freshStock->reserved_units}) does not match ledger reserved delta sum ({$reservedDeltaSum}).";
-        }
-
-        $stockTotalUnits = $freshStock->available_units + $freshStock->reserved_units;
-
-        if ($physicalUnitsDeltaSum !== $stockTotalUnits) {
-            $discrepancies[] = "Total physical stock ({$stockTotalUnits}) does not match net physical units_delta sum ({$physicalUnitsDeltaSum}).";
-        }
-
-        $unitAvailableCount = BloodUnit::query()
-            ->where('blood_group', $freshStock->blood_group)
-            ->where('blood_component_id', $freshStock->blood_component_id)
-            ->where('unit_status', 'Available')
-            ->count();
-
-        $unitReservedCount = BloodUnit::query()
-            ->where('blood_group', $freshStock->blood_group)
-            ->where('blood_component_id', $freshStock->blood_component_id)
-            ->where('unit_status', 'Reserved')
-            ->count();
-
-        if ($unitAvailableCount !== $freshStock->available_units) {
-            $discrepancies[] = "Serialized Available blood_units count ({$unitAvailableCount}) does not match stock available_units ({$freshStock->available_units}).";
-        }
-
-        if ($unitReservedCount !== $freshStock->reserved_units) {
-            $discrepancies[] = "Serialized Reserved blood_units count ({$unitReservedCount}) does not match stock reserved_units ({$freshStock->reserved_units}).";
-        }
-
-        return [
-            'inventory_stock_id' => $freshStock->id,
-            'blood_group' => $freshStock->blood_group,
-            'blood_component_id' => $freshStock->blood_component_id,
-            'is_reconciled' => $discrepancies === [],
-            'discrepancies' => $discrepancies,
-            'stock_available_units' => $freshStock->available_units,
-            'stock_reserved_units' => $freshStock->reserved_units,
-            'stock_total_units' => $stockTotalUnits,
-            'ledger_available_delta_sum' => $availableDeltaSum,
-            'ledger_reserved_delta_sum' => $reservedDeltaSum,
-            'ledger_physical_units_delta_sum' => $physicalUnitsDeltaSum,
-            'quarantined_zero_delta_discards_count' => $quarantinedZeroDeltaDiscardsCount,
-            'unit_available_count' => $unitAvailableCount,
-            'unit_reserved_count' => $unitReservedCount,
-            'transaction_count' => $transactions->count(),
-        ];
+        return $errors;
     }
 
     /**
@@ -728,15 +856,34 @@ class InventoryService
     }
 
     /**
-     * Lock the existing `inventory_stocks` row matching a serialized BloodUnit.
+     * Read current blood group and component dimensions for a unit directly from storage.
+     *
+     * @return array{blood_group: string, blood_component_id: int}
+     */
+    private function resolveFreshUnitBucketKey(BloodUnit $unit): array
+    {
+        $freshUnit = BloodUnit::query()
+            ->whereKey($unit->getKey())
+            ->firstOrFail(['id', 'blood_group', 'blood_component_id']);
+
+        return [
+            'blood_group' => (string) $freshUnit->blood_group,
+            'blood_component_id' => (int) $freshUnit->blood_component_id,
+        ];
+    }
+
+    /**
+     * Lock the existing `inventory_stocks` row matching a serialized BloodUnit's current database dimension.
      *
      * @throws ValidationException
      */
     private function lockExistingStockForUnit(BloodUnit $unit): InventoryStock
     {
+        $bucket = $this->resolveFreshUnitBucketKey($unit);
+
         $lockedStock = InventoryStock::query()
-            ->forBloodGroup($unit->blood_group)
-            ->forComponent($unit->blood_component_id)
+            ->forBloodGroup($bucket['blood_group'])
+            ->forComponent($bucket['blood_component_id'])
             ->lockForUpdate()
             ->first();
 
@@ -802,6 +949,7 @@ class InventoryService
         $hasActiveAllocation = InventoryAllocation::query()
             ->where('blood_unit_id', $lockedUnit->id)
             ->active()
+            ->lockForUpdate()
             ->exists();
 
         if ($hasActiveAllocation) {
@@ -890,6 +1038,10 @@ class InventoryService
             throw ValidationException::withMessages([
                 'available_units' => "Fewer than {$quantity} eligible Available blood unit(s) exist for this adjustment.",
             ]);
+        }
+
+        foreach ($lockedUnits as $unit) {
+            $this->ensureNoActiveAllocation($unit, 'blood_unit_ids');
         }
 
         return $lockedUnits;
