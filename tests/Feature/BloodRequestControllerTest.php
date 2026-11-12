@@ -523,6 +523,7 @@ class BloodRequestControllerTest extends TestCase
     public function test_only_authorized_users_can_perform_compatibility_overrides_over_http(): void
     {
         $admin = $this->createUserWithRole('admin');
+        $inactiveAdmin = $this->createUserWithRole('admin', isActive: false);
         $staff = $this->createUserWithRole('staff');
         $labOfficer = $this->createUserWithRole('lab_officer');
         $hospital = Hospital::factory()->create();
@@ -537,7 +538,9 @@ class BloodRequestControllerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $this->seedScreenedUnits($admin, $staff, $labOfficer, 'B-', 'PRBC', 2);
+        $seeded = $this->seedScreenedUnits($admin, $staff, $labOfficer, 'B-', 'PRBC', 2);
+        /** @var InventoryStock $bMinusStock */
+        $bMinusStock = $seeded['stock'];
 
         $bloodRequest = $this->fulfillmentService->approveRequest(
             $this->fulfillmentService->createRequest($hospital, $staff, [
@@ -550,26 +553,72 @@ class BloodRequestControllerTest extends TestCase
             $staff
         );
 
-        // Staff cannot override compatibility over HTTP even if trying to inject override_approver fields.
+        // Staff cannot override compatibility on reserve OR dispatch even with forged approver fields.
+        $this->actingAs($staff)
+            ->post(route('requests.reserve', $bloodRequest), [
+                'quantity' => 1,
+                'source_blood_group' => 'B-',
+                'override_approver' => $admin->id,
+                'override_approver_id' => $admin->id,
+                'co_signer_id' => $admin->id,
+                'supervisor_id' => $admin->id,
+                'override_reason' => 'Attempted staff reserve override spoofing.',
+            ])
+            ->assertForbidden();
+
         $this->actingAs($staff)
             ->post(route('requests.dispatch', $bloodRequest), [
                 'quantity' => 1,
                 'dispatched_blood_group' => 'B-',
                 'override_approver' => $admin->id,
                 'override_approver_id' => $admin->id,
-                'override_reason' => 'Attempted staff override spoofing.',
+                'co_signer_id' => $admin->id,
+                'supervisor_id' => $admin->id,
+                'override_reason' => 'Attempted staff dispatch override spoofing.',
             ])
             ->assertForbidden();
 
-        $this->assertDatabaseCount('request_fulfillments', 0);
+        // Inactive admin also cannot perform an override.
+        $this->actingAs($inactiveAdmin)
+            ->post(route('requests.reserve', $bloodRequest), [
+                'quantity' => 1,
+                'source_blood_group' => 'B-',
+                'override_reason' => 'Inactive admin reserve override attempt.',
+            ])
+            ->assertForbidden();
 
-        // Admin must supply override_reason, then override succeeds with audit trail.
+        $this->assertDatabaseCount('inventory_allocations', 0);
+        $this->assertDatabaseCount('request_fulfillments', 0);
+        $this->assertSame(2, $bMinusStock->fresh()->available_units);
+        $this->assertSame(0, $bMinusStock->fresh()->reserved_units);
+
+        // Admin self-override fails validation without override_reason on reserve and dispatch.
+        $this->actingAs($admin)
+            ->post(route('requests.reserve', $bloodRequest), [
+                'quantity' => 1,
+                'source_blood_group' => 'B-',
+            ])
+            ->assertSessionHasErrors('override_reason');
+
         $this->actingAs($admin)
             ->post(route('requests.dispatch', $bloodRequest), [
                 'quantity' => 1,
                 'dispatched_blood_group' => 'B-',
             ])
             ->assertSessionHasErrors('override_reason');
+
+        // Active Admin succeeds on both reserve and dispatch using their own authorization.
+        $this->actingAs($admin)
+            ->post(route('requests.reserve', $bloodRequest), [
+                'quantity' => 1,
+                'source_blood_group' => 'B-',
+                'override_reason' => 'Director approved emergency B- reservation.',
+            ])
+            ->assertRedirect(route('requests.index'))
+            ->assertSessionHas('success');
+
+        $this->assertSame(1, $bloodRequest->fresh()->reserved_units);
+        $this->assertSame(1, $bMinusStock->fresh()->reserved_units);
 
         $this->actingAs($admin)
             ->post(route('requests.dispatch', $bloodRequest), [
@@ -584,6 +633,60 @@ class BloodRequestControllerTest extends TestCase
         $this->assertTrue($fulfillment->is_compatibility_override);
         $this->assertSame($admin->id, $fulfillment->override_approved_by_user_id);
         $this->assertSame('Director approved emergency trauma substitution.', $fulfillment->override_reason);
+        $this->assertSame(0, $bMinusStock->fresh()->reserved_units);
+        $this->assertSame(1, $bMinusStock->fresh()->available_units);
+    }
+
+    public function test_staff_can_reserve_and_dispatch_normal_compatible_substitutions_without_override(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $hospital = Hospital::factory()->create();
+        $prbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        BloodCompatibilityRule::query()->create([
+            'recipient_blood_group' => 'A+',
+            'donor_blood_group' => 'O-',
+            'blood_component_id' => $prbc->id,
+            'compatibility_level' => 'Compatible Substitution',
+            'requires_medical_override' => false,
+            'is_active' => true,
+        ]);
+
+        $this->seedScreenedUnits($admin, $staff, $labOfficer, 'O-', 'PRBC', 2);
+
+        $bloodRequest = $this->fulfillmentService->approveRequest(
+            $this->fulfillmentService->createRequest($hospital, $staff, [
+                'blood_group' => 'A+',
+                'blood_component_code' => 'PRBC',
+                'requested_units' => 2,
+                'priority' => 'High',
+                'request_reason' => 'Standard compatible substitution reserve and dispatch.',
+            ]),
+            $staff
+        );
+
+        $this->actingAs($staff)
+            ->post(route('requests.reserve', $bloodRequest), [
+                'quantity' => 1,
+                'source_blood_group' => 'O-',
+            ])
+            ->assertRedirect(route('requests.index'))
+            ->assertSessionHas('success');
+
+        $this->actingAs($staff)
+            ->post(route('requests.dispatch', $bloodRequest), [
+                'quantity' => 2,
+                'dispatched_blood_group' => 'O-',
+            ])
+            ->assertRedirect(route('requests.index'))
+            ->assertSessionHas('success');
+
+        $fulfillment = RequestFulfillment::query()->firstOrFail();
+        $this->assertFalse($fulfillment->is_compatibility_override);
+        $this->assertNull($fulfillment->override_approved_by_user_id);
+        $this->assertSame('Fulfilled', $bloodRequest->fresh()->status);
     }
 
     public function test_json_validation_error_returns_unprocessable_status_without_exposing_trace(): void
