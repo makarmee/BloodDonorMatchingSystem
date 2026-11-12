@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\Donation;
 use App\Models\Donor;
 use App\Models\DonorEligibilityRecord;
+use App\Models\ScreeningRecord;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -135,6 +137,86 @@ class DonorEligibilityService
             reviewedAt: $reviewedAt,
             expectedCurrentRecordId: $expectedCurrentRecordId,
         );
+    }
+
+    /**
+     * Record an automated `Not Eligible` deferral backed strictly by a persisted `Failed` screening record.
+     *
+     * Allows screening workflows run by authorized lab personnel (`screening.record`) to trigger donor
+     * deferral without granting direct clinical eligibility assessment permissions.
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function recordFailedScreeningDeferral(
+        Donor $donor,
+        ScreeningRecord $failedScreeningRecord,
+        ?User $triggeredBy,
+        ?string $reason = null,
+        string $clearanceSource = 'Automated Failed Screening Deferral',
+        CarbonInterface|string|null $nextEligibleDate = null,
+        CarbonInterface|string|null $reviewedAt = null
+    ): DonorEligibilityRecord {
+        if (! $triggeredBy instanceof User || ! $triggeredBy->is_active) {
+            throw new AuthorizationException('An authenticated active user is required to record a failed-screening deferral.');
+        }
+
+        if (! $triggeredBy->hasRole('admin') && ! Gate::forUser($triggeredBy)->allows('recordResult', ScreeningRecord::class)) {
+            throw new AuthorizationException('The acting user is not authorized to record screening-triggered deferrals.');
+        }
+
+        $effectiveReason = is_string($reason) && trim($reason) !== ''
+            ? trim($reason)
+            : "Automated clinical deferral triggered by reactive/failed screening assay {$failedScreeningRecord->screening_code}.";
+
+        $validated = $this->validateAssessmentAttributes([
+            'eligibility_status' => 'Not Eligible',
+            'reason' => $effectiveReason,
+            'clearance_source' => $clearanceSource,
+            'reviewed_at' => $reviewedAt,
+            'next_eligible_date' => $nextEligibleDate,
+        ]);
+
+        return DB::transaction(function () use ($donor, $failedScreeningRecord, $triggeredBy, $validated): DonorEligibilityRecord {
+            $lockedDonor = Donor::query()
+                ->whereKey($donor->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $lockedRecord = ScreeningRecord::query()
+                ->whereKey($failedScreeningRecord->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            $lockedDonation = $lockedRecord instanceof ScreeningRecord
+                ? Donation::query()->whereKey($lockedRecord->donation_id)->lockForUpdate()->first()
+                : null;
+
+            if (
+                ! $lockedRecord instanceof ScreeningRecord
+                || ! $lockedDonation instanceof Donation
+                || (int) $lockedDonation->donor_id !== (int) $lockedDonor->id
+                || $lockedRecord->screening_result !== 'Failed'
+            ) {
+                throw ValidationException::withMessages([
+                    'screening_record' => 'Automated deferral requires a persisted Failed screening record belonging to this donor.',
+                ]);
+            }
+
+            $reviewer = $triggeredBy->hasRole('admin') ? $triggeredBy : null;
+
+            return $this->persistAuthoritativeRecord(
+                donor: $lockedDonor,
+                actor: $reviewer,
+                status: $validated['eligibility_status'],
+                reason: $validated['reason'],
+                clearanceSource: $validated['clearance_source'],
+                reviewedAt: $validated['reviewed_at'],
+                nextEligibleDate: $validated['next_eligible_date'],
+                expectedCurrentRecordId: null,
+                requireEmptyHistory: false,
+            );
+        }, 3);
     }
 
     /**
