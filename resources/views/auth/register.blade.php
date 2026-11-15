@@ -104,29 +104,43 @@
 
                     {{-- Hospital-specific fields --}}
                     <div x-show="role === 'hospital'" x-cloak class="space-y-4">
-                        <x-ui.alert variant="info" :dismissible="false">
-                            <span class="font-medium">Coming in Stage A2.2:</span>
-                            Hospital Partner self-registration is currently in preparation and will be available in the next release stage. To register a blood donor account, please switch to the Blood Donor tab.
-                        </x-ui.alert>
+                        <x-ui.input
+                            label="Hospital / Clinic name"
+                            name="organization_name"
+                            icon="building-hospital"
+                            placeholder="City General Hospital"
+                            x-bind:disabled="role !== 'hospital'"
+                            :value="old('organization_name')"
+                        />
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-ui.input
-                                label="Hospital / Clinic name"
-                                name="organization_name"
-                                icon="building-hospital"
-                                placeholder="City General Hospital"
+                                label="Primary phone"
+                                name="phone"
+                                type="tel"
+                                icon="phone"
+                                placeholder="+1 (555) 019-2834"
                                 x-bind:disabled="role !== 'hospital'"
-                                :value="old('organization_name')"
+                                :value="old('phone')"
                             />
 
                             <x-ui.input
-                                label="License / Facility code"
-                                name="facility_code"
-                                placeholder="HSP-2049"
+                                label="City"
+                                name="city"
+                                icon="map-pin"
+                                placeholder="Metropolis"
                                 x-bind:disabled="role !== 'hospital'"
-                                :value="old('facility_code')"
+                                :value="old('city')"
                             />
                         </div>
+
+                        <x-ui.input
+                            label="Address"
+                            name="address"
+                            placeholder="100 Hospital Boulevard, Suite 400"
+                            x-bind:disabled="role !== 'hospital'"
+                            :value="old('address')"
+                        />
                     </div>
 
                     <div class="grid gap-4 sm:grid-cols-2">

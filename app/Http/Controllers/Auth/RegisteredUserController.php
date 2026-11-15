@@ -66,9 +66,12 @@ class RegisteredUserController extends Controller
         $maxDob = CarbonImmutable::today()->subYears(16)->toDateString();
 
         $validated = $request->validate([
-            'role' => ['required', 'string', Rule::in(['donor'])],
+            'role' => ['required', 'string', Rule::in(['donor', 'hospital'])],
             'name' => ['required', 'string', 'max:150'],
             'email' => ['required', 'string', 'email', 'max:191'],
+            'password' => ['required', 'string', Password::min(8), 'confirmed'],
+
+            // Donor-specific fields
             'blood_group' => ['exclude_unless:role,donor', 'nullable', 'string', Rule::in(Donor::BLOOD_GROUPS)],
             'date_of_birth' => [
                 'exclude_unless:role,donor',
@@ -77,22 +80,42 @@ class RegisteredUserController extends Controller
                 "after_or_equal:{$minDob}",
                 "before_or_equal:{$maxDob}",
             ],
-            'password' => ['required', 'string', Password::min(8), 'confirmed'],
+
+            // Hospital-specific fields
+            'organization_name' => ['exclude_unless:role,hospital', 'required', 'string', 'max:191'],
+            'phone' => ['exclude_unless:role,hospital', 'nullable', 'string', 'max:32'],
+            'city' => ['exclude_unless:role,hospital', 'nullable', 'string', 'max:100'],
+            'address' => ['exclude_unless:role,hospital', 'nullable', 'string', 'max:2000'],
         ], [
-            'role.in' => $request->input('role') === 'hospital'
-                ? 'Hospital partner registration is not enabled yet. Please select Blood Donor or check back in the next stage.'
-                : 'Please select a valid registration account type.',
+            'role.in' => 'Please select a valid registration account type.',
             'date_of_birth.after_or_equal' => 'Donor age must not exceed 110 years.',
             'date_of_birth.before_or_equal' => 'Donors must be at least 16 years old to register.',
+            'organization_name.required' => 'Hospital or clinic name is required.',
         ]);
 
-        $user = $this->registrationService->registerDonor(Arr::only($validated, [
-            'name',
-            'email',
-            'blood_group',
-            'date_of_birth',
-            'password',
-        ]));
+        if ($validated['role'] === 'donor') {
+            $user = $this->registrationService->registerDonor(Arr::only($validated, [
+                'name',
+                'email',
+                'blood_group',
+                'date_of_birth',
+                'password',
+            ]));
+
+            $statusMessage = 'Donor account created. Your profile is pending clinical eligibility review.';
+        } else {
+            $user = $this->registrationService->registerHospital(Arr::only($validated, [
+                'name',
+                'email',
+                'organization_name',
+                'phone',
+                'city',
+                'address',
+                'password',
+            ]));
+
+            $statusMessage = 'Hospital partner account registered. Your facility is currently Pending administrative verification before blood orders can be placed.';
+        }
 
         Auth::login($user);
         $request->session()->regenerate();
@@ -100,7 +123,7 @@ class RegisteredUserController extends Controller
 
         return redirect()
             ->route($user->dashboardRouteName())
-            ->with('status', 'Donor account created. Your profile is pending clinical eligibility review.');
+            ->with('status', $statusMessage);
     }
 
     /**

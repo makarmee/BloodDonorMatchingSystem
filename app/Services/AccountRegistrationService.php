@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Donor;
+use App\Models\Hospital;
+use App\Models\HospitalUser;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -111,6 +113,138 @@ class AccountRegistrationService
                 );
 
                 return $user->load(['roles', 'donor']);
+            }, 3);
+        } catch (QueryException $e) {
+            if ($this->isRegistrationEmailUniqueConstraintViolation($e)) {
+                throw ValidationException::withMessages([
+                    'email' => 'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
+                ]);
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Self-register a new partner hospital facility, primary coordinator account, and coordinator link.
+     *
+     * @param  array{
+     *     name: string,
+     *     email: string,
+     *     password: string,
+     *     organization_name: string,
+     *     address?: ?string,
+     *     city?: ?string,
+     *     phone?: ?string
+     * }  $attributes
+     *
+     * @throws ValidationException
+     */
+    public function registerHospital(array $attributes): User
+    {
+        $coordinatorName = $this->inputNormalizer->normalizeRequiredText(
+            $attributes['name'] ?? null,
+            150,
+            'name',
+            'Coordinator name is required and may not exceed 150 characters.'
+        );
+
+        $organizationName = $this->inputNormalizer->normalizeRequiredText(
+            $attributes['organization_name'] ?? null,
+            191,
+            'organization_name',
+            'Hospital or clinic name is required and may not exceed 191 characters.'
+        );
+
+        $email = $this->normalizeEmail($attributes['email'] ?? null);
+        $password = is_string($attributes['password'] ?? null) ? $attributes['password'] : '';
+
+        if ($password === '') {
+            throw ValidationException::withMessages([
+                'password' => 'A password is required for account registration.',
+            ]);
+        }
+
+        $address = $this->inputNormalizer->normalizeOptionalText(
+            $attributes['address'] ?? null,
+            2000,
+            'address'
+        );
+
+        $city = $this->inputNormalizer->normalizeOptionalText(
+            $attributes['city'] ?? null,
+            100,
+            'city'
+        );
+
+        $phone = $this->inputNormalizer->normalizeOptionalText(
+            $attributes['phone'] ?? null,
+            32,
+            'phone'
+        );
+
+        try {
+            return DB::transaction(function () use (
+                $coordinatorName,
+                $organizationName,
+                $email,
+                $password,
+                $address,
+                $city,
+                $phone
+            ): User {
+                $userEmailExists = User::query()
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists();
+
+                $donorEmailExists = Donor::query()
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists();
+
+                if ($userEmailExists || $donorEmailExists) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
+                    ]);
+                }
+
+                $hospitalRole = Role::query()->bySlug('hospital')->firstOrFail();
+
+                $user = User::query()->create([
+                    'name' => $coordinatorName,
+                    'email' => $email,
+                    'password' => $password,
+                    'is_active' => true,
+                ]);
+
+                $user->roles()->attach($hospitalRole->id, [
+                    'assigned_at' => now(),
+                ]);
+
+                $hospital = Hospital::query()->create([
+                    'hospital_code' => $this->referenceCodeGenerator->generate(Hospital::class, 'hospital_code', 'HSP-'),
+                    'name' => $organizationName,
+                    'address' => $address,
+                    'city' => $city,
+                    'primary_contact_name' => $coordinatorName,
+                    'primary_phone' => $phone,
+                    'primary_email' => $email,
+                    'verification_status' => 'Pending',
+                    'verified_by_user_id' => null,
+                    'verified_at' => null,
+                    'is_active' => true,
+                ]);
+
+                HospitalUser::query()->create([
+                    'hospital_id' => $hospital->id,
+                    'user_id' => $user->id,
+                    'contact_name' => $coordinatorName,
+                    'work_phone' => $phone,
+                    'work_email' => $email,
+                    'is_primary_contact' => true,
+                    'is_active' => true,
+                ]);
+
+                return $user->load(['roles', 'hospitalUser.hospital']);
             }, 3);
         } catch (QueryException $e) {
             if ($this->isRegistrationEmailUniqueConstraintViolation($e)) {

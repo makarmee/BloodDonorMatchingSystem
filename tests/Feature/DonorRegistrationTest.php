@@ -169,7 +169,6 @@ class DonorRegistrationTest extends TestCase
     #[TestWith(['admin'])]
     #[TestWith(['staff'])]
     #[TestWith(['lab_officer'])]
-    #[TestWith(['hospital'])]
     #[TestWith(['unknown_role'])]
     public function test_donor_self_registration_rejects_disallowed_or_unimplemented_roles(string $role): void
     {
