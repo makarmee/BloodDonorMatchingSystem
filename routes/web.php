@@ -10,6 +10,7 @@ use App\Http\Controllers\DonationsController;
 use App\Http\Controllers\DonorPortalController;
 use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\HospitalVerificationController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ScreeningController;
@@ -34,6 +35,11 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('active')->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
         Route::get('/inventory', InventoryController::class)->name('inventory.index');
+
+        Route::get('/hospitals', [HospitalVerificationController::class, 'index'])->name('hospitals.index');
+        Route::get('/hospitals/{hospital}', [HospitalVerificationController::class, 'show'])->name('hospitals.show');
+        Route::post('/hospitals/{hospital}/verify', [HospitalVerificationController::class, 'verify'])->name('hospitals.verify');
+        Route::post('/hospitals/{hospital}/suspend', [HospitalVerificationController::class, 'suspend'])->name('hospitals.suspend');
 
         Route::get('/donors', [DonorsController::class, 'index'])->name('donors.index');
         Route::get('/donors/create', [DonorsController::class, 'create'])->name('donors.create');

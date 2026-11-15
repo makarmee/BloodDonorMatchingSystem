@@ -17,6 +17,7 @@
                     ['label' => 'Blood Inventory', 'icon' => 'archive-box', 'route' => 'inventory.index'],
                     ['label' => 'Donors', 'icon' => 'users', 'route' => 'donors.index'],
                     ['label' => 'Donations Log', 'icon' => 'heart-pulse', 'route' => 'donations.index'],
+                    ['label' => 'Partner Hospitals', 'icon' => 'building-hospital', 'route' => 'hospitals.index', 'match' => 'hospitals.*'],
                 ],
                 'Fulfillment & Screening' => [
                     ['label' => 'Blood Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index'],
