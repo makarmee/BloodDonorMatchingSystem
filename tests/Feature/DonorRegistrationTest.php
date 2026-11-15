@@ -5,9 +5,13 @@ namespace Tests\Feature;
 use App\Models\Donor;
 use App\Models\DonorEligibilityRecord;
 use App\Models\User;
+use App\Services\AccountRegistrationService;
+use App\Services\DonorEligibilityService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -287,6 +291,143 @@ class DonorRegistrationTest extends TestCase
         $this->assertDatabaseCount('users', 0);
 
         RateLimiter::clear($this->registrationThrottleKey());
+    }
+
+    public function test_registration_rolls_back_entirely_if_eligibility_initialization_fails(): void
+    {
+        $mockEligibilityService = $this->createMock(DonorEligibilityService::class);
+        $mockEligibilityService->expects($this->once())
+            ->method('initializeOnboardingEligibility')
+            ->willThrowException(new \RuntimeException('Simulated clinical eligibility service outage.'));
+
+        $this->app->instance(DonorEligibilityService::class, $mockEligibilityService);
+
+        $response = $this->post(route('register.attempt'), [
+            'role' => 'donor',
+            'name' => 'Failing Eligibility User',
+            'email' => 'rollback-test@example.org',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertStatus(500);
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'rollback-test@example.org']);
+        $this->assertDatabaseMissing('donors', ['email' => 'rollback-test@example.org']);
+        $this->assertDatabaseCount('donor_eligibility_records', 0);
+        $this->assertDatabaseCount('role_user', 0);
+    }
+
+    public function test_registration_rejects_non_string_role_input(): void
+    {
+        $response = $this->from(route('register'))->post(route('register.attempt'), [
+            'role' => ['donor'],
+            'name' => 'Array Role Attempt',
+            'email' => 'array-role@example.org',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertRedirect(route('register'));
+        $response->assertSessionHasErrors('role');
+        $this->assertGuest();
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('donors', 0);
+    }
+
+    public function test_registration_rejects_inactive_walk_in_donor_email_collision(): void
+    {
+        $inactiveWalkIn = Donor::factory()->create([
+            'user_id' => null,
+            'email' => 'inactive-walkin@example.org',
+            'full_name' => 'Inactive Walk-In Donor',
+            'account_status' => 'Inactive',
+            'availability_status' => 'Inactive',
+        ]);
+
+        $response = $this->from(route('register'))->post(route('register.attempt'), [
+            'role' => 'donor',
+            'name' => 'Attempted Claim Inactive',
+            'email' => '  INACTIVE-WALKIN@example.org  ',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertRedirect(route('register'));
+        $response->assertSessionHasErrors('email');
+        $this->assertSame(
+            'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
+            session('errors')->first('email')
+        );
+        $this->assertGuest();
+
+        $inactiveWalkIn->refresh();
+        $this->assertNull($inactiveWalkIn->user_id);
+        $this->assertSame('Inactive Walk-In Donor', $inactiveWalkIn->full_name);
+        $this->assertSame('Inactive', $inactiveWalkIn->account_status);
+        $this->assertDatabaseCount('users', 0);
+        $this->assertDatabaseCount('donors', 1);
+    }
+
+    public function test_registration_safely_handles_concurrent_duplicate_email_race_condition(): void
+    {
+        User::saving(function (User $user): void {
+            if ($user->email === 'concurrent-race@example.org' && User::query()->where('email', 'concurrent-race@example.org')->doesntExist()) {
+                DB::table('users')->insert([
+                    'name' => 'Concurrent Winner',
+                    'email' => 'concurrent-race@example.org',
+                    'password' => 'secret-hashed',
+                    'is_active' => 1,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        try {
+            $response = $this->from(route('register'))->post(route('register.attempt'), [
+                'role' => 'donor',
+                'name' => 'Concurrent Loser',
+                'email' => 'concurrent-race@example.org',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+            ]);
+
+            $response->assertRedirect(route('register'));
+            $response->assertSessionHasErrors('email');
+            $this->assertSame(
+                'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
+                session('errors')->first('email')
+            );
+            $this->assertGuest();
+        } finally {
+            User::flushEventListeners();
+        }
+    }
+
+    public function test_registration_does_not_convert_unrelated_database_query_exceptions(): void
+    {
+        User::saving(function (User $user): void {
+            if ($user->email === 'fk-error@example.org') {
+                $pdoException = new \PDOException('Cannot add or update a child row: a foreign key constraint fails');
+                $pdoException->errorInfo = ['23000', 1452, 'Cannot add or update a child row: a foreign key constraint fails'];
+
+                throw new QueryException('mysql', 'insert into users ...', [], $pdoException);
+            }
+        });
+
+        try {
+            $this->expectException(QueryException::class);
+
+            $service = app(AccountRegistrationService::class);
+            $service->registerDonor([
+                'name' => 'FK Error User',
+                'email' => 'fk-error@example.org',
+                'password' => 'password123',
+            ]);
+        } finally {
+            User::flushEventListeners();
+        }
     }
 
     private function registrationThrottleKey(): string

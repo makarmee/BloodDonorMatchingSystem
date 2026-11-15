@@ -6,6 +6,7 @@ use App\Models\Donor;
 use App\Models\Role;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -56,60 +57,100 @@ class AccountRegistrationService
         $bloodGroup = $this->normalizeOptionalBloodGroup($attributes['blood_group'] ?? null);
         $dateOfBirth = $this->normalizeOptionalDateOfBirth($attributes['date_of_birth'] ?? null);
 
-        return DB::transaction(function () use ($name, $email, $password, $bloodGroup, $dateOfBirth): User {
-            $userEmailExists = User::query()
-                ->whereRaw('LOWER(email) = ?', [$email])
-                ->exists();
+        try {
+            return DB::transaction(function () use ($name, $email, $password, $bloodGroup, $dateOfBirth): User {
+                $userEmailExists = User::query()
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists();
 
-            // Never auto-claim or link existing walk-in donors (`user_id IS NULL`) during unverified registration.
-            $donorEmailExists = Donor::query()
-                ->whereRaw('LOWER(email) = ?', [$email])
-                ->exists();
+                // Never auto-claim or link existing walk-in donors (`user_id IS NULL`) during unverified registration.
+                $donorEmailExists = Donor::query()
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists();
 
-            if ($userEmailExists || $donorEmailExists) {
+                if ($userEmailExists || $donorEmailExists) {
+                    throw ValidationException::withMessages([
+                        'email' => 'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
+                    ]);
+                }
+
+                $donorRole = Role::query()->bySlug('donor')->firstOrFail();
+
+                $user = User::query()->create([
+                    'name' => $name,
+                    'email' => $email,
+                    'password' => $password,
+                    'is_active' => true,
+                ]);
+
+                $user->roles()->attach($donorRole->id, [
+                    'assigned_at' => now(),
+                ]);
+
+                $donor = Donor::query()->create([
+                    'donor_code' => $this->referenceCodeGenerator->generate(Donor::class, 'donor_code', 'DNR-'),
+                    'user_id' => $user->id,
+                    'full_name' => $name,
+                    'email' => $email,
+                    'blood_group' => $bloodGroup,
+                    'date_of_birth' => $dateOfBirth,
+                    'availability_status' => 'Available',
+                    'account_status' => 'Active',
+                    'registered_at' => CarbonImmutable::today()->toDateString(),
+                ]);
+
+                $donor->profile_completed = $this->hasCompletedRequiredProfile($donor);
+                $donor->save();
+
+                $this->donorEligibilityService->initializeOnboardingEligibility(
+                    donor: $donor,
+                    actor: null,
+                    status: 'Pending Review',
+                    reason: 'Initial donor self-registration awaiting clinical eligibility review.',
+                    clearanceSource: 'Donor Self-Registration',
+                );
+
+                return $user->load(['roles', 'donor']);
+            }, 3);
+        } catch (QueryException $e) {
+            if ($this->isRegistrationEmailUniqueConstraintViolation($e)) {
                 throw ValidationException::withMessages([
                     'email' => 'Unable to complete registration with this email address. Please sign in or contact Blood Bank Staff for assistance.',
                 ]);
             }
 
-            $donorRole = Role::query()->bySlug('donor')->firstOrFail();
+            throw $e;
+        }
+    }
 
-            $user = User::query()->create([
-                'name' => $name,
-                'email' => $email,
-                'password' => $password,
-                'is_active' => true,
-            ]);
+    /**
+     * Determine whether a QueryException represents an account registration email uniqueness violation.
+     */
+    private function isRegistrationEmailUniqueConstraintViolation(QueryException $e): bool
+    {
+        $errorInfo = $e->errorInfo;
+        $sqlState = (string) ($errorInfo[0] ?? $e->getCode());
+        $vendorCode = isset($errorInfo[1]) ? (int) $errorInfo[1] : null;
+        $driverMessage = (string) ($errorInfo[2] ?? $e->getMessage());
 
-            $user->roles()->attach($donorRole->id, [
-                'assigned_at' => now(),
-            ]);
+        // MySQL 8.4: ER_DUP_ENTRY is vendor code 1062 under SQLSTATE 23000
+        $isMysqlDuplicate = $sqlState === '23000' && $vendorCode === 1062;
 
-            $donor = Donor::query()->create([
-                'donor_code' => $this->referenceCodeGenerator->generate(Donor::class, 'donor_code', 'DNR-'),
-                'user_id' => $user->id,
-                'full_name' => $name,
-                'email' => $email,
-                'blood_group' => $bloodGroup,
-                'date_of_birth' => $dateOfBirth,
-                'availability_status' => 'Available',
-                'account_status' => 'Active',
-                'registered_at' => CarbonImmutable::today()->toDateString(),
-            ]);
+        // SQLite: SQLITE_CONSTRAINT (19) or SQLSTATE 23000 with explicit UNIQUE constraint failure
+        $isSqliteDuplicate = ($sqlState === '23000' || $vendorCode === 19)
+            && str_contains($driverMessage, 'UNIQUE constraint failed');
 
-            $donor->profile_completed = $this->hasCompletedRequiredProfile($donor);
-            $donor->save();
+        if (! $isMysqlDuplicate && ! $isSqliteDuplicate) {
+            return false;
+        }
 
-            $this->donorEligibilityService->initializeOnboardingEligibility(
-                donor: $donor,
-                actor: null,
-                status: 'Pending Review',
-                reason: 'Initial donor self-registration awaiting clinical eligibility review.',
-                clearanceSource: 'Donor Self-Registration',
-            );
+        $lowerMessage = strtolower($driverMessage);
 
-            return $user->load(['roles', 'donor']);
-        }, 3);
+        // Ensure the unique constraint failure specifically targets user or donor email columns
+        return str_contains($lowerMessage, 'users.email')
+            || str_contains($lowerMessage, 'donors.email')
+            || str_contains($lowerMessage, 'users_email_unique')
+            || str_contains($lowerMessage, 'donors_email_unique');
     }
 
     /**

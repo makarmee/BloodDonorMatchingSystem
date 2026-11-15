@@ -103,23 +103,30 @@
                     </div>
 
                     {{-- Hospital-specific fields --}}
-                    <div x-show="role === 'hospital'" x-cloak class="grid gap-4 sm:grid-cols-2">
-                        <x-ui.input
-                            label="Hospital / Clinic name"
-                            name="organization_name"
-                            icon="building-hospital"
-                            placeholder="City General Hospital"
-                            x-bind:disabled="role !== 'hospital'"
-                            :value="old('organization_name')"
-                        />
+                    <div x-show="role === 'hospital'" x-cloak class="space-y-4">
+                        <x-ui.alert variant="info" :dismissible="false">
+                            <span class="font-medium">Coming in Stage A2.2:</span>
+                            Hospital Partner self-registration is currently in preparation and will be available in the next release stage. To register a blood donor account, please switch to the Blood Donor tab.
+                        </x-ui.alert>
 
-                        <x-ui.input
-                            label="License / Facility code"
-                            name="facility_code"
-                            placeholder="HSP-2049"
-                            x-bind:disabled="role !== 'hospital'"
-                            :value="old('facility_code')"
-                        />
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-ui.input
+                                label="Hospital / Clinic name"
+                                name="organization_name"
+                                icon="building-hospital"
+                                placeholder="City General Hospital"
+                                x-bind:disabled="role !== 'hospital'"
+                                :value="old('organization_name')"
+                            />
+
+                            <x-ui.input
+                                label="License / Facility code"
+                                name="facility_code"
+                                placeholder="HSP-2049"
+                                x-bind:disabled="role !== 'hospital'"
+                                :value="old('facility_code')"
+                            />
+                        </div>
                     </div>
 
                     <div class="grid gap-4 sm:grid-cols-2">
