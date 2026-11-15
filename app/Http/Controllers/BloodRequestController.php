@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class BloodRequestController extends Controller
@@ -27,6 +28,32 @@ class BloodRequestController extends Controller
 
         /** @var User $actor */
         $actor = $request->user();
+
+        if (! $request->filled('contact_person_snapshot') && $request->filled('contact_person')) {
+            $request->merge(['contact_person_snapshot' => $request->input('contact_person')]);
+        }
+        if (! $request->filled('contact_phone_snapshot') && ($request->filled('contact_number') || $request->filled('phone'))) {
+            $request->merge(['contact_phone_snapshot' => $request->input('contact_number') ?? $request->input('phone')]);
+        }
+        if (! $request->filled('contact_email_snapshot') && $request->filled('email')) {
+            $request->merge(['contact_email_snapshot' => $request->input('email')]);
+        }
+        if (! $request->filled('department_or_ward') && $request->filled('hospital_address')) {
+            $request->merge(['department_or_ward' => Str::limit((string) $request->input('hospital_address'), 150, '')]);
+        }
+
+        if (! $request->filled('contact_person_snapshot') && $request->filled('contact_person')) {
+            $request->merge(['contact_person_snapshot' => $request->input('contact_person')]);
+        }
+        if (! $request->filled('contact_phone_snapshot') && ($request->filled('contact_number') || $request->filled('phone'))) {
+            $request->merge(['contact_phone_snapshot' => $request->input('contact_number') ?? $request->input('phone')]);
+        }
+        if (! $request->filled('contact_email_snapshot') && $request->filled('email')) {
+            $request->merge(['contact_email_snapshot' => $request->input('email')]);
+        }
+        if (! $request->filled('department_or_ward') && $request->filled('hospital_address')) {
+            $request->merge(['department_or_ward' => \Illuminate\Support\Str::limit((string) $request->input('hospital_address'), 150, '')]);
+        }
 
         $validated = $request->validate([
             'hospital_id' => [
@@ -281,6 +308,19 @@ class BloodRequestController extends Controller
      */
     private function resolveHospitalForStore(User $actor, ?int $hospitalId): Hospital
     {
+        if ($actor->hasRole('hospital')) {
+            $coordinatorLink = $actor->hospitalUser()
+                ->where('is_active', true)
+                ->with('hospital')
+                ->firstOrFail();
+
+            if ($hospitalId !== null && (int) $hospitalId !== (int) $coordinatorLink->hospital_id) {
+                abort(403, 'You are not authorized to create blood requests for other hospitals.');
+            }
+
+            return $coordinatorLink->hospital;
+        }
+
         if ($hospitalId !== null) {
             return Hospital::query()->findOrFail($hospitalId);
         }

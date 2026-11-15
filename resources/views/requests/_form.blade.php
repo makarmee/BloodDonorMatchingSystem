@@ -87,7 +87,14 @@
         </button>
     </div>
 
-    <form @submit.prevent="submitForm()" novalidate class="space-y-6">
+    <form
+        method="POST"
+        action="{{ $isEdit ? '#' : route('requests.store') }}"
+        @if ($isEdit) @submit.prevent="submitForm()" @endif
+        novalidate
+        class="space-y-6"
+    >
+        @csrf
         {{-- Section 1: Hospital Information --}}
         <x-ui.card>
             <x-slot:header>

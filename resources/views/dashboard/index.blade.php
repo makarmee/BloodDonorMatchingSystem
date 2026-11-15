@@ -13,10 +13,17 @@
 
         <div class="flex flex-wrap items-center gap-2">
             @if ($activeRole === 'hospital')
-                <x-ui.button variant="primary" size="sm" x-data @click="$dispatch('open-modal', 'quick-action-preview')">
-                    <x-icons.icon name="plus" class="size-4" />
-                    New Blood Request
-                </x-ui.button>
+                @if (isset($hospital) && $hospital && $hospital->verification_status === 'Verified')
+                    <x-ui.button variant="primary" size="sm" :href="route('requests.create')">
+                        <x-icons.icon name="plus" class="size-4" />
+                        <span>New Blood Request</span>
+                    </x-ui.button>
+                @else
+                    <x-ui.button variant="outline" size="sm" disabled title="Requires verified hospital status">
+                        <x-icons.icon name="lock-closed" class="size-4" />
+                        <span>Verification Pending</span>
+                    </x-ui.button>
+                @endif
             @elseif ($activeRole === 'donor')
                 <x-ui.button variant="primary" size="sm" x-data @click="$dispatch('open-modal', 'quick-action-preview')">
                     <x-icons.icon name="calendar" class="size-4" />
@@ -51,6 +58,22 @@
             </div>
         </x-ui.card>
     @else
+        @if ($activeRole === 'hospital' && isset($hospital) && $hospital)
+            @if ($hospital->verification_status === 'Pending')
+                <x-ui.alert variant="warning" title="Facility Verification Pending" :dismissible="false" class="mb-6">
+                    Your medical facility (<strong>{{ $hospital->name }}</strong>, Code: <code>{{ $hospital->hospital_code }}</code>) is currently pending administrative verification. Blood request submissions are disabled until an administrator approves your facility credentials.
+                </x-ui.alert>
+            @elseif ($hospital->verification_status === 'Verified')
+                <x-ui.alert variant="success" title="Verified Hospital Partner" :dismissible="false" class="mb-6">
+                    Your medical facility (<strong>{{ $hospital->name }}</strong>) is verified and active. You are authorized to create blood requests.
+                </x-ui.alert>
+            @elseif ($hospital->verification_status === 'Suspended')
+                <x-ui.alert variant="danger" title="Facility Access Suspended" :dismissible="false" class="mb-6">
+                    Your medical facility's access is currently suspended. You cannot place new blood requests. Please contact the BDMS administration for assistance.
+                </x-ui.alert>
+            @endif
+        @endif
+
         {{-- KPI Stat Cards --}}
         <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ($portalData['kpis'] as $kpi)

@@ -1,4 +1,4 @@
-<x-app-layout title="Create Blood Request" page-title="New Blood Request" active-role="staff">
+<x-app-layout title="Create Blood Request" page-title="New Blood Request">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>

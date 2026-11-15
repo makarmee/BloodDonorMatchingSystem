@@ -28,6 +28,10 @@ class BloodRequestPolicy
         if (! $hospital instanceof Hospital) {
             return $user->hospitalUser()
                 ->where('is_active', true)
+                ->whereHas('hospital', function ($query): void {
+                    $query->where('is_active', true)
+                        ->where('verification_status', 'Verified');
+                })
                 ->exists();
         }
 
@@ -36,6 +40,26 @@ class BloodRequestPolicy
         }
 
         return $this->isActiveHospitalCoordinatorFor($user, $hospital);
+    }
+
+    /**
+     * Determine whether the user can view the blood request details.
+     */
+    public function view(User $user, BloodRequest $bloodRequest): bool
+    {
+        if (! $user->is_active) {
+            return false;
+        }
+
+        if ($user->hasPermission('requests.fulfill')) {
+            return true;
+        }
+
+        if (! $user->hasRole('hospital')) {
+            return false;
+        }
+
+        return $this->isActiveHospitalCoordinatorFor($user, $bloodRequest->hospital);
     }
 
     /**

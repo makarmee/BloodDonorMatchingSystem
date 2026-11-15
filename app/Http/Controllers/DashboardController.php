@@ -12,13 +12,24 @@ class DashboardController extends Controller
      */
     public function __invoke(Request $request): View
     {
-        $activeRole = $request->user()?->primaryRoleSlug();
+        $user = $request->user();
+        $activeRole = $user?->primaryRoleSlug();
 
         $portalData = $this->portalPayload($activeRole);
+
+        $hospital = null;
+        if ($activeRole === 'hospital' && $user) {
+            $hospital = $user->hospitalUser()
+                ->where('is_active', true)
+                ->with('hospital')
+                ->first()
+                ?->hospital;
+        }
 
         return view('dashboard.index', [
             'activeRole' => $activeRole,
             'portalData' => $portalData,
+            'hospital' => $hospital,
         ]);
     }
 

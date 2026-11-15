@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BloodRequest;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
 
 class BloodRequestsController extends Controller
 {
@@ -45,6 +47,8 @@ class BloodRequestsController extends Controller
      */
     public function create(): View
     {
+        Gate::authorize('create', BloodRequest::class);
+
         return view('requests.create', [
             'bloodGroups' => $this->bloodGroupOptions(),
             'priorities' => $this->priorityOptions(),
