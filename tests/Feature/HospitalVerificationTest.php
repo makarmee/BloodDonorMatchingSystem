@@ -318,6 +318,38 @@ class HospitalVerificationTest extends TestCase
     }
 
     /**
+     * Rejected or failed transitions do not produce audit log entries.
+     */
+    public function test_failed_or_rejected_transitions_do_not_produce_audit_logs(): void
+    {
+        Log::spy();
+        $admin = $this->createUserWithRole('admin');
+        $hospital = Hospital::factory()->create([
+            'verification_status' => 'Verified',
+            'is_active' => true,
+        ]);
+
+        // Attempt invalid transition: Verified -> Verified
+        $response = $this->actingAs($admin)->post(route('hospitals.verify', $hospital));
+        $response->assertSessionHasErrors('hospital');
+
+        // Attempt unauthorized transition: staff user
+        $staff = $this->createUserWithRole('staff');
+        $pendingHospital = Hospital::factory()->pendingVerification()->create();
+        $this->actingAs($staff)->post(route('hospitals.verify', $pendingHospital))->assertForbidden();
+
+        // Direct service call failure: Pending -> Suspended
+        $service = app(HospitalVerificationService::class);
+        try {
+            $service->suspendHospital($pendingHospital, $admin);
+        } catch (ValidationException) {
+            // expected
+        }
+
+        Log::shouldNotHaveReceived('info');
+    }
+
+    /**
      * 11. Non-admin roles (staff, lab_officer, hospital, donor) receive 403 Forbidden.
      */
     #[TestWith(['staff'])]

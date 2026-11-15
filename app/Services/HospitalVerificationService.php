@@ -21,7 +21,8 @@ class HospitalVerificationService
     {
         $this->authorizeAdmin($actor);
 
-        return DB::transaction(function () use ($hospital, $actor): Hospital {
+        /** @var array{0: Hospital, 1: array{message: string, context: array<string, mixed>}} $result */
+        $result = DB::transaction(function () use ($hospital, $actor): array {
             /** @var Hospital $lockedHospital */
             $lockedHospital = Hospital::query()
                 ->whereKey($hospital->getKey())
@@ -56,18 +57,28 @@ class HospitalVerificationService
                 'verified_at' => now(),
             ])->save();
 
-            Log::info("Hospital {$lockedHospital->hospital_code} verified by Admin #{$actor->id}", [
-                'hospital_id' => $lockedHospital->id,
-                'hospital_code' => $lockedHospital->hospital_code,
-                'previous_status' => $previousStatus,
-                'new_status' => 'Verified',
-                'acting_user_id' => $actor->id,
-                'admin_user_id' => $actor->id,
-                'timestamp' => now()->toIso8601String(),
-            ]);
+            $logPayload = [
+                'message' => "Hospital {$lockedHospital->hospital_code} verified by Admin #{$actor->id}",
+                'context' => [
+                    'hospital_id' => $lockedHospital->id,
+                    'hospital_code' => $lockedHospital->hospital_code,
+                    'previous_status' => $previousStatus,
+                    'new_status' => 'Verified',
+                    'acting_user_id' => $actor->id,
+                    'admin_user_id' => $actor->id,
+                    'timestamp' => now()->toIso8601String(),
+                ],
+            ];
 
-            return $lockedHospital->fresh(['verifiedBy', 'hospitalUsers.user']);
+            return [$lockedHospital->fresh(['verifiedBy', 'hospitalUsers.user']), $logPayload];
         }, 3);
+
+        [$resultHospital, $logPayload] = $result;
+
+        // Emit audit log strictly after the database transaction has committed
+        Log::info($logPayload['message'], $logPayload['context']);
+
+        return $resultHospital;
     }
 
     /**
@@ -80,7 +91,8 @@ class HospitalVerificationService
     {
         $this->authorizeAdmin($actor);
 
-        return DB::transaction(function () use ($hospital, $actor, $reason): Hospital {
+        /** @var array{0: Hospital, 1: array{message: string, context: array<string, mixed>}} $result */
+        $result = DB::transaction(function () use ($hospital, $actor, $reason): array {
             /** @var Hospital $lockedHospital */
             $lockedHospital = Hospital::query()
                 ->whereKey($hospital->getKey())
@@ -105,19 +117,29 @@ class HospitalVerificationService
                 'is_active' => false,
             ])->save();
 
-            Log::info("Hospital {$lockedHospital->hospital_code} suspended by Admin #{$actor->id}", [
-                'hospital_id' => $lockedHospital->id,
-                'hospital_code' => $lockedHospital->hospital_code,
-                'previous_status' => $previousStatus,
-                'new_status' => 'Suspended',
-                'acting_user_id' => $actor->id,
-                'admin_user_id' => $actor->id,
-                'timestamp' => now()->toIso8601String(),
-                'reason' => $reason,
-            ]);
+            $logPayload = [
+                'message' => "Hospital {$lockedHospital->hospital_code} suspended by Admin #{$actor->id}",
+                'context' => [
+                    'hospital_id' => $lockedHospital->id,
+                    'hospital_code' => $lockedHospital->hospital_code,
+                    'previous_status' => $previousStatus,
+                    'new_status' => 'Suspended',
+                    'acting_user_id' => $actor->id,
+                    'admin_user_id' => $actor->id,
+                    'timestamp' => now()->toIso8601String(),
+                    'reason' => $reason,
+                ],
+            ];
 
-            return $lockedHospital->fresh(['verifiedBy', 'hospitalUsers.user']);
+            return [$lockedHospital->fresh(['verifiedBy', 'hospitalUsers.user']), $logPayload];
         }, 3);
+
+        [$resultHospital, $logPayload] = $result;
+
+        // Emit audit log strictly after the database transaction has committed
+        Log::info($logPayload['message'], $logPayload['context']);
+
+        return $resultHospital;
     }
 
     /**
