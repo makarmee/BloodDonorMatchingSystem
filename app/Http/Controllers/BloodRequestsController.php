@@ -3,7 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\BloodRequest;
+use App\Models\InventoryStock;
+use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 class BloodRequestsController extends Controller
@@ -11,27 +15,89 @@ class BloodRequestsController extends Controller
     /**
      * Display the blood requests overview dashboard and filterable requests table.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $requests = $this->sampleRequests();
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if (! $user || ! $user->is_active) {
+            abort(403);
+        }
+
+        $canFulfill = $user->hasPermission('requests.fulfill');
+        $isHospitalCoordinator = $user->hasRole('hospital') && $user->hospitalUser()->where('is_active', true)->exists();
+
+        if (! $canFulfill && ! $isHospitalCoordinator) {
+            abort(403, 'You are not authorized to view blood requests.');
+        }
+
+        $baseQuery = BloodRequest::query();
+
+        if ($isHospitalCoordinator && ! $canFulfill) {
+            $hospitalId = $user->hospitalUser()->where('is_active', true)->value('hospital_id');
+            if (! $hospitalId) {
+                abort(403, 'Active hospital affiliation required.');
+            }
+            $baseQuery->where('hospital_id', $hospitalId);
+        }
 
         $summary = [
-            'totalRequests' => count($requests),
-            'pendingRequests' => count(array_filter(
-                $requests,
-                fn (array $item): bool => $item['status'] === 'Pending'
-            )),
-            'urgentRequests' => count(array_filter(
-                $requests,
-                fn (array $item): bool => in_array($item['priority'], ['High', 'Critical'], true)
-            )),
-            'fulfilledRequests' => count(array_filter(
-                $requests,
-                fn (array $item): bool => $item['status'] === 'Fulfilled'
-            )),
-            'totalUnitsRequested' => array_sum(array_column($requests, 'requestedUnits')),
-            'totalUnitsFulfilled' => array_sum(array_column($requests, 'fulfilledUnits')),
+            'totalRequests' => (clone $baseQuery)->count(),
+            'pendingRequests' => (clone $baseQuery)->where('status', 'Pending')->count(),
+            'urgentRequests' => (clone $baseQuery)->whereIn('priority', ['High', 'Critical'])->count(),
+            'fulfilledRequests' => (clone $baseQuery)->where('status', 'Fulfilled')->count(),
+            'totalUnitsRequested' => (int) (clone $baseQuery)->sum('requested_units'),
+            'totalUnitsFulfilled' => (int) (clone $baseQuery)->sum('fulfilled_units'),
         ];
+
+        $query = clone $baseQuery;
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->where(function ($q) use ($search): void {
+                $q->where('request_code', 'like', "%{$search}%")
+                    ->orWhereHas('hospital', function ($hq) use ($search): void {
+                        $hq->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if ($request->filled('blood_group') && $request->input('blood_group') !== 'all') {
+            $query->where('blood_group', $request->input('blood_group'));
+        }
+
+        if ($request->filled('component') && $request->input('component') !== 'all') {
+            $component = $request->input('component');
+            $query->where(function ($q) use ($component): void {
+                $q->where('blood_component_id', $component)
+                    ->orWhereHas('bloodComponent', function ($cq) use ($component): void {
+                        $cq->where('code', $component)
+                            ->orWhere('name', $component);
+                    });
+            });
+        }
+
+        if ($request->filled('priority') && $request->input('priority') !== 'all') {
+            $query->where('priority', $request->input('priority'));
+        }
+
+        if ($request->filled('status') && $request->input('status') !== 'all') {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('request_date', '>=', $request->input('date_from'));
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('request_date', '<=', $request->input('date_to'));
+        }
+
+        $records = $query->with(['hospital', 'bloodComponent', 'requestedBy'])
+            ->latest('id')
+            ->get();
+
+        $requests = $records->map(fn (BloodRequest $item): array => $this->formatRequestListItem($item))->all();
 
         return view('requests.index', [
             'requests' => $requests,
@@ -45,58 +111,103 @@ class BloodRequestsController extends Controller
     /**
      * Display the new hospital blood request creation form.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
         Gate::authorize('create', BloodRequest::class);
+
+        /** @var User|null $user */
+        $user = $request->user();
+        $coordinatorLink = $user?->hospitalUser()->where('is_active', true)->with('hospital')->first();
+        $hospital = $coordinatorLink?->hospital;
+
+        $prefill = [];
+        if ($hospital) {
+            $prefill = [
+                'hospitalName' => $hospital->name,
+                'contactPerson' => $coordinatorLink->contact_name ?? $hospital->primary_contact_name ?? $user->name,
+                'contactNumber' => $coordinatorLink->work_phone ?? $hospital->primary_phone ?? $user->phone ?? '',
+                'email' => $coordinatorLink->work_email ?? $hospital->primary_email ?? $user->email ?? '',
+                'hospitalAddress' => $hospital->address ?? '',
+            ];
+        }
 
         return view('requests.create', [
             'bloodGroups' => $this->bloodGroupOptions(),
             'priorities' => $this->priorityOptions(),
+            'prefill' => $prefill,
         ]);
     }
 
     /**
      * Display full blood request details, fulfillment progress, history, and staff workflow.
      */
-    public function show(string $request): View
+    public function show(Request $request, string $requestId): View
     {
-        $requestRecord = $this->findRequestOrFail($request);
+        $bloodRequest = BloodRequest::query()
+            ->with([
+                'hospital',
+                'requestedBy',
+                'bloodComponent',
+                'reviewedBy',
+                'cancelledBy',
+                'statusHistories.actor',
+                'fulfillments.dispatchedBy',
+                'allocations.bloodUnit',
+            ])
+            ->where('id', $requestId)
+            ->orWhere('request_code', $requestId)
+            ->firstOrFail();
+
+        Gate::authorize('view', $bloodRequest);
+
+        $stockLevels = [];
+        foreach (BloodRequest::BLOOD_GROUPS as $group) {
+            $stockLevels[$group] = 0;
+        }
+
+        $dbStocks = InventoryStock::query()
+            ->selectRaw('blood_group, sum(available_units) as total_available')
+            ->groupBy('blood_group')
+            ->pluck('total_available', 'blood_group')
+            ->all();
+
+        foreach ($dbStocks as $grp => $qty) {
+            $stockLevels[$grp] = (int) $qty;
+        }
 
         return view('requests.show', [
-            'bloodRequest' => $requestRecord,
+            'bloodRequest' => $this->formatRequestForDetail($bloodRequest),
+            'bloodRequestRecord' => $bloodRequest,
             'bloodGroups' => $this->bloodGroupOptions(),
-            'sampleInventory' => $this->sampleInventorySnapshot(),
+            'sampleInventory' => $stockLevels,
         ]);
     }
 
     /**
-     * Display the edit request form prefilled with sample data.
+     * Display the edit request form prefilled with live persisted data.
      */
-    public function edit(string $request): View
+    public function edit(Request $request, string $requestId): View|RedirectResponse
     {
-        $requestRecord = $this->findRequestOrFail($request);
+        $bloodRequest = BloodRequest::query()
+            ->with(['hospital', 'requestedBy', 'bloodComponent'])
+            ->where('id', $requestId)
+            ->orWhere('request_code', $requestId)
+            ->firstOrFail();
+
+        Gate::authorize('update', $bloodRequest);
+
+        if (in_array($bloodRequest->status, ['Rejected', 'Cancelled', 'Fulfilled'], true)) {
+            return redirect()
+                ->route('requests.show', $bloodRequest->request_code)
+                ->with('error', "Blood request {$bloodRequest->request_code} is in terminal state '{$bloodRequest->status}' and cannot be edited.");
+        }
 
         return view('requests.edit', [
-            'bloodRequest' => $requestRecord,
+            'bloodRequest' => $this->formatRequestForDetail($bloodRequest),
+            'bloodRequestRecord' => $bloodRequest,
             'bloodGroups' => $this->bloodGroupOptions(),
             'priorities' => $this->priorityOptions(),
         ]);
-    }
-
-    /**
-     * Locate a blood request sample record by ID or abort with HTTP 404.
-     *
-     * @return array<string, mixed>
-     */
-    private function findRequestOrFail(string $requestId): array
-    {
-        foreach ($this->sampleRequests() as $record) {
-            if (strcasecmp($record['id'], $requestId) === 0) {
-                return $record;
-            }
-        }
-
-        abort(404);
     }
 
     /**
@@ -106,7 +217,7 @@ class BloodRequestsController extends Controller
      */
     private function bloodGroupOptions(): array
     {
-        return ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        return BloodRequest::BLOOD_GROUPS;
     }
 
     /**
@@ -116,7 +227,7 @@ class BloodRequestsController extends Controller
      */
     private function priorityOptions(): array
     {
-        return ['Low', 'Normal', 'High', 'Critical'];
+        return BloodRequest::PRIORITIES;
     }
 
     /**
@@ -126,399 +237,100 @@ class BloodRequestsController extends Controller
      */
     private function statusOptions(): array
     {
+        return BloodRequest::STATUSES;
+    }
+
+    /**
+     * Format a blood request model for the overview table and Alpine directory.
+     *
+     * @return array<string, mixed>
+     */
+    private function formatRequestListItem(BloodRequest $req): array
+    {
         return [
-            'Pending',
-            'Approved',
-            'Rejected',
-            'Partially Fulfilled',
-            'Fulfilled',
-            'Cancelled',
+            'id' => $req->request_code,
+            'record_id' => $req->id,
+            'hospitalName' => $req->hospital?->name ?? 'Unknown Hospital',
+            'contactPerson' => $req->contact_person_snapshot ?? $req->requestedBy?->name ?? $req->hospital?->primary_contact_name ?? 'Coordinator',
+            'bloodGroup' => $req->blood_group,
+            'component' => $req->bloodComponent?->name,
+            'requestedUnits' => (int) $req->requested_units,
+            'fulfilledUnits' => (int) $req->fulfilled_units,
+            'remainingUnits' => max(0, (int) $req->requested_units - (int) $req->fulfilled_units),
+            'requestDate' => $req->request_date?->format('Y-m-d') ?? $req->created_at?->format('Y-m-d') ?? '',
+            'requestDateFormatted' => $req->request_date?->format('M d, Y') ?? $req->created_at?->format('M d, Y') ?? '—',
+            'requiredDate' => $req->required_date?->format('Y-m-d') ?? '',
+            'requiredDateFormatted' => $req->required_date?->format('M d, Y') ?? '—',
+            'priority' => $req->priority,
+            'status' => $req->status,
         ];
     }
 
     /**
-     * Read-only sample inventory levels aligned with InventoryController (preview reference only).
+     * Format a blood request model with detailed history and fulfillment allocations for show/edit views.
      *
-     * @return array<string, int>
+     * @return array<string, mixed>
      */
-    private function sampleInventorySnapshot(): array
+    private function formatRequestForDetail(BloodRequest $bloodRequest): array
     {
         return [
-            'A+' => 64,
-            'A-' => 24,
-            'B+' => 52,
-            'B-' => 19,
-            'AB+' => 45,
-            'AB-' => 12,
-            'O+' => 78,
-            'O-' => 11,
+            'id' => $bloodRequest->request_code,
+            'record_id' => $bloodRequest->id,
+            'hospitalName' => $bloodRequest->hospital?->name ?? 'Unknown Hospital',
+            'contactPerson' => $bloodRequest->contact_person_snapshot ?? $bloodRequest->requestedBy?->name ?? $bloodRequest->hospital?->primary_contact_name ?? 'Coordinator',
+            'contactNumber' => $bloodRequest->contact_phone_snapshot ?? $bloodRequest->hospital?->primary_phone ?? '—',
+            'email' => $bloodRequest->contact_email_snapshot ?? $bloodRequest->requestedBy?->email ?? $bloodRequest->hospital?->primary_email ?? '—',
+            'hospitalAddress' => $bloodRequest->department_or_ward ?? $bloodRequest->hospital?->address ?? '—',
+            'requesterName' => $bloodRequest->requestedBy?->name ?? '—',
+            'requesterEmail' => $bloodRequest->requestedBy?->email ?? '—',
+            'bloodGroup' => $bloodRequest->blood_group,
+            'componentName' => $bloodRequest->bloodComponent?->name,
+            'componentCode' => $bloodRequest->bloodComponent?->code,
+            'requestedUnits' => (int) $bloodRequest->requested_units,
+            'reservedUnits' => (int) $bloodRequest->reserved_units,
+            'fulfilledUnits' => (int) $bloodRequest->fulfilled_units,
+            'remainingUnits' => max(0, (int) $bloodRequest->requested_units - (int) $bloodRequest->fulfilled_units),
+            'priority' => $bloodRequest->priority,
+            'status' => $bloodRequest->status,
+            'requestDate' => $bloodRequest->request_date?->format('Y-m-d') ?? $bloodRequest->created_at?->format('Y-m-d') ?? '',
+            'requestDateFormatted' => $bloodRequest->request_date?->format('M d, Y') ?? $bloodRequest->created_at?->format('M d, Y') ?? '—',
+            'requiredDate' => $bloodRequest->required_date?->format('Y-m-d') ?? '',
+            'requiredDateFormatted' => $bloodRequest->required_date?->format('M d, Y') ?? '—',
+            'requestReason' => $bloodRequest->request_reason,
+            'additionalNotes' => $bloodRequest->additional_notes,
+            'reviewedBy' => $bloodRequest->reviewedBy?->name,
+            'reviewedAt' => $bloodRequest->reviewed_at?->format('M d, Y • H:i'),
+            'rejectionReason' => $bloodRequest->rejection_reason,
+            'cancelledBy' => $bloodRequest->cancelledBy?->name,
+            'cancelledAt' => $bloodRequest->cancelled_at?->format('M d, Y • H:i'),
+            'cancellationReason' => $bloodRequest->cancellation_reason,
+            'history' => $bloodRequest->statusHistories->sortByDesc('occurred_at')->values()->map(fn ($history): array => [
+                'date' => $history->occurred_at?->format('M d, Y • H:i') ?? '',
+                'event' => $history->event_name,
+                'status' => $history->new_status,
+                'units' => (int) $history->units_affected,
+                'actor' => $history->actor_name ?? $history->actor?->name ?? 'System',
+                'notes' => $history->notes ?? '',
+            ])->all(),
+            'fulfillments' => $bloodRequest->fulfillments->sortByDesc('id')->values()->map(fn ($f): array => [
+                'code' => $f->fulfillment_code,
+                'units' => (int) $f->units_dispatched,
+                'group' => $f->dispatched_blood_group,
+                'component' => $f->bloodComponent?->name,
+                'courier' => $f->courier_reference,
+                'date' => $f->dispatch_date?->format('M d, Y') ?? $f->dispatched_at?->format('M d, Y • H:i') ?? '—',
+                'dispatchedBy' => $f->dispatchedBy?->name ?? 'Staff',
+                'notes' => $f->notes,
+            ])->all(),
+            'allocations' => $bloodRequest->allocations->sortByDesc('id')->values()->map(fn ($a): array => [
+                'id' => $a->id,
+                'code' => $a->allocation_code,
+                'units' => (int) $a->units_allocated,
+                'status' => $a->allocation_status,
+                'unitNumber' => $a->bloodUnit?->unit_number,
+                'bloodGroup' => $a->bloodUnit?->blood_group,
+                'date' => $a->allocated_at?->format('M d, Y • H:i') ?? '',
+            ])->all(),
         ];
-    }
-
-    /**
-     * Realistic sample blood request records covering all priorities and statuses.
-     *
-     * @return array<int, array{
-     *     id: string,
-     *     hospitalName: string,
-     *     contactPerson: string,
-     *     contactNumber: string,
-     *     hospitalAddress: string,
-     *     email: string,
-     *     bloodGroup: string,
-     *     requestedUnits: int,
-     *     fulfilledUnits: int,
-     *     remainingUnits: int,
-     *     requestDate: string,
-     *     requestDateFormatted: string,
-     *     requiredDate: string,
-     *     requiredDateFormatted: string,
-     *     priority: string,
-     *     status: string,
-     *     requestReason: string,
-     *     additionalNotes: string,
-     *     history: array<int, array{date: string, event: string, status: string, units: int, actor: string, notes: string}>
-     * }>
-     */
-    private function sampleRequests(): array
-    {
-        $entries = [
-            [
-                'id' => 'REQ-1044',
-                'hospitalName' => 'Metro General Trauma Center',
-                'contactPerson' => 'Dr. Arthur Vance',
-                'contactNumber' => '+1 (555) 402-8810',
-                'hospitalAddress' => '900 Emergency Plaza, Central Medical District',
-                'email' => 'transfusion.lab@metrotrauma.org',
-                'bloodGroup' => 'O-',
-                'requestedUnits' => 14,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-11',
-                'requestDateFormatted' => 'Nov 11, 2026',
-                'requiredDate' => '2026-11-11',
-                'requiredDateFormatted' => 'Nov 11, 2026',
-                'priority' => 'Critical',
-                'status' => 'Pending',
-                'requestReason' => 'Mass casualty emergency surgical protocol requiring universal O-negative packed RBCs.',
-                'additionalNotes' => 'Coordinate split dispatch if regional O- reserve falls short of full 14-unit volume.',
-                'history' => [
-                    [
-                        'date' => 'Nov 11, 2026 • 13:15',
-                        'event' => 'Request Submitted',
-                        'status' => 'Pending',
-                        'units' => 0,
-                        'actor' => 'Dr. Arthur Vance (Metro General)',
-                        'notes' => 'Critical trauma intake opened for 14 units of O- packed red cells.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1043',
-                'hospitalName' => 'Harborview Cardiac Institute',
-                'contactPerson' => 'Nurse Mei Chen',
-                'contactNumber' => '+1 (555) 719-3304',
-                'hospitalAddress' => '220 Bayfront Blvd, Suite 400, Eastside',
-                'email' => 'bloodbank@harborviewcardiac.org',
-                'bloodGroup' => 'B-',
-                'requestedUnits' => 8,
-                'fulfilledUnits' => 4,
-                'requestDate' => '2026-11-10',
-                'requestDateFormatted' => 'Nov 10, 2026',
-                'requiredDate' => '2026-11-12',
-                'requiredDateFormatted' => 'Nov 12, 2026',
-                'priority' => 'High',
-                'status' => 'Partially Fulfilled',
-                'requestReason' => 'Scheduled cardiothoracic bypass surgery standby and post-op transfusion reserve.',
-                'additionalNotes' => 'Remaining 4 crossmatched B- units requested before 07:00 AM operating theater prep.',
-                'history' => [
-                    [
-                        'date' => 'Nov 11, 2026 • 09:40',
-                        'event' => 'Partial Dispatch Recorded',
-                        'status' => 'Partially Fulfilled',
-                        'units' => 4,
-                        'actor' => 'Nurse Hannah Reed',
-                        'notes' => 'Dispatched initial 4 units B- via cold-chain courier #TR-208.',
-                    ],
-                    [
-                        'date' => 'Nov 10, 2026 • 16:20',
-                        'event' => 'Request Approved',
-                        'status' => 'Approved',
-                        'units' => 0,
-                        'actor' => 'Dr. Maya Lin',
-                        'notes' => 'Crossmatch screening cleared; split allocation authorized.',
-                    ],
-                    [
-                        'date' => 'Nov 10, 2026 • 15:05',
-                        'event' => 'Request Submitted',
-                        'status' => 'Pending',
-                        'units' => 0,
-                        'actor' => 'Nurse Mei Chen (Harborview)',
-                        'notes' => 'Surgical blood order for 8 units B-.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1042',
-                'hospitalName' => 'City General Hospital',
-                'contactPerson' => 'Dr. Elena Morales',
-                'contactNumber' => '+1 (555) 289-4100',
-                'hospitalAddress' => '145 Civic Parkway, Ward 3B, Downtown',
-                'email' => 'icu.transfusion@citygeneral.org',
-                'bloodGroup' => 'AB-',
-                'requestedUnits' => 4,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-11',
-                'requestDateFormatted' => 'Nov 11, 2026',
-                'requiredDate' => '2026-11-11',
-                'requiredDateFormatted' => 'Nov 11, 2026',
-                'priority' => 'Critical',
-                'status' => 'Approved',
-                'requestReason' => 'ICU Trauma Unit Ward 3B acute hemorrhage stabilization.',
-                'additionalNotes' => 'Priority ambulance courier waiting at loading bay 2.',
-                'history' => [
-                    [
-                        'date' => 'Nov 11, 2026 • 14:15',
-                        'event' => 'Request Approved',
-                        'status' => 'Approved',
-                        'units' => 0,
-                        'actor' => 'Dr. Maya Lin',
-                        'notes' => 'Emergency AB- allocation approved for immediate crossmatch dispatch.',
-                    ],
-                    [
-                        'date' => 'Nov 11, 2026 • 14:02',
-                        'event' => 'Request Submitted',
-                        'status' => 'Pending',
-                        'units' => 0,
-                        'actor' => 'Dr. Elena Morales (City General)',
-                        'notes' => 'Urgent request logged for 4 units AB- packed RBC.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1041',
-                'hospitalName' => 'Northside Pediatric Clinic',
-                'contactPerson' => 'Dr. Samuel Okafor',
-                'contactNumber' => '+1 (555) 614-2908',
-                'hospitalAddress' => '78 Pinecrest Road, North Hills',
-                'email' => 'hematology@northsidepeds.org',
-                'bloodGroup' => 'A-',
-                'requestedUnits' => 6,
-                'fulfilledUnits' => 2,
-                'requestDate' => '2026-11-09',
-                'requestDateFormatted' => 'Nov 09, 2026',
-                'requiredDate' => '2026-11-13',
-                'requiredDateFormatted' => 'Nov 13, 2026',
-                'priority' => 'Normal',
-                'status' => 'Partially Fulfilled',
-                'requestReason' => 'Pediatric thalassemia chronic transfusion support schedule.',
-                'additionalNotes' => 'Leukoreduced irradiated aliquots preferred where available.',
-                'history' => [
-                    [
-                        'date' => 'Nov 10, 2026 • 11:00',
-                        'event' => 'Partial Dispatch Recorded',
-                        'status' => 'Partially Fulfilled',
-                        'units' => 2,
-                        'actor' => 'Nurse Clara Diaz',
-                        'notes' => 'Released 2 leukoreduced A- units for outpatient clinic day 1.',
-                    ],
-                    [
-                        'date' => 'Nov 09, 2026 • 14:30',
-                        'event' => 'Request Approved',
-                        'status' => 'Approved',
-                        'units' => 0,
-                        'actor' => 'Dr. Tariq Nassar',
-                        'notes' => 'Approved 6-unit multi-day pediatric infusion plan.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1040',
-                'hospitalName' => 'Westgate Surgical Center',
-                'contactPerson' => 'Karen Gallagher',
-                'contactNumber' => '+1 (555) 890-5512',
-                'hospitalAddress' => '510 Crescent Avenue, Westgate',
-                'email' => 'or.logistics@westgatesurgical.org',
-                'bloodGroup' => 'O+',
-                'requestedUnits' => 10,
-                'fulfilledUnits' => 10,
-                'requestDate' => '2026-11-07',
-                'requestDateFormatted' => 'Nov 07, 2026',
-                'requiredDate' => '2026-11-08',
-                'requiredDateFormatted' => 'Nov 08, 2026',
-                'priority' => 'High',
-                'status' => 'Fulfilled',
-                'requestReason' => 'Weekend orthopedic & trauma surgical theater replenishment.',
-                'additionalNotes' => 'All 10 O+ units signed into Westgate OR cold cabinet.',
-                'history' => [
-                    [
-                        'date' => 'Nov 08, 2026 • 08:25',
-                        'event' => 'Full Fulfillment Completed',
-                        'status' => 'Fulfilled',
-                        'units' => 10,
-                        'actor' => 'Nurse Hannah Reed',
-                        'notes' => 'All 10 units of O+ delivered and receipted by OR blood coordinator.',
-                    ],
-                    [
-                        'date' => 'Nov 07, 2026 • 13:10',
-                        'event' => 'Request Approved',
-                        'status' => 'Approved',
-                        'units' => 0,
-                        'actor' => 'Dr. Maya Lin',
-                        'notes' => 'Approved standard O+ regional dispatch.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1039',
-                'hospitalName' => 'St. Jude Maternity Center',
-                'contactPerson' => 'Dr. Nadia Patel',
-                'contactNumber' => '+1 (555) 341-7722',
-                'hospitalAddress' => '312 Blossom Way, Obstetrics Wing',
-                'email' => 'ob.transfusion@stjudematernity.org',
-                'bloodGroup' => 'O-',
-                'requestedUnits' => 2,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-10',
-                'requestDateFormatted' => 'Nov 10, 2026',
-                'requiredDate' => '2026-11-12',
-                'requiredDateFormatted' => 'Nov 12, 2026',
-                'priority' => 'Critical',
-                'status' => 'Pending',
-                'requestReason' => 'High-risk obstetrics surgical suite standby reserve.',
-                'additionalNotes' => 'CMV-negative units requested if available in screened O- inventory.',
-                'history' => [
-                    [
-                        'date' => 'Nov 10, 2026 • 17:45',
-                        'event' => 'Request Submitted',
-                        'status' => 'Pending',
-                        'units' => 0,
-                        'actor' => 'Dr. Nadia Patel (St. Jude)',
-                        'notes' => 'Emergency obstetrics reserve order for 2 O- units.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1038',
-                'hospitalName' => 'Regional Trauma Clinic',
-                'contactPerson' => 'Marcus Sterling',
-                'contactNumber' => '+1 (555) 552-6019',
-                'hospitalAddress' => '104 University Loop, Campus South',
-                'email' => 'lab.orders@regionaltrauma.org',
-                'bloodGroup' => 'B+',
-                'requestedUnits' => 3,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-08',
-                'requestDateFormatted' => 'Nov 08, 2026',
-                'requiredDate' => '2026-11-15',
-                'requiredDateFormatted' => 'Nov 15, 2026',
-                'priority' => 'Normal',
-                'status' => 'Approved',
-                'requestReason' => 'Elective vascular procedure crossmatch reserve.',
-                'additionalNotes' => 'Scheduled pickup on morning courier run.',
-                'history' => [
-                    [
-                        'date' => 'Nov 09, 2026 • 10:15',
-                        'event' => 'Request Approved',
-                        'status' => 'Approved',
-                        'units' => 0,
-                        'actor' => 'Dr. Tariq Nassar',
-                        'notes' => 'B+ units reserved pending courier departure.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1037',
-                'hospitalName' => 'Valley Community Hospital',
-                'contactPerson' => 'Lydia Gomez',
-                'contactNumber' => '+1 (555) 664-1190',
-                'hospitalAddress' => '880 Valley View Road, Southgate',
-                'email' => 'supply@valleycommunity.org',
-                'bloodGroup' => 'AB+',
-                'requestedUnits' => 5,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-05',
-                'requestDateFormatted' => 'Nov 05, 2026',
-                'requiredDate' => '2026-11-18',
-                'requiredDateFormatted' => 'Nov 18, 2026',
-                'priority' => 'Low',
-                'status' => 'Rejected',
-                'requestReason' => 'Routine ward stock buffer transfer request.',
-                'additionalNotes' => 'Deferred — Valley Community maintains surplus stock within partner network.',
-                'history' => [
-                    [
-                        'date' => 'Nov 06, 2026 • 09:05',
-                        'event' => 'Request Rejected',
-                        'status' => 'Rejected',
-                        'units' => 0,
-                        'actor' => 'Dr. Maya Lin',
-                        'notes' => 'Rejected: Duplicate buffer request already covered under regional redistribution #RD-44.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1036',
-                'hospitalName' => 'Eastside Orthopedics',
-                'contactPerson' => 'Dr. Henrik Lindqvist',
-                'contactNumber' => '+1 (555) 930-4481',
-                'hospitalAddress' => '45 Harbor View Road, Eastside',
-                'email' => 'surgery@eastsideortho.org',
-                'bloodGroup' => 'A+',
-                'requestedUnits' => 4,
-                'fulfilledUnits' => 0,
-                'requestDate' => '2026-11-04',
-                'requestDateFormatted' => 'Nov 04, 2026',
-                'requiredDate' => '2026-11-14',
-                'requiredDateFormatted' => 'Nov 14, 2026',
-                'priority' => 'Low',
-                'status' => 'Cancelled',
-                'requestReason' => 'Elective joint arthroplasty preoperative blood order.',
-                'additionalNotes' => 'Procedure postponed by hospital scheduling team; order closed.',
-                'history' => [
-                    [
-                        'date' => 'Nov 05, 2026 • 14:12',
-                        'event' => 'Request Cancelled',
-                        'status' => 'Cancelled',
-                        'units' => 0,
-                        'actor' => 'Dr. Henrik Lindqvist (Eastside)',
-                        'notes' => 'Surgery rescheduled to next quarter; blood units released.',
-                    ],
-                ],
-            ],
-            [
-                'id' => 'REQ-1035',
-                'hospitalName' => 'Mercy Oncology Wing',
-                'contactPerson' => 'Sarah Al-Khoury',
-                'contactNumber' => '+1 (555) 778-9023',
-                'hospitalAddress' => '615 Mercy Campus Drive, Midtown',
-                'email' => 'infusion@mercyoncology.org',
-                'bloodGroup' => 'A+',
-                'requestedUnits' => 6,
-                'fulfilledUnits' => 6,
-                'requestDate' => '2026-11-02',
-                'requestDateFormatted' => 'Nov 02, 2026',
-                'requiredDate' => '2026-11-04',
-                'requiredDateFormatted' => 'Nov 04, 2026',
-                'priority' => 'Normal',
-                'status' => 'Fulfilled',
-                'requestReason' => 'Oncology infusion unit weekly platelet and red cell support.',
-                'additionalNotes' => 'Verified cold-chain delivery complete.',
-                'history' => [
-                    [
-                        'date' => 'Nov 04, 2026 • 10:30',
-                        'event' => 'Full Fulfillment Completed',
-                        'status' => 'Fulfilled',
-                        'units' => 6,
-                        'actor' => 'Nurse Clara Diaz',
-                        'notes' => 'Delivered final 6 units of A+ to Mercy Infusion pharmacy.',
-                    ],
-                ],
-            ],
-        ];
-
-        return array_map(function (array $entry): array {
-            $entry['remainingUnits'] = max(0, $entry['requestedUnits'] - $entry['fulfilledUnits']);
-
-            return $entry;
-        }, $entries);
     }
 }

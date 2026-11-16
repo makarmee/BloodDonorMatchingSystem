@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\BloodRequest;
+use App\Models\Hospital;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -22,6 +24,120 @@ class BloodRequestsPageTest extends TestCase
         $staffUser->roles()->attach(Role::where('slug', 'staff')->firstOrFail());
 
         $this->actingAs($staffUser);
+
+        $hospitalMetro = Hospital::factory()->create(['name' => 'Metro General Trauma Center']);
+        $hospitalHarbor = Hospital::factory()->create(['name' => 'Harborview Cardiac Institute']);
+        $hospitalCity = Hospital::factory()->create(['name' => 'City General Hospital']);
+        $hospitalValley = Hospital::factory()->create(['name' => 'Valley Community Hospital']);
+        $hospitalEastside = Hospital::factory()->create(['name' => 'Eastside Orthopedics']);
+
+        BloodRequest::query()->create([
+            'request_code' => 'REQ-1044',
+            'hospital_id' => $hospitalMetro->id,
+            'requested_by_user_id' => $staffUser->id,
+            'contact_person_snapshot' => 'Dr. Arthur Vance',
+            'contact_phone_snapshot' => '+1 (555) 402-8810',
+            'contact_email_snapshot' => 'transfusion.lab@metrotrauma.org',
+            'blood_group' => 'O-',
+            'requested_units' => 14,
+            'reserved_units' => 0,
+            'fulfilled_units' => 0,
+            'priority' => 'Critical',
+            'status' => 'Pending',
+            'request_date' => now(),
+            'required_date' => now(),
+            'request_reason' => 'Mass casualty emergency surgical protocol requiring universal O-negative packed RBCs.',
+        ]);
+
+        $req1043 = BloodRequest::query()->create([
+            'request_code' => 'REQ-1043',
+            'hospital_id' => $hospitalHarbor->id,
+            'requested_by_user_id' => $staffUser->id,
+            'contact_person_snapshot' => 'Nurse Mei Chen',
+            'contact_phone_snapshot' => '+1 (555) 719-3304',
+            'contact_email_snapshot' => 'bloodbank@harborviewcardiac.org',
+            'department_or_ward' => '220 Bayfront Blvd, Suite 400, Eastside',
+            'blood_group' => 'B-',
+            'requested_units' => 8,
+            'reserved_units' => 0,
+            'fulfilled_units' => 4,
+            'priority' => 'High',
+            'status' => 'Partially Fulfilled',
+            'request_date' => now(),
+            'required_date' => now(),
+            'request_reason' => 'Scheduled cardiothoracic bypass surgery standby and post-op transfusion reserve.',
+        ]);
+
+        $req1043->statusHistories()->create([
+            'event_name' => 'Partial Dispatch Recorded',
+            'previous_status' => 'Approved',
+            'new_status' => 'Partially Fulfilled',
+            'units_affected' => 4,
+            'actor_user_id' => $staffUser->id,
+            'actor_name' => 'Nurse Hannah Reed',
+            'notes' => 'Dispatched initial 4 units B- via cold-chain courier #TR-208.',
+            'occurred_at' => now(),
+        ]);
+
+        BloodRequest::query()->create([
+            'request_code' => 'REQ-1042',
+            'hospital_id' => $hospitalCity->id,
+            'requested_by_user_id' => $staffUser->id,
+            'contact_person_snapshot' => 'Dr. Elena Morales',
+            'contact_phone_snapshot' => '+1 (555) 289-4100',
+            'contact_email_snapshot' => 'icu.transfusion@citygeneral.org',
+            'blood_group' => 'AB-',
+            'requested_units' => 4,
+            'reserved_units' => 0,
+            'fulfilled_units' => 0,
+            'priority' => 'Critical',
+            'status' => 'Approved',
+            'request_date' => now(),
+            'required_date' => now(),
+            'request_reason' => 'ICU Trauma Unit Ward 3B acute hemorrhage stabilization.',
+        ]);
+
+        BloodRequest::query()->create([
+            'request_code' => 'REQ-1037',
+            'hospital_id' => $hospitalValley->id,
+            'requested_by_user_id' => $staffUser->id,
+            'contact_person_snapshot' => 'Lydia Gomez',
+            'contact_phone_snapshot' => '+1 (555) 664-1190',
+            'contact_email_snapshot' => 'supply@valleycommunity.org',
+            'blood_group' => 'AB+',
+            'requested_units' => 5,
+            'reserved_units' => 0,
+            'fulfilled_units' => 0,
+            'priority' => 'Low',
+            'status' => 'Rejected',
+            'request_date' => now(),
+            'required_date' => now(),
+            'request_reason' => 'Routine ward stock buffer transfer request.',
+            'rejection_reason' => 'Duplicate buffer request already covered under regional redistribution #RD-44.',
+            'reviewed_by_user_id' => $staffUser->id,
+            'reviewed_at' => now(),
+        ]);
+
+        BloodRequest::query()->create([
+            'request_code' => 'REQ-1036',
+            'hospital_id' => $hospitalEastside->id,
+            'requested_by_user_id' => $staffUser->id,
+            'contact_person_snapshot' => 'Dr. Henrik Lindqvist',
+            'contact_phone_snapshot' => '+1 (555) 930-4481',
+            'contact_email_snapshot' => 'surgery@eastsideortho.org',
+            'blood_group' => 'A+',
+            'requested_units' => 4,
+            'reserved_units' => 0,
+            'fulfilled_units' => 0,
+            'priority' => 'Low',
+            'status' => 'Cancelled',
+            'request_date' => now(),
+            'required_date' => now(),
+            'request_reason' => 'Elective joint arthroplasty preoperative blood order.',
+            'cancellation_reason' => 'Surgery rescheduled to next quarter; blood units released.',
+            'cancelled_by_user_id' => $staffUser->id,
+            'cancelled_at' => now(),
+        ]);
     }
 
     public function test_requests_overview_renders_all_six_summary_cards_ten_columns_and_filters(): void

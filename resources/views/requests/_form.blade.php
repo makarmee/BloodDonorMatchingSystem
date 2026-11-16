@@ -1,13 +1,14 @@
 @php
     $isEdit = ($mode ?? 'create') === 'edit';
     $requestRecord = $bloodRequest ?? [];
+    $prefillData = $prefill ?? [];
 
     $initialForm = [
-        'hospitalName' => old('hospital_name', $requestRecord['hospitalName'] ?? ''),
-        'contactPerson' => old('contact_person', $requestRecord['contactPerson'] ?? ''),
-        'contactNumber' => old('contact_number', $requestRecord['contactNumber'] ?? ''),
-        'hospitalAddress' => old('hospital_address', $requestRecord['hospitalAddress'] ?? ''),
-        'email' => old('email', $requestRecord['email'] ?? ''),
+        'hospitalName' => old('hospital_name', $requestRecord['hospitalName'] ?? $prefillData['hospitalName'] ?? ''),
+        'contactPerson' => old('contact_person', $requestRecord['contactPerson'] ?? $prefillData['contactPerson'] ?? ''),
+        'contactNumber' => old('contact_number', $requestRecord['contactNumber'] ?? $prefillData['contactNumber'] ?? ''),
+        'hospitalAddress' => old('hospital_address', $requestRecord['hospitalAddress'] ?? $prefillData['hospitalAddress'] ?? ''),
+        'email' => old('email', $requestRecord['email'] ?? $prefillData['email'] ?? ''),
         'bloodGroup' => old('blood_group', $requestRecord['bloodGroup'] ?? ''),
         'requestedUnits' => old('requested_units', $requestRecord['requestedUnits'] ?? ''),
         'requiredDate' => old('required_date', $requestRecord['requiredDate'] ?? ''),
@@ -29,6 +30,10 @@
     $cancelUrl = $isEdit && isset($requestRecord['id'])
         ? route('requests.show', $requestRecord['id'])
         : route('requests.index');
+
+    $formAction = $isEdit && isset($bloodRequestRecord)
+        ? route('requests.update', $bloodRequestRecord->id)
+        : route('requests.store');
 @endphp
 
 <div
@@ -89,12 +94,14 @@
 
     <form
         method="POST"
-        action="{{ $isEdit ? '#' : route('requests.store') }}"
-        @if ($isEdit) @submit.prevent="submitForm()" @endif
+        action="{{ $formAction }}"
         novalidate
         class="space-y-6"
     >
         @csrf
+        @if ($isEdit)
+            @method('PUT')
+        @endif
         {{-- Section 1: Hospital Information --}}
         <x-ui.card>
             <x-slot:header>

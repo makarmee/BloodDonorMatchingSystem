@@ -1,4 +1,4 @@
-<x-app-layout title="Blood Requests Management" page-title="Blood Requests" active-role="staff">
+<x-app-layout title="Blood Requests Management" page-title="Blood Requests">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -11,10 +11,12 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
-                <x-ui.button variant="primary" size="md" :href="route('requests.create')">
-                    <x-icons.icon name="plus" class="size-4" />
-                    <span>New Blood Request</span>
-                </x-ui.button>
+                @can('create', App\Models\BloodRequest::class)
+                    <x-ui.button variant="primary" size="md" :href="route('requests.create')">
+                        <x-icons.icon name="plus" class="size-4" />
+                        <span>New Blood Request</span>
+                    </x-ui.button>
+                @endcan
             </div>
         </div>
     </x-slot:header>
@@ -301,10 +303,14 @@
                                             <span>View</span>
                                         </x-ui.button>
 
-                                        <x-ui.button variant="outline" size="sm" :href="route('requests.edit', $item['id'])">
-                                            <x-icons.icon name="pencil" class="size-3.5" />
-                                            <span>Edit</span>
-                                        </x-ui.button>
+                                        @can('update', App\Models\BloodRequest::class)
+                                            @if (! in_array($item['status'], ['Rejected', 'Cancelled', 'Fulfilled'], true))
+                                                <x-ui.button variant="outline" size="sm" :href="route('requests.edit', $item['id'])">
+                                                    <x-icons.icon name="pencil" class="size-3.5" />
+                                                    <span>Edit</span>
+                                                </x-ui.button>
+                                            @endif
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

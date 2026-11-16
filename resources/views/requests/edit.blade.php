@@ -1,4 +1,4 @@
-<x-app-layout :title="'Edit Blood Request · ' . $bloodRequest['id']" page-title="Edit Request" active-role="staff">
+<x-app-layout :title="'Edit Blood Request · ' . $bloodRequest['id']" page-title="Edit Request">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -39,6 +39,7 @@
         @include('requests._form', [
             'mode' => 'edit',
             'bloodRequest' => $bloodRequest,
+            'bloodRequestRecord' => $bloodRequestRecord,
             'bloodGroups' => $bloodGroups,
             'priorities' => $priorities,
         ])
