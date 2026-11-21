@@ -48,8 +48,11 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('/donors', [DonorsController::class, 'index'])->name('donors.index');
         Route::get('/donors/create', [DonorsController::class, 'create'])->name('donors.create');
+        Route::post('/donors', [DonorsController::class, 'store'])->name('donors.store');
         Route::get('/donors/{donor}', [DonorsController::class, 'show'])->name('donors.show');
         Route::get('/donors/{donor}/edit', [DonorsController::class, 'edit'])->name('donors.edit');
+        Route::match(['put', 'patch'], '/donors/{donor}', [DonorsController::class, 'update'])->name('donors.update');
+        Route::post('/donors/{donor}/eligibility', [DonorsController::class, 'assessEligibility'])->name('donors.eligibility.assess');
 
         Route::get('/donations', [DonationsController::class, 'index'])->name('donations.index');
         Route::get('/donations/create', [DonationsController::class, 'create'])->name('donations.create');

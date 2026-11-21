@@ -55,6 +55,19 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
+                @if (isset($donorModel))
+                    @can('assessEligibility', $donorModel)
+                        <button
+                            type="button"
+                            @click="$dispatch('open-modal', 'assess-eligibility-modal')"
+                            class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                            <x-icons.icon name="shield-check" class="size-4 text-emerald-600 dark:text-emerald-400" />
+                            <span>Assess Eligibility</span>
+                        </button>
+                    @endcan
+                @endif
+
                 <x-ui.button variant="outline" size="md" :href="route('donors.index')">
                     <x-icons.icon name="arrow-left" class="size-4" />
                     <span>Back to Donors</span>
@@ -69,6 +82,10 @@
     </x-slot:header>
 
     <div class="space-y-6">
+        @if (session('success'))
+            <x-ui.alert variant="success" :title="session('success')" class="mb-4" />
+        @endif
+
         {{-- Top Profile Metrics --}}
         <section aria-label="Donor summary metrics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
@@ -346,4 +363,71 @@
             </div>
         </div>
     </div>
+
+    @if (isset($donorModel))
+        @can('assessEligibility', $donorModel)
+            <x-ui.modal name="assess-eligibility-modal" title="Record Eligibility Assessment" max-width="md">
+                <form method="POST" action="{{ route('donors.eligibility.assess', $donor['id']) }}" class="space-y-4">
+                    @csrf
+                    <div>
+                        <label for="eligibility-status-select" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            Eligibility Status
+                        </label>
+                        <select
+                            id="eligibility-status-select"
+                            name="eligibility_status"
+                            required
+                            class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        >
+                            <option value="Eligible">Eligible</option>
+                            <option value="Not Eligible">Not Eligible (Deferral)</option>
+                            <option value="Pending Review">Pending Review</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="eligibility-reason" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            Clinical Assessment Reason
+                        </label>
+                        <textarea
+                            id="eligibility-reason"
+                            name="reason"
+                            rows="3"
+                            required
+                            placeholder="Document clinical screening rationale, physical exam findings, or deferral justification..."
+                            class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        ></textarea>
+                    </div>
+
+                    <div>
+                        <label for="eligibility-next-date" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            Next Eligible Date (Optional)
+                        </label>
+                        <input
+                            id="eligibility-next-date"
+                            name="next_eligible_date"
+                            type="date"
+                            class="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+                        />
+                    </div>
+
+                    <div class="mt-5 flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <button
+                            type="button"
+                            @click="$dispatch('close-modal', 'assess-eligibility-modal')"
+                            class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-crimson-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-crimson-700 cursor-pointer"
+                        >
+                            Save Assessment
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
+        @endcan
+    @endif
 </x-app-layout>

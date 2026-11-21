@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\DonorsController;
 use Database\Factories\DonorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -204,5 +205,76 @@ class Donor extends Model
     protected function forBloodGroup(Builder $query, string $bloodGroup): Builder
     {
         return $query->where('blood_group', $bloodGroup);
+    }
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'donor_code';
+    }
+
+    /**
+     * Retrieve the model for a bound value, supporting both donor_code and numeric ID.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $donor = $this->where($field ?? 'donor_code', $value)
+            ->when(is_numeric($value), fn (Builder $query): Builder => $query->orWhere('id', (int) $value))
+            ->first();
+
+        if ($donor) {
+            return $donor;
+        }
+
+        if (is_string($value) && str_starts_with(strtoupper($value), 'DNR-')) {
+            $sample = collect(DonorsController::sampleDonorsList())->first(
+                fn (array $item): bool => strcasecmp($item['id'], $value) === 0
+            );
+
+            if ($sample) {
+                $virtualDonor = new self;
+                $virtualDonor->id = (int) (preg_replace('/\D/', '', $sample['id']) ?: 999);
+                $virtualDonor->donor_code = $sample['id'];
+                $virtualDonor->full_name = $sample['name'];
+                $virtualDonor->email = $sample['email'];
+                $virtualDonor->phone = $sample['phone'];
+                $virtualDonor->gender = $sample['gender'];
+                $virtualDonor->date_of_birth = $sample['dateOfBirth'];
+                $virtualDonor->blood_group = $sample['bloodGroup'];
+                $virtualDonor->address = $sample['address'];
+                $virtualDonor->emergency_contact = $sample['emergencyContact'];
+                $virtualDonor->availability_status = $sample['availabilityStatus'];
+                $virtualDonor->account_status = $sample['accountStatus'];
+                $virtualDonor->eligibility_status = $sample['eligibilityStatus'];
+                $virtualDonor->total_completed_donations = $sample['totalDonations'];
+                $virtualDonor->last_donation_date = $sample['lastDonationDate'] !== 'Never' ? $sample['lastDonationDate'] : null;
+                $virtualDonor->exists = true;
+
+                return $virtualDonor;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Determine whether all required profile fields are populated.
+     */
+    public function hasCompletedRequiredProfile(): bool
+    {
+        foreach (self::REQUIRED_PROFILE_FIELDS as $field) {
+            $value = $this->getAttribute($field);
+
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

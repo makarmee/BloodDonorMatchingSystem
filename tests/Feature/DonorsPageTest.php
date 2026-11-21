@@ -2,6 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Donation;
+use App\Models\Donor;
+use App\Models\DonorEligibilityRecord;
+use App\Models\DonorMedicalProfile;
 use App\Models\Role;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -22,6 +26,99 @@ class DonorsPageTest extends TestCase
         $staffUser->roles()->attach(Role::where('slug', 'staff')->firstOrFail());
 
         $this->actingAs($staffUser);
+
+        $elena = Donor::factory()->create([
+            'donor_code' => 'DNR-1041',
+            'full_name' => 'Elena Rostova',
+            'email' => 'elena.rostova@example.org',
+            'phone' => '+1 (555) 234-8812',
+            'gender' => 'Female',
+            'date_of_birth' => '1996-04-18',
+            'blood_group' => 'O-',
+            'address' => '412 Oakridge Ave, Apt 4B, Central District',
+            'emergency_contact' => 'Victor Rostov — +1 (555) 234-8890',
+            'availability_status' => 'Available',
+            'account_status' => 'Active',
+            'eligibility_status' => 'Eligible',
+            'last_donation_date' => '2026-07-22',
+            'total_completed_donations' => 8,
+            'registered_at' => now(),
+            'profile_completed' => true,
+        ]);
+
+        DonorEligibilityRecord::create([
+            'donor_id' => $elena->id,
+            'eligibility_status' => 'Eligible',
+            'reason' => 'Verified by clinical screening criteria; ready for scheduled collection.',
+            'clearance_source' => 'Medical Officer Clearance',
+            'reviewed_at' => '2026-07-22',
+            'is_current' => true,
+        ]);
+
+        DonorMedicalProfile::create([
+            'donor_id' => $elena->id,
+            'medical_notes' => 'Cleared on prior physical & hemoglobin screening (13.9 g/dL). Universal RBC donor.',
+            'updated_by_user_id' => $staffUser->id,
+        ]);
+
+        Donation::factory()->create([
+            'donation_code' => 'DON-4012',
+            'donor_id' => $elena->id,
+            'donation_date' => '2026-07-22',
+            'collection_location_name' => 'Central Medical Plaza',
+            'center_id' => null,
+            'camp_id' => null,
+            'collection_status' => 'Completed',
+            'quantity_ml' => 450,
+        ]);
+
+        $marcus = Donor::factory()->create([
+            'donor_code' => 'DNR-1042',
+            'full_name' => 'Marcus Vance',
+            'email' => 'marcus.vance@example.org',
+            'phone' => '+1 (555) 391-4420',
+            'gender' => 'Male',
+            'date_of_birth' => '1991-09-03',
+            'blood_group' => 'A+',
+            'address' => '88 Harbor View Rd, Eastside',
+            'emergency_contact' => 'Claire Vance — +1 (555) 391-0014',
+            'availability_status' => 'Temporarily Unavailable',
+            'account_status' => 'Active',
+            'registered_at' => now(),
+            'profile_completed' => true,
+        ]);
+
+        DonorEligibilityRecord::create([
+            'donor_id' => $marcus->id,
+            'eligibility_status' => 'Not Eligible',
+            'reason' => 'Currently ineligible per verified post-donation clinical deferral rule.',
+            'clearance_source' => 'Clinical Deferral',
+            'is_current' => true,
+        ]);
+
+        $priya = Donor::factory()->create([
+            'donor_code' => 'DNR-1043',
+            'full_name' => 'Priya Sharma',
+            'email' => 'priya.sharma@example.org',
+            'phone' => '+1 (555) 612-7745',
+            'gender' => 'Female',
+            'date_of_birth' => '1999-11-12',
+            'blood_group' => 'B+',
+            'address' => '19 Cedar Crest Blvd, West End',
+            'emergency_contact' => 'Rohan Sharma — +1 (555) 612-7700',
+            'availability_status' => 'Available',
+            'account_status' => 'Active',
+            'registered_at' => now(),
+            'profile_completed' => true,
+        ]);
+
+        DonorEligibilityRecord::create([
+            'donor_id' => $priya->id,
+            'eligibility_status' => 'Pending Review',
+            'reason' => 'First-time registrant awaiting initial medical screening verification.',
+            'clearance_source' => 'Donor Self-Registration',
+            'is_current' => true,
+        ]);
     }
 
     public function test_donors_directory_renders_overview_statistics_filters_and_all_columns(): void
