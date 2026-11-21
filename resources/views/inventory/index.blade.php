@@ -6,9 +6,17 @@
                     Blood Inventory Management
                 </h2>
                 <x-ui.badge variant="crimson">8 Blood Groups</x-ui.badge>
+                @if ($selectedComponentId)
+                    @php
+                        $activeComp = $components->firstWhere('id', $selectedComponentId);
+                    @endphp
+                    @if ($activeComp)
+                        <x-ui.badge variant="neutral">{{ $activeComp->name }}</x-ui.badge>
+                    @endif
+                @endif
             </div>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Monitor available units, reserve thresholds, and recent blood stock adjustments across the central bank.
+                Monitor available units, reserve thresholds, physical blood bags, and auditable stock ledger movements.
             </p>
         </div>
 
@@ -17,14 +25,18 @@
                 Back to Dashboard
             </x-ui.button>
             @if (auth()->user()?->hasPermission('inventory.adjust'))
+                <x-ui.button variant="outline" size="sm" :href="route('inventory.reconcile')">
+                    <x-icons.icon name="clipboard-document-check" class="size-4" />
+                    <span>Audit Reconciliation</span>
+                </x-ui.button>
                 <x-ui.button
                     variant="primary"
                     size="sm"
                     x-data
-                    @click="$dispatch('inventory-open-adjust', { group: '' })"
+                    @click="$dispatch('inventory-open-adjust', { group: '', stockId: '{{ $stockBuckets->first()?->id ?? 1 }}' })"
                 >
                     <x-icons.icon name="adjustments" class="size-4" />
-                    Adjust Inventory
+                    <span>Adjust Inventory</span>
                 </x-ui.button>
             @endif
         </div>
@@ -36,10 +48,40 @@
             'history' => $history,
             'actor' => auth()->user()?->name ?? 'Authenticated User',
         ]))"
-        x-on:inventory-open-adjust.window="openAdjustModal($event.detail?.group || '')"
+        x-on:inventory-open-adjust.window="openAdjustModal($event.detail?.group || '', $event.detail?.stockId || '')"
         class="space-y-6"
     >
-        {{-- Live feedback alert after client-side stock adjustment --}}
+        {{-- Flash Messages --}}
+        @if (session('success'))
+            <div
+                role="status"
+                class="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:border-emerald-800/70 dark:bg-emerald-950/60 dark:text-emerald-200"
+            >
+                <x-icons.icon name="check-circle" class="size-5 mt-0.5 shrink-0" />
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold">Operation Completed</p>
+                    <p class="mt-0.5 opacity-90">{{ session('success') }}</p>
+                </div>
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
+                <div class="flex items-start gap-3">
+                    <x-icons.icon name="exclamation-triangle" class="size-5 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <div>
+                        <p class="font-semibold">Action could not be processed</p>
+                        <ul class="mt-1 list-disc pl-5 space-y-0.5 text-xs">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        @endif
+
+        {{-- Live client notification --}}
         <div
             x-show="feedbackMessage !== ''"
             x-cloak
@@ -102,6 +144,32 @@
             />
         </section>
 
+        {{-- Component Filtering Toolbar --}}
+        @if ($components->isNotEmpty())
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-center gap-2">
+                    <x-icons.icon name="funnel" class="size-4 text-slate-500 dark:text-slate-400" />
+                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Component Filter:</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                    <a
+                        href="{{ route('inventory.index', request()->except('component_id')) }}"
+                        class="rounded-lg px-2.5 py-1 font-medium transition {{ $selectedComponentId === null ? 'bg-crimson-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}"
+                    >
+                        All Components
+                    </a>
+                    @foreach ($components as $comp)
+                        <a
+                            href="{{ route('inventory.index', array_merge(request()->query(), ['component_id' => $comp->id])) }}"
+                            class="rounded-lg px-2.5 py-1 font-medium transition {{ $selectedComponentId === $comp->id ? 'bg-crimson-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}"
+                        >
+                            {{ $comp->name }} ({{ $comp->code }})
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         {{-- 1. Inventory Overview (All 8 Standard Blood Groups) --}}
         <section aria-labelledby="inventory-overview-heading" class="space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -130,6 +198,8 @@
                             'low' => 'Low Stock',
                             default => 'Normal',
                         };
+                        $firstMatchingBucket = $stockBuckets->firstWhere('blood_group', $item['group']);
+                        $stockId = $firstMatchingBucket?->id ?? 1;
                     @endphp
 
                     <x-ui.card class="flex flex-col justify-between gap-4">
@@ -183,14 +253,16 @@
                                 <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="groups[{{ $index }}].reserved">{{ $item['reserved'] }}</span>
                             </span>
 
-                            <button
-                                type="button"
-                                @click="openAdjustModal('{{ $item['group'] }}')"
-                                class="inline-flex items-center gap-1 font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400 dark:hover:text-crimson-300 cursor-pointer"
-                            >
-                                <span>Adjust</span>
-                                <x-icons.icon name="chevron-right" class="size-3.5" />
-                            </button>
+                            @if (auth()->user()?->hasPermission('inventory.adjust'))
+                                <button
+                                    type="button"
+                                    @click="openAdjustModal('{{ $item['group'] }}', '{{ $stockId }}')"
+                                    class="inline-flex items-center gap-1 font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400 dark:hover:text-crimson-300 cursor-pointer"
+                                >
+                                    <span>Adjust</span>
+                                    <x-icons.icon name="chevron-right" class="size-3.5" />
+                                </button>
+                            @endif
                         </div>
                     </x-ui.card>
                 @endforeach
@@ -289,6 +361,10 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
                             @foreach ($bloodGroups as $index => $item)
+                                @php
+                                    $firstMatchingBucket = $stockBuckets->firstWhere('blood_group', $item['group']);
+                                    $stockId = $firstMatchingBucket?->id ?? 1;
+                                @endphp
                                 <tr
                                     x-show="isRowVisible({{ $index }})"
                                     class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition"
@@ -324,14 +400,18 @@
                                         {{ $item['lastUpdated'] }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-right">
-                                        <x-ui.button
-                                            variant="outline"
-                                            size="sm"
-                                            @click="openAdjustModal('{{ $item['group'] }}')"
-                                        >
-                                            <x-icons.icon name="adjustments" class="size-3.5" />
-                                            Adjust
-                                        </x-ui.button>
+                                        @if (auth()->user()?->hasPermission('inventory.adjust'))
+                                            <x-ui.button
+                                                variant="outline"
+                                                size="sm"
+                                                @click="openAdjustModal('{{ $item['group'] }}', '{{ $stockId }}')"
+                                            >
+                                                <x-icons.icon name="adjustments" class="size-3.5" />
+                                                <span>Adjust</span>
+                                            </x-ui.button>
+                                        @else
+                                            <span class="text-xs text-slate-400 dark:text-slate-600">Read-only</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach
@@ -400,7 +480,184 @@
             </x-ui.card>
         </section>
 
-        {{-- 5. Inventory History --}}
+        {{-- 4. Serialized Blood Units Directory (Real Physical Bags) --}}
+        <section aria-labelledby="blood-units-heading">
+            <x-ui.card :padding="false">
+                <x-slot:header>
+                    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 id="blood-units-heading" class="text-base font-semibold text-slate-900 dark:text-white">
+                                    Serialized Blood Units Directory
+                                </h3>
+                                <x-ui.badge variant="neutral">{{ $units->total() }} units</x-ui.badge>
+                            </div>
+                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                Real-time registry of individual physical blood bags, cold vault locations, and shelf-life expirations.
+                            </p>
+                        </div>
+
+                        {{-- Unit Filters Form --}}
+                        <form method="GET" action="{{ route('inventory.index') }}" class="flex flex-wrap items-center gap-2">
+                            <input type="hidden" name="component_id" value="{{ $selectedComponentId }}" />
+                            <div class="relative w-full sm:w-44">
+                                <input
+                                    type="search"
+                                    name="unit_search"
+                                    value="{{ $filters['unit_search'] }}"
+                                    placeholder="Unit code..."
+                                    class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                            </div>
+
+                            <select
+                                name="unit_group"
+                                class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                            >
+                                <option value="all">All Groups</option>
+                                @foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $grp)
+                                    <option value="{{ $grp }}" @selected($filters['unit_group'] === $grp)>{{ $grp }}</option>
+                                @endforeach
+                            </select>
+
+                            <select
+                                name="unit_status"
+                                class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                            >
+                                <option value="all">All Statuses</option>
+                                @foreach (['Available', 'Reserved', 'Dispatched', 'Expired', 'Discarded', 'Quarantined'] as $st)
+                                    <option value="{{ $st }}" @selected($filters['unit_status'] === $st)>{{ $st }}</option>
+                                @endforeach
+                            </select>
+
+                            <button
+                                type="submit"
+                                class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 transition dark:bg-slate-700 cursor-pointer"
+                            >
+                                Filter
+                            </button>
+                        </form>
+                    </div>
+                </x-slot:header>
+
+                @if ($units->isEmpty())
+                    <div class="px-6 py-12 text-center">
+                        <x-icons.icon name="archive-box" class="mx-auto size-8 text-slate-400" />
+                        <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white">No physical blood units recorded yet</p>
+                        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Verified units will populate automatically as laboratory screening releases completed donations.
+                        </p>
+                    </div>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-slate-200 text-xs dark:divide-slate-800">
+                            <thead class="bg-slate-50/70 text-left font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                                <tr>
+                                    <th class="px-5 py-3.5">Unit Code</th>
+                                    <th class="px-5 py-3.5">Blood Group</th>
+                                    <th class="px-5 py-3.5">Component</th>
+                                    <th class="px-5 py-3.5">Status</th>
+                                    <th class="px-5 py-3.5">Expiration</th>
+                                    <th class="px-5 py-3.5">Location</th>
+                                    <th class="px-5 py-3.5 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
+                                @foreach ($units as $unit)
+                                    @php
+                                        $unitBadge = match ($unit->unit_status) {
+                                            'Available' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300',
+                                            'Reserved' => 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/60 dark:text-sky-300',
+                                            'Dispatched' => 'bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950/60 dark:text-purple-300',
+                                            'Expired' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300',
+                                            'Discarded' => 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/60 dark:text-rose-300',
+                                            'Quarantined' => 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300',
+                                            default => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300',
+                                        };
+                                        $isPastExpiry = $unit->expires_at && $unit->expires_at->isPast();
+                                    @endphp
+                                    <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                                        <td class="whitespace-nowrap px-5 py-3 font-mono font-semibold text-slate-900 dark:text-white">
+                                            <a href="{{ route('inventory.units.show', $unit->id) }}" class="hover:underline hover:text-crimson-600">
+                                                {{ $unit->unit_code }}
+                                            </a>
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3">
+                                            <x-bdms.blood-group-badge :group="$unit->blood_group" size="sm" />
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3 text-slate-700 dark:text-slate-300">
+                                            {{ $unit->bloodComponent?->name }} ({{ $unit->volume_ml }} mL)
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3">
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 font-medium ring-1 ring-inset {{ $unitBadge }}">
+                                                {{ $unit->unit_status }}
+                                            </span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3">
+                                            <span class="{{ $isPastExpiry ? 'font-semibold text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-300' }}">
+                                                {{ $unit->expires_at?->format('M d, Y') }}
+                                            </span>
+                                            @if ($isPastExpiry && $unit->unit_status === 'Available')
+                                                <span class="ml-1 text-2xs font-bold text-rose-600 dark:text-rose-400">(Expired)</span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3 text-slate-500 dark:text-slate-400">
+                                            {{ $unit->storage_location ?? 'Vault Unassigned' }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-5 py-3 text-right">
+                                            <div class="flex items-center justify-end gap-1.5">
+                                                <x-ui.button variant="outline" size="sm" :href="route('inventory.units.show', $unit->id)">
+                                                    View
+                                                </x-ui.button>
+
+                                                @if (auth()->user()?->hasPermission('inventory.adjust'))
+                                                    @if ($unit->unit_status === 'Available' && $isPastExpiry)
+                                                        <form method="POST" action="{{ route('inventory.units.expire', $unit->id) }}">
+                                                            @csrf
+                                                            <button
+                                                                type="submit"
+                                                                class="rounded-lg bg-amber-600 px-2.5 py-1.5 font-semibold text-white shadow-xs hover:bg-amber-700 transition cursor-pointer"
+                                                            >
+                                                                Expire
+                                                            </button>
+                                                        </form>
+                                                    @endif
+
+                                                    @if (in_array($unit->unit_status, ['Available', 'Reserved', 'Quarantined']))
+                                                        <form
+                                                            method="POST"
+                                                            action="{{ route('inventory.units.discard', $unit->id) }}"
+                                                            onsubmit="return confirm('Confirm discard for {{ $unit->unit_code }}?');"
+                                                        >
+                                                            @csrf
+                                                            <input type="hidden" name="reason" value="Administrative biohazard disposal from inventory directory." />
+                                                            <button
+                                                                type="submit"
+                                                                class="rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 font-semibold text-rose-700 hover:bg-rose-100 transition dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 cursor-pointer"
+                                                            >
+                                                                Discard
+                                                            </button>
+                                                        </form>
+                                                    @endif
+                                                @endif
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if ($units->hasPages())
+                        <div class="p-4 border-t border-slate-100 dark:border-slate-800">
+                            {{ $units->links() }}
+                        </div>
+                    @endif
+                @endif
+            </x-ui.card>
+        </section>
+
+        {{-- 5. Inventory History (Real Transaction Ledger) --}}
         <section aria-labelledby="inventory-history-heading">
             <x-ui.card :padding="false">
                 <x-slot:header>
@@ -410,7 +667,7 @@
                                 Recent Inventory History
                             </h3>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                Audit log of recent blood stock additions, removals, and hospital reservations.
+                                Audit log of blood stock additions, removals, and hospital reservations.
                             </p>
                         </div>
 
@@ -484,110 +741,192 @@
         </section>
 
         {{-- 6. Adjust Inventory Modal --}}
-        <x-ui.modal name="adjust-inventory" title="Adjust Blood Inventory" maxWidth="lg">
-            <form @submit.prevent="submitAdjustment()" novalidate class="space-y-4">
-                <div class="space-y-1.5">
-                    <label for="adjust-blood-group" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                        Blood group <span class="text-crimson-600 dark:text-crimson-400" aria-hidden="true">*</span>
-                    </label>
-                    <select
-                        id="adjust-blood-group"
-                        x-model="form.bloodGroup"
-                        :class="errors.bloodGroup
-                            ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 dark:border-rose-500'
-                            : 'border-slate-300 focus:border-crimson-500 focus:ring-crimson-500/20 dark:border-slate-700 dark:focus:border-crimson-400'"
-                        class="block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                        <option value="">Select blood group</option>
-                        @foreach ($bloodGroups as $item)
-                            <option value="{{ $item['group'] }}">{{ $item['group'] }}</option>
-                        @endforeach
-                    </select>
-                    <p x-show="errors.bloodGroup" x-cloak class="text-xs font-medium text-rose-600 dark:text-rose-400" x-text="errors.bloodGroup"></p>
-
-                    <div
-                        x-show="selectedGroupItem"
-                        x-cloak
-                        class="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300"
-                    >
-                        <span>
-                            Current available:
-                            <strong class="tabular-nums text-slate-900 dark:text-white" x-text="selectedGroupItem?.available + ' units'"></strong>
-                        </span>
-                        <span>
-                            Reserved:
-                            <strong class="tabular-nums text-slate-900 dark:text-white" x-text="selectedGroupItem?.reserved + ' units'"></strong>
-                        </span>
-                    </div>
-                </div>
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="space-y-1.5">
-                        <label for="adjust-operation" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Operation type <span class="text-crimson-600 dark:text-crimson-400" aria-hidden="true">*</span>
-                        </label>
-                        <select
-                            id="adjust-operation"
-                            x-model="form.operation"
-                            :class="errors.operation
-                                ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 dark:border-rose-500'
-                                : 'border-slate-300 focus:border-crimson-500 focus:ring-crimson-500/20 dark:border-slate-700 dark:focus:border-crimson-400'"
-                            class="block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-slate-100"
+        @if (auth()->user()?->hasPermission('inventory.adjust'))
+            <x-ui.modal name="adjust-inventory" title="Adjust Blood Inventory" maxWidth="lg">
+                <div x-data="{
+                    activeTab: 'thresholds',
+                    stockId: '{{ $stockBuckets->first()?->id ?? 1 }}',
+                    minLevel: 20,
+                    targetCapacity: 100,
+                    deltaUnits: '',
+                    targetStatus: 'Discarded',
+                    description: '',
+                    errorMessage: '',
+                }">
+                    <div class="flex items-center border-b border-slate-200 pb-3 mb-4 text-xs font-semibold dark:border-slate-800">
+                        <button
+                            type="button"
+                            @click="activeTab = 'thresholds'"
+                            :class="activeTab === 'thresholds' ? 'border-b-2 border-crimson-600 text-crimson-600' : 'text-slate-500 hover:text-slate-700'"
+                            class="pb-2 mr-4 transition"
                         >
-                            <option value="Added">Added (Stock In)</option>
-                            <option value="Removed">Removed (Dispatch / Expired)</option>
-                            <option value="Reserved">Reserved (Hospital Hold)</option>
-                        </select>
-                        <p x-show="errors.operation" x-cloak class="text-xs font-medium text-rose-600 dark:text-rose-400" x-text="errors.operation"></p>
+                            Threshold &amp; Capacity Settings
+                        </button>
+                        <button
+                            type="button"
+                            @click="activeTab = 'decrement'"
+                            :class="activeTab === 'decrement' ? 'border-b-2 border-crimson-600 text-crimson-600' : 'text-slate-500 hover:text-slate-700'"
+                            class="pb-2 transition"
+                        >
+                            Authorized Decrement / Discard
+                        </button>
                     </div>
 
-                    <div class="space-y-1.5">
-                        <label for="adjust-units" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Number of units <span class="text-crimson-600 dark:text-crimson-400" aria-hidden="true">*</span>
-                        </label>
-                        <input
-                            id="adjust-units"
-                            type="number"
-                            min="1"
-                            step="1"
-                            x-model="form.units"
-                            placeholder="e.g. 5"
-                            :class="errors.units
-                                ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 dark:border-rose-500'
-                                : 'border-slate-300 focus:border-crimson-500 focus:ring-crimson-500/20 dark:border-slate-700 dark:focus:border-crimson-400'"
-                            class="block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
-                        />
-                        <p x-show="errors.units" x-cloak class="text-xs font-medium text-rose-600 dark:text-rose-400" x-text="errors.units"></p>
-                    </div>
-                </div>
+                    {{-- Form A: Threshold Settings --}}
+                    <form
+                        x-show="activeTab === 'thresholds'"
+                        method="POST"
+                        :action="'{{ url('/inventory/stocks') }}/' + stockId + '/adjust'"
+                        class="space-y-4"
+                    >
+                        @csrf
+                        <div class="space-y-1.5">
+                            <label for="stock-bucket-select" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Select Stock Bucket <span class="text-crimson-600">*</span>
+                            </label>
+                            <select
+                                id="stock-bucket-select"
+                                x-model="stockId"
+                                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                                @foreach ($stockBuckets as $bucket)
+                                    <option value="{{ $bucket->id }}">
+                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} (Available: {{ $bucket->available_units }}, Reserved: {{ $bucket->reserved_units }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
 
-                <div class="space-y-1.5">
-                    <label for="adjust-description" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                        Description / Reason <span class="text-crimson-600 dark:text-crimson-400" aria-hidden="true">*</span>
-                    </label>
-                    <textarea
-                        id="adjust-description"
-                        rows="3"
-                        x-model="form.description"
-                        placeholder="Enter batch reference, hospital request ID, or reason for stock adjustment..."
-                        :class="errors.description
-                            ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20 dark:border-rose-500'
-                            : 'border-slate-300 focus:border-crimson-500 focus:ring-crimson-500/20 dark:border-slate-700 dark:focus:border-crimson-400'"
-                        class="block w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:outline-none focus:ring-2 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
-                    ></textarea>
-                    <p x-show="errors.description" x-cloak class="text-xs font-medium text-rose-600 dark:text-rose-400" x-text="errors.description"></p>
-                </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label for="threshold-min-level" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                    Minimum Stock Level <span class="text-crimson-600">*</span>
+                                </label>
+                                <input
+                                    id="threshold-min-level"
+                                    type="number"
+                                    name="minimum_level"
+                                    min="1"
+                                    x-model="minLevel"
+                                    required
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                            </div>
+                            <div class="space-y-1">
+                                <label for="threshold-target-capacity" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                    Target Capacity <span class="text-crimson-600">*</span>
+                                </label>
+                                <input
+                                    id="threshold-target-capacity"
+                                    type="number"
+                                    name="target_capacity"
+                                    min="1"
+                                    x-model="targetCapacity"
+                                    required
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                            </div>
+                        </div>
 
-                <div class="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
-                    <x-ui.button type="button" variant="outline" @click="closeAdjustModal()">
-                        Cancel
-                    </x-ui.button>
-                    <x-ui.button type="submit" variant="primary">
-                        <x-icons.icon name="check" class="size-4" />
-                        Submit Adjustment
-                    </x-ui.button>
+                        <div class="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <x-ui.button type="button" variant="outline" @click="$dispatch('close-modal', 'adjust-inventory')">
+                                Cancel
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="primary">
+                                Save Thresholds
+                            </x-ui.button>
+                        </div>
+                    </form>
+
+                    {{-- Form B: Decrement / Discard --}}
+                    <form
+                        x-show="activeTab === 'decrement'"
+                        method="POST"
+                        :action="'{{ url('/inventory/stocks') }}/' + stockId + '/adjust'"
+                        class="space-y-4"
+                    >
+                        @csrf
+                        <div class="space-y-1.5">
+                            <label for="decrement-bucket-select" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Target Stock Bucket <span class="text-crimson-600">*</span>
+                            </label>
+                            <select
+                                id="decrement-bucket-select"
+                                x-model="stockId"
+                                class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                                @foreach ($stockBuckets as $bucket)
+                                    <option value="{{ $bucket->id }}">
+                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} (Available: {{ $bucket->available_units }})
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label for="adjust-units-delta" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                    Units to Decrement <span class="text-crimson-600">*</span>
+                                </label>
+                                <input
+                                    id="adjust-units-delta"
+                                    type="number"
+                                    name="units_delta"
+                                    min="-100"
+                                    max="-1"
+                                    placeholder="e.g. -2"
+                                    required
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                                <p class="text-2xs text-slate-400">Must be a negative number (e.g. -1, -2).</p>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label for="adjust-target-status" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                    Reason Category <span class="text-crimson-600">*</span>
+                                </label>
+                                <select
+                                    id="adjust-target-status"
+                                    name="target_unit_status"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                    <option value="Discarded">Discarded (Compromised Bag)</option>
+                                    <option value="Expired">Expired (Shelf Life)</option>
+                                    <option value="Dispatched">Dispatched (Manual Transfer)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label for="adjust-justification" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                Mandatory Justification Description <span class="text-crimson-600">*</span>
+                            </label>
+                            <textarea
+                                id="adjust-justification"
+                                name="description"
+                                rows="3"
+                                minlength="3"
+                                required
+                                placeholder="Audit reason for stock removal (min 3 characters)..."
+                                class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            ></textarea>
+                        </div>
+
+                        <div class="rounded-lg bg-amber-50 p-2.5 text-2xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                            <strong>Critical Stock Integrity Notice:</strong> Manual positive additions are strictly forbidden. All available blood units must originate through authorized laboratory screening release.
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
+                            <x-ui.button type="button" variant="outline" @click="$dispatch('close-modal', 'adjust-inventory')">
+                                Cancel
+                            </x-ui.button>
+                            <x-ui.button type="submit" variant="primary">
+                                Apply Decrement
+                            </x-ui.button>
+                        </div>
+                    </form>
                 </div>
-            </form>
-        </x-ui.modal>
+            </x-ui.modal>
+        @endif
     </div>
 </x-app-layout>

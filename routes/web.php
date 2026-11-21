@@ -34,7 +34,12 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('active')->group(function (): void {
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
-        Route::get('/inventory', InventoryController::class)->name('inventory.index');
+        Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+        Route::get('/inventory/units/{bloodUnit}', [InventoryController::class, 'showUnit'])->name('inventory.units.show');
+        Route::post('/inventory/stocks/{inventoryStock}/adjust', [InventoryController::class, 'adjustStock'])->name('inventory.stocks.adjust');
+        Route::post('/inventory/units/{bloodUnit}/discard', [InventoryController::class, 'discardUnit'])->name('inventory.units.discard');
+        Route::post('/inventory/units/{bloodUnit}/expire', [InventoryController::class, 'markExpired'])->name('inventory.units.expire');
+        Route::get('/inventory/reconcile', [InventoryController::class, 'reconcile'])->name('inventory.reconcile');
 
         Route::get('/hospitals', [HospitalVerificationController::class, 'index'])->name('hospitals.index');
         Route::get('/hospitals/{hospital}', [HospitalVerificationController::class, 'show'])->name('hospitals.show');
