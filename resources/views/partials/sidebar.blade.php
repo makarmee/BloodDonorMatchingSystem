@@ -61,7 +61,7 @@
                     ['label' => 'Requester Overview', 'icon' => 'squares-2x2', 'route' => 'dashboard', 'match' => 'dashboard'],
                     ['label' => 'Request Blood Units', 'icon' => 'plus', 'route' => 'requests.create', 'match' => 'requests.create'],
                     ['label' => 'Track Requests', 'icon' => 'clipboard-list', 'route' => 'requests.index', 'match' => ['requests.index', 'requests.show', 'requests.edit']],
-                    ['label' => 'Regional Stock', 'icon' => 'droplet', 'route' => 'inventory.index'],
+                    ['label' => 'Available Blood Stock', 'icon' => 'droplet', 'route' => 'inventory.index'],
                 ],
             ],
         ],

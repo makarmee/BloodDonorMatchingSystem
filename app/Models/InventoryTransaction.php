@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use LogicException;
 
 #[Table('inventory_transactions', key: 'id', keyType: 'int')]
 #[Fillable([
@@ -38,6 +39,24 @@ class InventoryTransaction extends Model
      * Disable updated_at because inventory_transactions is an immutable append-only ledger.
      */
     public const ?string UPDATED_AT = null;
+
+    /**
+     * Prevent mutating or deleting existing ledger rows through ordinary Eloquent model operations.
+     *
+     * Note: This protection applies to Eloquent model instances ($model->save(), $model->update(), $model->delete()).
+     * It does NOT intercept raw SQL queries or bulk updates/deletions executed directly via the query builder
+     * (e.g., DB::table(...) or InventoryTransaction::query()->update(...)).
+     */
+    protected static function booted(): void
+    {
+        static::updating(static function (self $transaction): void {
+            throw new LogicException('InventoryTransaction records are an immutable append-only ledger and cannot be updated through Eloquent.');
+        });
+
+        static::deleting(static function (self $transaction): void {
+            throw new LogicException('InventoryTransaction records are an immutable append-only ledger and cannot be deleted through Eloquent.');
+        });
+    }
 
     /**
      * Valid inventory ledger operation types.

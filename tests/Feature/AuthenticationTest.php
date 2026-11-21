@@ -288,7 +288,7 @@ class AuthenticationTest extends TestCase
             ->assertSee('Hospital Partner')
             ->assertSee('Request Blood Units')
             ->assertSee('Track Requests')
-            ->assertSee('Regional Stock')
+            ->assertSee('Available Blood Stock')
             ->assertDontSee('Donations Log')
             ->assertDontSee('Lab Screening')
             ->assertDontSee(route('screening.index'), false)

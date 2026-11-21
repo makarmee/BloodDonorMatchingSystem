@@ -525,7 +525,7 @@
                                 class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
                                 <option value="all">All Statuses</option>
-                                @foreach (['Available', 'Reserved', 'Dispatched', 'Expired', 'Discarded', 'Quarantined'] as $st)
+                                @foreach (['Available', 'Reserved', 'Dispatched', 'Transfused', 'Expired', 'Discarded', 'Quarantined'] as $st)
                                     <option value="{{ $st }}" @selected($filters['unit_status'] === $st)>{{ $st }}</option>
                                 @endforeach
                             </select>
@@ -731,7 +731,9 @@
 
                             <tr x-show="filteredHistory.length === 0" x-cloak>
                                 <td colspan="6" class="px-5 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                                    No inventory activities recorded for this operation type.
+                                    <span x-text="history.length === 0 ? 'No inventory transactions recorded yet.' : 'No inventory activities recorded for this operation type.'">
+                                        No inventory transactions recorded yet.
+                                    </span>
                                 </td>
                             </tr>
                         </tbody>

@@ -287,10 +287,11 @@ class InventoryManagementIntegrationTest extends TestCase
         ['stock' => $stock, 'units' => $units] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'A+', 'WB', 1);
         $unit = $units[0];
 
-        // 1. Hospital coordinator can view index with Regional Stock context
+        // 1. Hospital coordinator can view index with Available Blood Stock sidebar navigation
         $viewResponse = $this->actingAs($hospitalUser)->get(route('inventory.index'));
         $viewResponse->assertOk();
-        $viewResponse->assertSee('Regional Stock');
+        $viewResponse->assertSee('Available Blood Stock');
+        $viewResponse->assertDontSee('Regional Stock');
         $viewResponse->assertDontSee('Adjust Inventory');
 
         // 2. All mutation endpoints return 403 Forbidden
@@ -381,6 +382,115 @@ class InventoryManagementIntegrationTest extends TestCase
 
         $this->assertNull(InventoryTransaction::UPDATED_AT, 'InventoryTransaction model must have UPDATED_AT disabled.');
         $this->assertNull($txn->updated_at, 'InventoryTransaction record does not have updated_at column.');
+    }
+
+    public function test_eloquent_model_protection_prevents_updates_and_deletions_on_inventory_transactions(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        ['stock' => $stock] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'AB+', 'WB', 1);
+
+        $txn = InventoryTransaction::query()->firstOrFail();
+
+        // 1. Eloquent update must throw LogicException
+        try {
+            $txn->update(['description' => 'Tampered ledger entry.']);
+            $this->fail('Expected LogicException when updating InventoryTransaction via Eloquent.');
+        } catch (\LogicException $e) {
+            $this->assertStringContainsString('immutable append-only ledger and cannot be updated', $e->getMessage());
+        }
+
+        // 2. Eloquent save on existing model must throw LogicException
+        try {
+            $txn->description = 'Direct property mutation.';
+            $txn->save();
+            $this->fail('Expected LogicException when saving existing InventoryTransaction via Eloquent.');
+        } catch (\LogicException $e) {
+            $this->assertStringContainsString('immutable append-only ledger and cannot be updated', $e->getMessage());
+        }
+
+        // 3. Eloquent delete must throw LogicException
+        try {
+            $txn->delete();
+            $this->fail('Expected LogicException when deleting InventoryTransaction via Eloquent.');
+        } catch (\LogicException $e) {
+            $this->assertStringContainsString('immutable append-only ledger and cannot be deleted', $e->getMessage());
+        }
+
+        // 4. Normal creation of new transactions succeeds
+        $newTxn = InventoryTransaction::query()->create([
+            'transaction_code' => 'TXN-TEST-IMMUTABLE-01',
+            'inventory_stock_id' => $stock->id,
+            'blood_unit_id' => null,
+            'operation_type' => 'Manual Adjustment',
+            'units_delta' => -1,
+            'available_before' => 1,
+            'available_after' => 0,
+            'reserved_before' => 0,
+            'reserved_after' => 0,
+            'reference_type' => null,
+            'reference_id' => null,
+            'performed_by_user_id' => $staff->id,
+            'actor_name' => $staff->name,
+            'description' => 'Legitimate ledger row creation.',
+            'occurred_at' => now(),
+        ]);
+
+        $this->assertDatabaseHas('inventory_transactions', [
+            'id' => $newTxn->id,
+            'transaction_code' => 'TXN-TEST-IMMUTABLE-01',
+        ]);
+    }
+
+    public function test_serialized_units_directory_can_filter_by_transfused_status(): void
+    {
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        ['units' => $units] = $this->releaseScreenedUnits($admin, $staff, $labOfficer, 'B+', 'WB', 2);
+        $availableUnit = $units[0];
+        $transfusedUnit = $units[1];
+
+        // Mark second unit as Transfused
+        BloodUnit::query()->whereKey($transfusedUnit->id)->update(['unit_status' => 'Transfused']);
+
+        // Query with ?unit_status=Transfused
+        $response = $this->actingAs($staff)->get(route('inventory.index', ['unit_status' => 'Transfused']));
+        $response->assertOk();
+
+        $filteredCodes = $response->viewData('units')->pluck('unit_code')->all();
+        $this->assertContains($transfusedUnit->unit_code, $filteredCodes);
+        $this->assertNotContains($availableUnit->unit_code, $filteredCodes);
+
+        // Query with ?unit_status=Available
+        $responseAvailable = $this->actingAs($staff)->get(route('inventory.index', ['unit_status' => 'Available']));
+        $responseAvailable->assertOk();
+
+        $availableCodes = $responseAvailable->viewData('units')->pluck('unit_code')->all();
+        $this->assertContains($availableUnit->unit_code, $availableCodes);
+        $this->assertNotContains($transfusedUnit->unit_code, $availableCodes);
+    }
+
+    public function test_empty_inventory_and_ledger_states_render_zero_stock_and_no_fictional_records(): void
+    {
+        $staff = $this->createUserWithRole('staff');
+
+        $response = $this->actingAs($staff)->get(route('inventory.index'));
+        $response->assertOk();
+
+        $summary = $response->viewData('summary');
+        $this->assertSame(0, $summary['totalUnits']);
+        $this->assertSame(8, $summary['criticalStockGroups']);
+        $this->assertEmpty($response->viewData('history'));
+
+        $response->assertSee('No inventory transactions recorded yet.');
+        $response->assertSee('No physical blood units recorded yet');
+        $response->assertDontSee('Dr. Maya Lin');
+        $response->assertDontSee('Samuel Ortega');
+        $response->assertDontSee('Regional Stock');
     }
 
     /**

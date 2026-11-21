@@ -47,6 +47,13 @@ class InventoryPageTest extends TestCase
         $response->assertSee('Normal');
         $response->assertSee('Low Stock');
         $response->assertSee('Critical');
+
+        // Empty state verifications when unseeded
+        $response->assertSee('No inventory transactions recorded yet.');
+        $response->assertDontSee('Dr. Maya Lin');
+        $response->assertDontSee('Samuel Ortega');
+        $this->assertSame(0, $response->viewData('summary')['totalUnits']);
+        $this->assertEmpty($response->viewData('history'));
     }
 
     public function test_inventory_page_derives_role_from_authenticated_user_and_ignores_query_override(): void
@@ -57,7 +64,8 @@ class InventoryPageTest extends TestCase
             ->get(route('inventory.index'))
             ->assertOk()
             ->assertViewHas('activeRole', 'hospital')
-            ->assertSee('Regional Stock')
+            ->assertSee('Available Blood Stock')
+            ->assertDontSee('Regional Stock')
             ->assertDontSee('Adjust Inventory');
 
         $staffUser = $this->createUserWithRole('staff');

@@ -77,7 +77,7 @@ class InventoryController extends Controller
         }
 
         if ($status = $request->query('unit_status')) {
-            if ($status !== 'all') {
+            if ($status !== 'all' && in_array($status, BloodUnit::UNIT_STATUSES, true)) {
                 $unitsQuery->where('unit_status', $status);
             }
         }
@@ -336,7 +336,8 @@ class InventoryController extends Controller
     }
 
     /**
-     * Build 8-group stock status data from actual InventoryStock records, with fallback to sample data.
+     * Build 8-group stock status data from actual InventoryStock records.
+     * When unseeded, defaults to 0 on-hand units across standard blood groups.
      *
      * @return array<int, array{
      *     group: string,
@@ -350,12 +351,6 @@ class InventoryController extends Controller
      */
     public function getBloodGroupsData(?int $componentId = null): array
     {
-        $hasDbStocks = InventoryStock::query()->exists();
-
-        if (! $hasDbStocks) {
-            return $this->sampleBloodGroups();
-        }
-
         $query = InventoryStock::query();
 
         if ($componentId !== null) {
@@ -427,7 +422,8 @@ class InventoryController extends Controller
     }
 
     /**
-     * Build recent history from actual InventoryTransaction records, with fallback to sample data.
+     * Build recent history from actual InventoryTransaction records.
+     * Returns an empty array when no transactions exist.
      *
      * @return array<int, array{
      *     id: int,
@@ -441,12 +437,6 @@ class InventoryController extends Controller
      */
     public function getRecentHistoryData(): array
     {
-        $hasTransactions = InventoryTransaction::query()->exists();
-
-        if (! $hasTransactions) {
-            return $this->sampleHistory();
-        }
-
         return InventoryTransaction::query()
             ->with(['inventoryStock.bloodComponent'])
             ->orderByDesc('occurred_at')
@@ -525,78 +515,5 @@ class InventoryController extends Controller
 
             return $item;
         }, $definitions);
-    }
-
-    /**
-     * Sample recent inventory audit history entries for fallback.
-     *
-     * @return array<int, array{
-     *     id: int,
-     *     group: string,
-     *     operation: string,
-     *     units: int,
-     *     date: string,
-     *     user: string,
-     *     description: string
-     * }>
-     */
-    private function sampleHistory(): array
-    {
-        return [
-            [
-                'id' => 106,
-                'group' => 'O+',
-                'operation' => 'Added',
-                'units' => 14,
-                'date' => 'Nov 11, 2026 • 13:55',
-                'user' => 'Dr. Maya Lin',
-                'description' => 'Cleared morning donation batch #DB-2611 from Central Plaza Drive.',
-            ],
-            [
-                'id' => 105,
-                'group' => 'AB-',
-                'operation' => 'Reserved',
-                'units' => 4,
-                'date' => 'Nov 11, 2026 • 13:10',
-                'user' => 'Samuel Ortega',
-                'description' => 'Allocated for City General Hospital ICU Trauma Unit (#REQ-1042).',
-            ],
-            [
-                'id' => 104,
-                'group' => 'O-',
-                'operation' => 'Removed',
-                'units' => 3,
-                'date' => 'Nov 11, 2026 • 12:15',
-                'user' => 'Nurse Elena Vance',
-                'description' => 'Dispatched emergency packed red blood cells to St. Jude Maternity.',
-            ],
-            [
-                'id' => 103,
-                'group' => 'A+',
-                'operation' => 'Added',
-                'units' => 10,
-                'date' => 'Nov 11, 2026 • 10:40',
-                'user' => 'Dr. Maya Lin',
-                'description' => 'Verified serology screening and transferred units to Cold Vault A1.',
-            ],
-            [
-                'id' => 102,
-                'group' => 'B+',
-                'operation' => 'Reserved',
-                'units' => 3,
-                'date' => 'Nov 10, 2026 • 17:25',
-                'user' => 'Samuel Ortega',
-                'description' => 'Scheduled elective cardiac surgery crossmatch hold (#REQ-1038).',
-            ],
-            [
-                'id' => 101,
-                'group' => 'A-',
-                'operation' => 'Removed',
-                'units' => 2,
-                'date' => 'Nov 10, 2026 • 15:05',
-                'user' => 'Lab Tech Priya Nair',
-                'description' => 'Retired 2 units approaching 42-day shelf-life limit per FIFO policy.',
-            ],
-        ];
     }
 }
