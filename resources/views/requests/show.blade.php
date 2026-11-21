@@ -619,6 +619,79 @@
                     @endif
                 </x-ui.card>
 
+                {{-- Inventory Allocations Card --}}
+                <x-ui.card :padding="false">
+                    <x-slot:header>
+                        <div class="flex items-center justify-between gap-2">
+                            <div>
+                                <h2 class="text-base font-semibold text-slate-900 dark:text-white">
+                                    Inventory Allocations
+                                </h2>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    Active reserved holds and released blood unit allocations for this order.
+                                </p>
+                            </div>
+
+                            <x-ui.badge variant="neutral">
+                                {{ count($bloodRequest['allocations']) }} allocations
+                            </x-ui.badge>
+                        </div>
+                    </x-slot:header>
+
+                    @if (empty($bloodRequest['allocations']))
+                        <div class="px-6 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                            No inventory unit allocations recorded yet.
+                        </div>
+                    @else
+                        <div class="divide-y divide-slate-200 dark:divide-slate-800">
+                            @foreach ($bloodRequest['allocations'] as $allocation)
+                                @php
+                                    $allocBadgeClass = match ($allocation['status']) {
+                                        'Reserved' => 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:ring-sky-800/70',
+                                        'Dispatched' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/70',
+                                        'Released' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-800/70',
+                                        'Cancelled' => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
+                                        default => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
+                                    };
+                                @endphp
+                                <div class="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="space-y-1">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white">
+                                                {{ $allocation['code'] }}
+                                            </span>
+                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset {{ $allocBadgeClass }}">
+                                                {{ $allocation['status'] }}
+                                            </span>
+                                            @if ($allocation['unitNumber'])
+                                                <span class="text-xs text-slate-600 dark:text-slate-300">
+                                                    Unit: <strong class="font-mono text-slate-800 dark:text-slate-200">{{ $allocation['unitNumber'] }}</strong>
+                                                    @if ($allocation['bloodGroup'])
+                                                        ({{ $allocation['bloodGroup'] }})
+                                                    @endif
+                                                </span>
+                                            @elseif ($allocation['bloodGroup'])
+                                                <span class="text-xs text-slate-600 dark:text-slate-300">
+                                                    Group: <strong class="text-slate-800 dark:text-slate-200">{{ $allocation['bloodGroup'] }}</strong>
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                                            {{ $allocation['units'] }} unit(s) allocated
+                                        </p>
+                                    </div>
+
+                                    @if ($allocation['date'])
+                                        <span class="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">
+                                            {{ $allocation['date'] }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </x-ui.card>
+
                 {{-- Status & Fulfillment History Card --}}
                 <x-ui.card :padding="false">
                     <x-slot:header>

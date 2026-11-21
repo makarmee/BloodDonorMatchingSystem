@@ -21,6 +21,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\ScreeningTestTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class BloodRequestsUiIntegrationTest extends TestCase
@@ -475,6 +476,114 @@ class BloodRequestsUiIntegrationTest extends TestCase
         $editResponse = $this->actingAs($staff)->get(route('requests.edit', $bloodRequest->id));
         $editResponse->assertRedirect(route('requests.show', $bloodRequest->request_code));
         $editResponse->assertSessionHas('error');
+    }
+
+    public function test_request_details_page_displays_inventory_allocations_and_empty_state(): void
+    {
+        $hospital = Hospital::factory()->create();
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        $component = BloodComponent::query()->where('code', 'WB')->firstOrFail();
+
+        $bloodRequest = $this->fulfillmentService->createRequest($hospital, $staff, [
+            'blood_group' => 'A+',
+            'blood_component_id' => $component->id,
+            'requested_units' => 2,
+            'request_reason' => 'Emergency surgical allocation display test.',
+        ]);
+
+        // 1. Initial empty state: no allocations
+        $emptyResponse = $this->actingAs($staff)->get(route('requests.show', $bloodRequest->id));
+        $emptyResponse->assertOk();
+        $emptyResponse->assertSee('Inventory Allocations');
+        $emptyResponse->assertSee('0 allocations');
+        $emptyResponse->assertSee('No inventory unit allocations recorded yet.');
+
+        // 2. Approve and reserve units
+        $this->seedScreenedUnits($admin, $staff, $labOfficer, 'A+', 'WB', 2);
+        $this->fulfillmentService->approveRequest($bloodRequest, $staff, 'Approved for reservation.');
+
+        $allocations = $this->fulfillmentService->reserveUnits($bloodRequest, $staff, 1);
+        $allocation = $allocations->first();
+        $allocationCode = $allocation->allocation_code;
+        $unitNumber = $allocation->bloodUnit->unit_number;
+
+        $allocatedResponse = $this->actingAs($staff)->get(route('requests.show', $bloodRequest->id));
+        $allocatedResponse->assertOk();
+        $allocatedResponse->assertSee('Inventory Allocations');
+        $allocatedResponse->assertSee('1 allocations');
+        $allocatedResponse->assertSee($allocationCode);
+        $allocatedResponse->assertSee('Reserved');
+        $allocatedResponse->assertSee($unitNumber);
+        $allocatedResponse->assertSee('A+');
+        $allocatedResponse->assertSee('1 unit(s) allocated');
+
+        // 3. Release reserved allocations and verify Released state rendering
+        $this->fulfillmentService->releaseReservedAllocations($bloodRequest, $staff, null, 'Released for UI test.');
+
+        $releasedResponse = $this->actingAs($staff)->get(route('requests.show', $bloodRequest->id));
+        $releasedResponse->assertOk();
+        $releasedResponse->assertSee('Released');
+    }
+
+    public function test_fulfillment_blood_component_is_eager_loaded_without_n_plus_one_queries(): void
+    {
+        $hospital = Hospital::factory()->create();
+        $admin = $this->createUserWithRole('admin');
+        $staff = $this->createUserWithRole('staff');
+        $labOfficer = $this->createUserWithRole('lab_officer');
+
+        $component = BloodComponent::query()->where('code', 'WB')->firstOrFail();
+
+        $this->seedScreenedUnits($admin, $staff, $labOfficer, 'O+', 'WB', 3);
+
+        $bloodRequest = $this->fulfillmentService->createRequest($hospital, $staff, [
+            'blood_group' => 'O+',
+            'blood_component_id' => $component->id,
+            'requested_units' => 3,
+            'request_reason' => 'Multiple fulfillments N+1 verification test.',
+        ]);
+
+        $this->fulfillmentService->approveRequest($bloodRequest, $staff, 'Approved for dispatch.');
+
+        // Dispatch 2 separate fulfillments
+        $this->actingAs($staff)->post(route('requests.dispatch', $bloodRequest->id), [
+            'quantity' => 1,
+            'dispatched_blood_group' => 'O+',
+            'courier_reference' => 'BATCH-ALPHA',
+            'notes' => 'First dispatch batch.',
+        ]);
+
+        $this->actingAs($staff)->post(route('requests.dispatch', $bloodRequest->id), [
+            'quantity' => 1,
+            'dispatched_blood_group' => 'O+',
+            'courier_reference' => 'BATCH-BETA',
+            'notes' => 'Second dispatch batch.',
+        ]);
+
+        $bloodRequest->refresh();
+        $this->assertCount(2, $bloodRequest->fulfillments);
+
+        // Record query log during show invocation
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $showResponse = $this->actingAs($staff)->get(route('requests.show', $bloodRequest->id));
+        $showResponse->assertOk();
+
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        // In SQLite/MySQL, queries selecting from blood_components should be at most 2:
+        // 1 for the BloodRequest's bloodComponent, and 1 for fulfillments.bloodComponent in a batch IN (...) query.
+        // If an N+1 query occurred, each fulfillment would trigger a distinct SELECT on blood_components (total >= 3).
+        $componentQueries = collect($queries)->filter(function (array $query): bool {
+            return str_contains(strtolower($query['query']), 'blood_components');
+        });
+
+        $this->assertLessThanOrEqual(2, $componentQueries->count(), 'Expected fulfillments.bloodComponent to be eager-loaded without N+1 queries.');
     }
 
     /**

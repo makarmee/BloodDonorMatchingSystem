@@ -152,6 +152,7 @@ class BloodRequestsController extends Controller
                 'cancelledBy',
                 'statusHistories.actor',
                 'fulfillments.dispatchedBy',
+                'fulfillments.bloodComponent',
                 'allocations.bloodUnit',
             ])
             ->where('id', $requestId)
