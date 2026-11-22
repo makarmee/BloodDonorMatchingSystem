@@ -21,7 +21,7 @@
     };
 @endphp
 
-<span {{ $attributes->merge(['class' => "inline-flex items-center justify-center rounded-lg font-bold tracking-tight tabular-nums ring-1 ring-inset {$colorClasses} {$sizeClasses}"]) }}>
+<span dir="ltr" {{ $attributes->merge(['class' => "inline-flex items-center justify-center rounded-lg font-bold tracking-tight tabular-nums ring-1 ring-inset {$colorClasses} {$sizeClasses}"]) }}>
     {{ $normalized }}
 </span>
 

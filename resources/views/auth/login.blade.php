@@ -10,22 +10,22 @@
                 </span>
                 <div>
                     <span class="block text-base font-bold tracking-tight">{{ config('app.name', 'BDMS') }}</span>
-                    <span class="block text-xs text-slate-400">Blood Donation Management System</span>
+                    <span class="block text-xs text-slate-400">{{ __('Blood Donation Management System') }}</span>
                 </div>
             </a>
 
             <div class="relative space-y-5 max-w-md">
-                <x-ui.badge variant="crimson" :dot="true">Unified Clinical Access</x-ui.badge>
+                <x-ui.badge variant="crimson" :dot="true">{{ __('Unified Clinical Access') }}</x-ui.badge>
                 <h1 class="text-3xl font-bold tracking-tight">
-                    Every unit tracked. Every emergency prioritized.
+                    {{ __('Every unit tracked. Every emergency prioritized.') }}
                 </h1>
                 <p class="text-sm leading-relaxed text-slate-300">
-                    Sign in to manage blood bank inventory, track hospital dispatch requests, or schedule your next life-saving donation.
+                    {{ __('Sign in to manage blood bank inventory, track hospital dispatch requests, or schedule your next life-saving donation.') }}
                 </p>
             </div>
 
             <div class="relative flex items-center gap-6 text-xs text-slate-400">
-                <span>Role-aware portals: Admin • Staff • Lab Officer • Hospital • Donor</span>
+                <span>{{ __('Role-aware portals: Admin • Staff • Lab Officer • Hospital • Donor') }}</span>
             </div>
         </div>
 
@@ -33,10 +33,8 @@
         <div class="flex flex-col justify-between px-4 py-8 sm:px-8 lg:px-12 bg-slate-50 dark:bg-slate-950">
             <div class="flex items-center justify-between">
                 <a href="{{ route('home') }}" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
-                    <span class="flex size-8 items-center justify-center rounded-lg bg-crimson-600 text-white lg:hidden">
-                        <x-icons.icon name="droplet" class="size-4" />
-                    </span>
-                    <span>&larr; {{ __('Back to Home') }}</span>
+                    <x-icons.icon name="arrow-left" class="size-4" />
+                    <span>{{ __('Back to Home') }}</span>
                 </a>
                 <div class="flex items-center gap-2">
                     <x-ui.language-selector />

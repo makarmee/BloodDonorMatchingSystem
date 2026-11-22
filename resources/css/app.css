@@ -62,6 +62,15 @@
         text-align: left;
     }
 
+    [dir="rtl"] th {
+        text-align: start;
+    }
+
+    [dir="rtl"] .rtl-flip,
+    [dir="rtl"] [data-dir-flip="true"] {
+        transform: scaleX(-1);
+    }
+
     .dir-ltr {
         direction: ltr;
         text-align: left;

@@ -16,9 +16,9 @@
     ];
 
     $genderOptions = [
-        'Female' => 'Female',
-        'Male' => 'Male',
-        'Other' => 'Other',
+        'Female' => __('Female'),
+        'Male' => __('Male'),
+        'Other' => __('Other'),
     ];
 
     $bloodGroupOptions = collect($bloodGroups)
@@ -26,9 +26,9 @@
         ->all();
 
     $availabilityOptions = [
-        'Available' => 'Available',
-        'Temporarily Unavailable' => 'Temporarily Unavailable',
-        'Inactive' => 'Inactive',
+        'Available' => __('Available'),
+        'Temporarily Unavailable' => __('Temporarily Unavailable'),
+        'Inactive' => __('Inactive'),
     ];
 
     $cancelUrl = $isEdit && isset($donorRecord['id'])
@@ -49,8 +49,8 @@
     @endif
 
     @if ($errors->any())
-        <x-ui.alert variant="danger" title="Validation errors occurred" class="mb-4">
-            <ul class="list-disc pl-5 text-xs space-y-1">
+        <x-ui.alert variant="danger" :title="__('Validation errors occurred')" class="mb-4">
+            <ul class="list-disc ps-5 text-xs space-y-1">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -92,8 +92,8 @@
         <button
             type="button"
             @click="dismissFeedback()"
-            aria-label="Dismiss message"
-            class="rounded-lg p-1 opacity-70 transition hover:opacity-100"
+            aria-label="{{ __('Dismiss notification') }}"
+            class="rounded-lg p-1 opacity-70 transition hover:opacity-100 cursor-pointer"
         >
             <x-icons.icon name="x-mark" class="size-4" />
         </button>
@@ -102,7 +102,7 @@
     <form
         method="POST"
         action="{{ $isEdit ? route('donors.update', $donorRecord['id']) : route('donors.store') }}"
-        @submit="if (!validateAll()) { $event.preventDefault(); feedback = { type: 'danger', title: 'Validation errors found', message: 'Please complete or correct the highlighted donor fields before continuing.' }; window.scrollTo({ top: 0, behavior: 'smooth' }); }"
+        @submit="if (!validateAll()) { $event.preventDefault(); feedback = { type: 'danger', title: window.__ ? window.__('Validation errors found') : 'Validation errors found', message: window.__ ? window.__('Please complete or correct the highlighted donor fields before continuing.') : 'Please complete or correct the highlighted donor fields before continuing.' }; window.scrollTo({ top: 0, behavior: 'smooth' }); }"
         novalidate
         class="space-y-6"
     >
@@ -115,10 +115,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        Personal Information
+                        {{ __('Personal Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Core identity details and confirmed ABO/Rh blood group classification.
+                        {{ __('Core identity details and confirmed ABO/Rh blood group classification.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -128,7 +128,7 @@
                     <x-ui.input
                         id="donor-name"
                         name="name"
-                        label="Full Name"
+                        :label="__('Full Name')"
                         placeholder="e.g. Elena Rostova"
                         icon="user"
                         :value="$initialForm['name']"
@@ -149,8 +149,8 @@
                     <x-ui.select
                         id="donor-blood-group"
                         name="blood_group"
-                        label="Blood Group"
-                        placeholder="Select blood group"
+                        :label="__('Blood Group')"
+                        :placeholder="__('Select blood group')"
                         :options="$bloodGroupOptions"
                         :value="$initialForm['bloodGroup']"
                         required
@@ -170,8 +170,8 @@
                     <x-ui.select
                         id="donor-gender"
                         name="gender"
-                        label="Gender"
-                        placeholder="Select gender"
+                        :label="__('Gender')"
+                        :placeholder="__('Select gender')"
                         :options="$genderOptions"
                         :value="$initialForm['gender']"
                         required
@@ -192,7 +192,7 @@
                         id="donor-dob"
                         name="date_of_birth"
                         type="date"
-                        label="Date of Birth"
+                        :label="__('Date of Birth')"
                         icon="calendar"
                         :value="$initialForm['dateOfBirth']"
                         required
@@ -215,10 +215,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        Contact &amp; Emergency Details
+                        {{ __('Contact & Emergency Details') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Reachable donor contact channels, residential address, and next-of-kin emergency contact.
+                        {{ __('Reachable donor contact channels, residential address, and next-of-kin emergency contact.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -229,7 +229,7 @@
                         id="donor-email"
                         name="email"
                         type="email"
-                        label="Email"
+                        :label="__('Email')"
                         placeholder="donor@example.org"
                         icon="envelope"
                         :value="$initialForm['email']"
@@ -251,7 +251,7 @@
                         id="donor-phone"
                         name="phone"
                         type="tel"
-                        label="Phone Number"
+                        :label="__('Phone Number')"
                         placeholder="+1 (555) 234-8910"
                         icon="phone"
                         :value="$initialForm['phone']"
@@ -272,7 +272,7 @@
                     <x-ui.input
                         id="donor-emergency-contact"
                         name="emergency_contact"
-                        label="Emergency Contact"
+                        :label="__('Emergency Contact')"
                         placeholder="e.g. Viktor Rostov (Spouse) - +1 (555) 234-8999"
                         icon="shield-check"
                         :value="$initialForm['emergencyContact']"
@@ -293,9 +293,9 @@
                     <x-ui.textarea
                         id="donor-address"
                         name="address"
-                        label="Address"
+                        :label="__('Address')"
                         rows="2"
-                        placeholder="Street address, apartment or suite, city, state/province, postal code"
+                        :placeholder="__('Street address, apartment or suite, city, state/province, postal code')"
                         :value="$initialForm['address']"
                         required
                         x-model="form.address"
@@ -317,10 +317,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        Medical Notes &amp; Availability
+                        {{ __('Medical Notes & Availability') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Donation scheduling readiness and relevant clinical intake notes.
+                        {{ __('Donation scheduling readiness and relevant clinical intake notes.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -331,7 +331,7 @@
                         <x-ui.select
                             id="donor-availability-status"
                             name="availability_status"
-                            label="Availability Status"
+                            :label="__('Availability Status')"
                             :options="$availabilityOptions"
                             :value="$initialForm['availabilityStatus']"
                             required
@@ -350,7 +350,7 @@
                     <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-800/50">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                                Clinical Eligibility Status
+                                {{ __('Clinical Eligibility Status') }}
                             </span>
 
                             @if ($isEdit && isset($donorRecord['eligibilityStatus']))
@@ -362,16 +362,16 @@
                                     };
                                 @endphp
                                 <x-ui.badge :variant="$statusVariant" :dot="true">
-                                    {{ $donorRecord['eligibilityStatus'] }}
+                                    {{ __($donorRecord['eligibilityStatus']) }}
                                 </x-ui.badge>
                             @else
                                 <x-ui.badge variant="warning" :dot="true">
-                                    Pending Review
+                                    {{ __('Pending Review') }}
                                 </x-ui.badge>
                             @endif
                         </div>
                         <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-                            Eligibility is determined exclusively by verified clinical screening criteria and backend rules rather than a frontend timer.
+                            {{ __('Eligibility is determined exclusively by verified clinical screening criteria and backend rules rather than a frontend timer.') }}
                         </p>
                     </div>
                 </div>
@@ -380,10 +380,10 @@
                     <x-ui.textarea
                         id="donor-medical-notes"
                         name="medical_notes"
-                        label="Medical Notes"
+                        :label="__('Medical Notes')"
                         rows="4"
-                        placeholder="Record verified allergies, hemoglobin screening notes, deferral remarks, or appointment preferences..."
-                        hint="Optional clinical context for intake staff (up to 1000 characters)."
+                        :placeholder="__('Record verified allergies, hemoglobin screening notes, deferral remarks, or appointment preferences...')"
+                        :hint="__('Optional clinical context for intake staff (up to 1000 characters).')"
                         :value="$initialForm['medicalNotes']"
                         x-model="form.medicalNotes"
                         @blur="validateField('medicalNotes')"
@@ -403,19 +403,19 @@
                     <button
                         type="button"
                         @click="resetForm()"
-                        class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                        class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                     >
-                        Reset Fields
+                        {{ __('Reset Fields') }}
                     </button>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                         <x-ui.button variant="outline" size="md" :href="$cancelUrl">
-                            Cancel
+                            {{ __('Cancel') }}
                         </x-ui.button>
 
                         <x-ui.button variant="primary" size="md" type="submit">
                             <x-icons.icon name="check" class="size-4" />
-                            <span>{{ $isEdit ? 'Save Changes' : 'Register Donor' }}</span>
+                            <span>{{ $isEdit ? __('Save Changes') : __('Register Donor') }}</span>
                         </x-ui.button>
                     </div>
                 </div>

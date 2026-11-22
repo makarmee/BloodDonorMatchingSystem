@@ -39,14 +39,14 @@
         <div class="flex items-center gap-2.5">
             <x-bdms.blood-group-badge :group="$group" size="sm" />
             <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
-                {{ $units }} <span class="font-normal text-slate-500 dark:text-slate-400">units</span>
+                {{ $units }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ __('units') }}</span>
             </span>
         </div>
 
-        <x-ui.badge :variant="$badgeVariant" :dot="true">{{ $statusLabel }}</x-ui.badge>
+        <x-ui.badge :variant="$badgeVariant" :dot="true">{{ __($statusLabel) }}</x-ui.badge>
     </div>
 
-    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $group }} stock level">
+    <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuenow="{{ $percentage }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $group }} {{ __('stock level') }}">
         <div class="h-full rounded-full transition-all duration-300 {{ $barClasses }}" style="width: {{ $percentage }}%"></div>
     </div>
 </div>

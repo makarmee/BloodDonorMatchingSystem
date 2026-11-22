@@ -1,10 +1,14 @@
 <x-guest-layout title="Reset Password" :minimal="true">
     <div class="min-h-screen flex flex-col justify-between bg-slate-50 px-4 py-8 sm:px-6 lg:px-8 dark:bg-slate-950">
         <div class="mx-auto flex w-full max-w-md items-center justify-between">
-            <a href="{{ route('login') }}" class="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
-                &larr; Back to Sign in
+            <a href="{{ route('login') }}" class="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">
+                <x-icons.icon name="arrow-left" class="size-4" />
+                <span>{{ __('Back to Sign in') }}</span>
             </a>
-            <x-ui.theme-toggle />
+            <div class="flex items-center gap-2">
+                <x-ui.language-selector />
+                <x-ui.theme-toggle />
+            </div>
         </div>
 
         <div class="mx-auto w-full max-w-md py-8">
@@ -13,10 +17,10 @@
                     <x-icons.icon name="lock-closed" class="size-5" />
                 </div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Forgot your password?
+                    {{ __('Forgot your password?') }}
                 </h1>
                 <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
-                    Enter your registered email and we will send a password reset link.
+                    {{ __('Enter your registered email and we will send a password reset link.') }}
                 </p>
             </div>
 
@@ -35,13 +39,13 @@
                     @if (! Route::has('password.email'))
                         <div x-show="frontendNotice" x-cloak>
                             <x-ui.alert variant="info" :dismissible="false">
-                                Frontend UI mode — password reset mail dispatch will activate once auth routes are added.
+                                {{ __('Frontend UI mode — password reset mail dispatch will activate once auth routes are added.') }}
                             </x-ui.alert>
                         </div>
                     @endif
 
                     <x-ui.input
-                        label="Email address"
+                        :label="__('Email address')"
                         name="email"
                         type="email"
                         icon="envelope"
@@ -52,7 +56,7 @@
                     />
 
                     <x-ui.button type="submit" variant="primary" class="w-full">
-                        Send Reset Link
+                        {{ __('Send Reset Link') }}
                     </x-ui.button>
                 </form>
             </x-ui.card>

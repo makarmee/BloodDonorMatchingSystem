@@ -1,19 +1,19 @@
-<x-app-layout title="Lab Screening" page-title="Lab Screening" active-role="staff">
+<x-app-layout :title="__('Lab Screening')" :page-title="__('Lab Screening')" active-role="staff">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Lab Screening
+                    {{ __('Lab Screening') }}
                 </h1>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Track infectious disease assays, blood group compatibility panels, and explicit laboratory test outcomes.
+                    {{ __('Track infectious disease assays, blood group compatibility panels, and explicit laboratory test outcomes.') }}
                 </p>
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
                 <x-ui.button variant="primary" size="md" :href="route('screening.create')">
                     <x-icons.icon name="plus" class="size-4" />
-                    <span>Record Screening Test</span>
+                    <span>{{ __('Record Screening Test') }}</span>
                 </x-ui.button>
             </div>
         </div>
@@ -23,36 +23,36 @@
         {{-- Overview Statistic Cards --}}
         <section aria-label="Lab screening overview statistics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-bdms.stat-card
-                label="Total Samples"
+                :label="__('Total Samples')"
                 :value="$summary['totalSamples']"
-                trend="Accessioned laboratory specimens"
+                :trend="__('Accessioned laboratory specimens')"
                 trend-tone="neutral"
                 icon="clipboard-list"
                 accent="crimson"
             />
 
             <x-bdms.stat-card
-                label="Pending Tests"
+                :label="__('Pending Tests')"
                 :value="$summary['pendingTests']"
-                trend="Awaiting explicit laboratory verification"
+                :trend="__('Awaiting explicit laboratory verification')"
                 trend-tone="neutral"
                 icon="clock"
                 accent="amber"
             />
 
             <x-bdms.stat-card
-                label="Passed Samples"
+                :label="__('Passed Samples')"
                 :value="$summary['passedSamples']"
-                trend="Explicitly marked Passed in sample log"
+                :trend="__('Explicitly marked Passed in sample log')"
                 trend-tone="up"
                 icon="check-circle"
                 accent="emerald"
             />
 
             <x-bdms.stat-card
-                label="Failed Samples"
+                :label="__('Failed Samples')"
                 :value="$summary['failedSamples']"
-                trend="Flagged for quarantine & medical review"
+                :trend="__('Flagged for quarantine & medical review')"
                 trend-tone="down"
                 icon="exclamation-triangle"
                 accent="sky"
@@ -60,8 +60,12 @@
         </section>
 
         {{-- Clinical Rule Disclaimer --}}
-        <x-ui.alert variant="info" title="Laboratory Screening Policy (Preview Data Only)">
-            Screening results (<strong>Pending</strong>, <strong>Passed</strong>, and <strong>Failed</strong>) must be selected explicitly per sample and are never marked Passed automatically. Sample records shown here are frontend preview fixtures and do not represent real clinical clearance.
+        <x-ui.alert variant="info" :title="__('Laboratory Screening Policy (Preview Data Only)')">
+            {!! __('Screening results (:pending, :passed, and :failed) must be selected explicitly per sample and are never marked Passed automatically. Sample records shown here are frontend preview fixtures and do not represent real clinical clearance.', [
+                'pending' => '<strong>' . __('Pending') . '</strong>',
+                'passed' => '<strong>' . __('Passed') . '</strong>',
+                'failed' => '<strong>' . __('Failed') . '</strong>'
+            ]) !!}
         </x-ui.alert>
 
         {{-- Screening Table Card --}}
@@ -71,10 +75,10 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                Laboratory Sample Queue
+                                {{ __('Laboratory Sample Queue') }}
                             </h2>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Showing <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered">{{ count($samples) }}</span> of {{ count($samples) }} screening samples
+                                {{ __('Showing') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered">{{ count($samples) }}</span> {{ __('of :total screening samples', ['total' => count($samples)]) }}
                             </p>
                         </div>
 
@@ -87,18 +91,18 @@
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                             >
                                 <x-icons.icon name="x-mark" class="size-3.5" />
-                                <span>Clear all filters</span>
+                                <span>{{ __('Clear all filters') }}</span>
                             </button>
 
-                            <label for="screening-per-page" class="sr-only">Rows per page</label>
+                            <label for="screening-per-page" class="sr-only">{{ __('Rows per page') }}</label>
                             <select
                                 id="screening-per-page"
                                 x-model.number="perPage"
                                 class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-xs focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                             >
-                                <option value="5">5 / page</option>
-                                <option value="10">10 / page</option>
-                                <option value="25">25 / page</option>
+                                <option value="5">{{ __('5 / page') }}</option>
+                                <option value="10">{{ __('10 / page') }}</option>
+                                <option value="25">{{ __('25 / page') }}</option>
                             </select>
                         </div>
                     </div>
@@ -106,25 +110,25 @@
                     {{-- Search & Filter Controls --}}
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <div class="xl:col-span-2">
-                            <label for="screening-search" class="sr-only">Search screening ID, donation ID, or donor name</label>
+                            <label for="screening-search" class="sr-only">{{ __('Search screening ID, donation ID, or donor name') }}</label>
                             <x-ui.input
                                 id="screening-search"
                                 name="search"
                                 type="search"
                                 icon="magnifying-glass"
-                                placeholder="Search Screening ID, Donation ID, or donor..."
+                                :placeholder="__('Search Screening ID, Donation ID, or donor...')"
                                 x-model.debounce.150ms="search"
                             />
                         </div>
 
                         <div>
-                            <label for="filter-screening-blood-group" class="sr-only">Filter by blood group</label>
+                            <label for="filter-screening-blood-group" class="sr-only">{{ __('Filter by blood group') }}</label>
                             <select
                                 id="filter-screening-blood-group"
                                 x-model="bloodGroupFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Blood Groups</option>
+                                <option value="all">{{ __('All Blood Groups') }}</option>
                                 @foreach ($bloodGroups as $group)
                                     <option value="{{ $group }}">{{ $group }}</option>
                                 @endforeach
@@ -132,27 +136,27 @@
                         </div>
 
                         <div>
-                            <label for="filter-screening-result" class="sr-only">Filter by screening result</label>
+                            <label for="filter-screening-result" class="sr-only">{{ __('Filter by screening result') }}</label>
                             <select
                                 id="filter-screening-result"
                                 x-model="resultFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Results</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Passed">Passed</option>
-                                <option value="Failed">Failed</option>
+                                <option value="all">{{ __('All Results') }}</option>
+                                <option value="Pending">{{ __('Pending') }}</option>
+                                <option value="Passed">{{ __('Passed') }}</option>
+                                <option value="Failed">{{ __('Failed') }}</option>
                             </select>
                         </div>
 
                         <div>
-                            <label for="filter-test-type" class="sr-only">Filter by test type</label>
+                            <label for="filter-test-type" class="sr-only">{{ __('Filter by test type') }}</label>
                             <select
                                 id="filter-test-type"
                                 x-model="testTypeFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Test Types</option>
+                                <option value="all">{{ __('All Test Types') }}</option>
                                 @foreach ($testTypes as $testType)
                                     <option value="{{ $testType }}">{{ $testType }}</option>
                                 @endforeach
@@ -161,22 +165,22 @@
 
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label for="screening-date-from" class="sr-only">From date</label>
+                                <label for="screening-date-from" class="sr-only">{{ __('From date') }}</label>
                                 <input
                                     id="screening-date-from"
                                     type="date"
                                     x-model="dateFrom"
-                                    title="From date"
+                                    title="{{ __('From date') }}"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
                             </div>
                             <div>
-                                <label for="screening-date-to" class="sr-only">To date</label>
+                                <label for="screening-date-to" class="sr-only">{{ __('To date') }}</label>
                                 <input
                                     id="screening-date-to"
                                     type="date"
                                     x-model="dateTo"
-                                    title="To date"
+                                    title="{{ __('To date') }}"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
                             </div>
@@ -186,18 +190,18 @@
             </x-slot:header>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
+                <table class="min-w-full divide-y divide-slate-200 text-start text-sm dark:divide-slate-800">
                     <thead class="bg-slate-50/80 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:bg-slate-800/50 dark:text-slate-400">
                         <tr>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Screening ID</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Donation ID</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Donor Name</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Blood Group</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Sample Collection Date</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Test Date</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Test Type</th>
-                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">Screening Result</th>
-                            <th scope="col" class="px-6 py-3.5 text-right whitespace-nowrap">Actions</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Screening ID') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Donation ID') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Donor Name') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Blood Group') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Sample Collection Date') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Test Date') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Test Type') }}</th>
+                            <th scope="col" class="px-6 py-3.5 whitespace-nowrap">{{ __('Screening Result') }}</th>
+                            <th scope="col" class="px-6 py-3.5 text-end whitespace-nowrap">{{ __('Actions') }}</th>
                         </tr>
                     </thead>
 
@@ -215,7 +219,7 @@
                                 x-show="isRowVisible({{ $index }})"
                                 class="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                             >
-                                <td class="px-6 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">
+                                <td class="px-6 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200 dir-ltr text-start">
                                     <a
                                         href="{{ route('screening.show', $sample['id']) }}"
                                         class="hover:text-crimson-600 dark:hover:text-crimson-400"
@@ -224,7 +228,7 @@
                                     </a>
                                 </td>
 
-                                <td class="px-6 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-700 dark:text-slate-300">
+                                <td class="px-6 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-700 dark:text-slate-300 dir-ltr text-start">
                                     <a
                                         href="{{ route('donations.show', $sample['donationId']) }}"
                                         class="hover:text-crimson-600 dark:hover:text-crimson-400"
@@ -241,7 +245,7 @@
                                         >
                                             {{ $sample['donorName'] }}
                                         </a>
-                                        <p class="font-mono text-xs text-slate-500 dark:text-slate-400">
+                                        <p class="font-mono text-xs text-slate-500 dark:text-slate-400 dir-ltr text-start">
                                             {{ $sample['donorId'] }}
                                         </p>
                                     </div>
@@ -269,14 +273,14 @@
 
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <x-ui.badge :variant="$resultVariant" :dot="true">
-                                        {{ $sample['screeningResult'] }}
+                                        {{ __($sample['screeningResult']) }}
                                     </x-ui.badge>
                                 </td>
 
-                                <td class="px-6 py-4 text-right whitespace-nowrap">
+                                <td class="px-6 py-4 text-end whitespace-nowrap">
                                     <x-ui.button variant="ghost" size="sm" :href="route('screening.show', $sample['id'])">
                                         <x-icons.icon name="eye" class="size-4" />
-                                        <span>View</span>
+                                        <span>{{ __('View') }}</span>
                                     </x-ui.button>
                                 </td>
                             </tr>
@@ -295,10 +299,10 @@
                     <x-icons.icon name="shield-check" class="size-6" />
                 </div>
                 <h3 class="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
-                    No matching lab screening samples found
+                    {{ __('No matching lab screening samples found') }}
                 </h3>
                 <p class="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                    Try adjusting your search keywords, test panel selection, result status, or date range filter.
+                    {{ __('Try adjusting your search keywords, test panel selection, result status, or date range filter.') }}
                 </p>
                 <button
                     type="button"
@@ -306,16 +310,16 @@
                     class="mt-4 inline-flex items-center gap-2 rounded-xl bg-crimson-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-crimson-700 cursor-pointer"
                 >
                     <x-icons.icon name="x-mark" class="size-4" />
-                    <span>Clear all filters</span>
+                    <span>{{ __('Clear all filters') }}</span>
                 </button>
             </div>
 
             <x-slot:footer>
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Showing <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingFrom"></span>
-                        to <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingTo"></span>
-                        of <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered"></span> samples
+                        {{ __('Showing') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingFrom"></span>
+                        {{ __('to') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingTo"></span>
+                        {{ __('of') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered"></span> {{ __('samples') }}
                     </p>
 
                     <nav aria-label="Screening pagination" class="flex items-center gap-1.5">
@@ -325,8 +329,8 @@
                             :disabled="safePage <= 1"
                             class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            <x-icons.icon name="chevron-left" class="size-3.5" />
-                            <span>Prev</span>
+                            <x-icons.icon name="chevron-left" class="size-3.5 rtl-flip" />
+                            <span>{{ __('Prev') }}</span>
                         </button>
 
                         <template x-for="page in pageNumbers" :key="page">
@@ -347,8 +351,8 @@
                             :disabled="safePage >= totalPages"
                             class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            <span>Next</span>
-                            <x-icons.icon name="chevron-right" class="size-3.5" />
+                            <span>{{ __('Next') }}</span>
+                            <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
                         </button>
                     </nav>
                 </div>
@@ -356,4 +360,3 @@
         </x-ui.card>
     </div>
 </x-app-layout>
-

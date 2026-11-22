@@ -39,12 +39,12 @@
     >
         @if ($title)
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-white">{{ $title }}</h3>
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white">{{ __($title) }}</h3>
                 <button
                     type="button"
                     @click="open = false"
                     class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200 cursor-pointer"
-                    aria-label="Close modal"
+                    aria-label="{{ __('Close modal') }}"
                 >
                     <x-icons.icon name="x-mark" class="size-4" />
                 </button>

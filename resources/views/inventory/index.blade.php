@@ -1,11 +1,11 @@
-<x-app-layout page-title="Blood Inventory" :active-role="$activeRole">
+<x-app-layout :page-title="__('Blood Inventory')" :active-role="$activeRole">
     <x-slot:header>
         <div>
             <div class="flex items-center gap-2">
                 <h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Blood Inventory Management
+                    {{ __('Blood Inventory Management') }}
                 </h2>
-                <x-ui.badge variant="crimson">8 Blood Groups</x-ui.badge>
+                <x-ui.badge variant="crimson">{{ __('8 Blood Groups') }}</x-ui.badge>
                 @if ($selectedComponentId)
                     @php
                         $activeComp = $components->firstWhere('id', $selectedComponentId);
@@ -16,18 +16,18 @@
                 @endif
             </div>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Monitor available units, reserve thresholds, physical blood bags, and auditable stock ledger movements.
+                {{ __('Monitor available units, reserve thresholds, physical blood bags, and auditable stock ledger movements.') }}
             </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
             <x-ui.button variant="outline" size="sm" :href="route('dashboard')">
-                Back to Dashboard
+                {{ __('Back to Dashboard') }}
             </x-ui.button>
             @if (auth()->user()?->hasPermission('inventory.adjust'))
                 <x-ui.button variant="outline" size="sm" :href="route('inventory.reconcile')">
                     <x-icons.icon name="clipboard-document-check" class="size-4" />
-                    <span>Audit Reconciliation</span>
+                    <span>{{ __('Audit Reconciliation') }}</span>
                 </x-ui.button>
                 <x-ui.button
                     variant="primary"
@@ -36,7 +36,7 @@
                     @click="$dispatch('inventory-open-adjust', { group: '', stockId: '{{ $stockBuckets->first()?->id ?? 1 }}' })"
                 >
                     <x-icons.icon name="adjustments" class="size-4" />
-                    <span>Adjust Inventory</span>
+                    <span>{{ __('Adjust Inventory') }}</span>
                 </x-ui.button>
             @endif
         </div>
@@ -59,7 +59,7 @@
             >
                 <x-icons.icon name="check-circle" class="size-5 mt-0.5 shrink-0" />
                 <div class="flex-1 min-w-0">
-                    <p class="font-semibold">Operation Completed</p>
+                    <p class="font-semibold">{{ __('Operation Completed') }}</p>
                     <p class="mt-0.5 opacity-90">{{ session('success') }}</p>
                 </div>
             </div>
@@ -70,7 +70,7 @@
                 <div class="flex items-start gap-3">
                     <x-icons.icon name="exclamation-triangle" class="size-5 mt-0.5 shrink-0 text-rose-600 dark:text-rose-400" />
                     <div>
-                        <p class="font-semibold">Action could not be processed</p>
+                        <p class="font-semibold">{{ __('Action could not be processed') }}</p>
                         <ul class="mt-1 list-disc pl-5 space-y-0.5 text-xs">
                             @foreach ($errors->all() as $error)
                                 <li>{{ $error }}</li>
@@ -91,14 +91,14 @@
         >
             <x-icons.icon name="check-circle" class="size-5 mt-0.5 shrink-0" />
             <div class="flex-1 min-w-0">
-                <p class="font-semibold">Inventory updated</p>
+                <p class="font-semibold">{{ __('Inventory updated') }}</p>
                 <p class="mt-0.5 opacity-90" x-text="feedbackMessage"></p>
             </div>
             <button
                 type="button"
                 @click="feedbackMessage = ''"
                 class="rounded-md p-1 opacity-70 hover:opacity-100 transition cursor-pointer"
-                aria-label="Dismiss notification"
+                aria-label="{{ __('Dismiss notification') }}"
             >
                 <x-icons.icon name="x-mark" class="size-4" />
             </button>
@@ -107,37 +107,37 @@
         {{-- 2. Inventory Statistics --}}
         <section aria-label="Inventory summary statistics" class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-bdms.stat-card
-                label="Total Available Units"
+                :label="__('Total Available Units')"
                 :value="$summary['totalUnits']"
                 value-bind="totalUnits"
-                trend="Ready for crossmatch & dispatch"
+                :trend="__('Ready for crossmatch & dispatch')"
                 trend-tone="up"
                 icon="droplet"
                 accent="crimson"
             />
             <x-bdms.stat-card
-                label="Total Blood Groups"
+                :label="__('Total Blood Groups')"
                 :value="$summary['totalGroups']"
                 value-bind="groups.length"
-                trend="All standard ABO & Rh(D) groups"
+                :trend="__('All standard ABO & Rh(D) groups')"
                 trend-tone="neutral"
                 icon="archive-box"
                 accent="sky"
             />
             <x-bdms.stat-card
-                label="Low Stock Groups"
+                :label="__('Low Stock Groups')"
                 :value="$summary['lowStockGroups']"
                 value-bind="lowStockCount"
-                trend="At or below minimum threshold"
+                :trend="__('At or below minimum threshold')"
                 trend-tone="neutral"
                 icon="exclamation-triangle"
                 accent="amber"
             />
             <x-bdms.stat-card
-                label="Critical Stock Groups"
+                :label="__('Critical Stock Groups')"
                 :value="$summary['criticalStockGroups']"
                 value-bind="criticalStockCount"
-                trend="Immediate donor outreach required"
+                :trend="__('Immediate donor outreach required')"
                 trend-tone="down"
                 icon="activity"
                 accent="crimson"
@@ -149,14 +149,14 @@
             <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
                 <div class="flex items-center gap-2">
                     <x-icons.icon name="funnel" class="size-4 text-slate-500 dark:text-slate-400" />
-                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Component Filter:</span>
+                    <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ __('Component Filter:') }}</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-1.5 text-xs">
                     <a
                         href="{{ route('inventory.index', request()->except('component_id')) }}"
                         class="rounded-lg px-2.5 py-1 font-medium transition {{ $selectedComponentId === null ? 'bg-crimson-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}"
                     >
-                        All Components
+                        {{ __('All Components') }}
                     </a>
                     @foreach ($components as $comp)
                         <a
@@ -175,17 +175,17 @@
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h3 id="inventory-overview-heading" class="text-base font-semibold text-slate-900 dark:text-white">
-                        Blood Group Stock Overview
+                        {{ __('Blood Group Stock Overview') }}
                     </h3>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Live stock status across all 8 ABO/Rh blood groups against target capacity (100 units).
+                        {{ __('Live stock status across all 8 ABO/Rh blood groups against target capacity (100 units).') }}
                     </p>
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                    <x-ui.badge variant="success" :dot="true">Normal</x-ui.badge>
-                    <x-ui.badge variant="warning" :dot="true">Low Stock</x-ui.badge>
-                    <x-ui.badge variant="danger" :dot="true">Critical</x-ui.badge>
+                    <x-ui.badge variant="success" :dot="true">{{ __('Normal') }}</x-ui.badge>
+                    <x-ui.badge variant="warning" :dot="true">{{ __('Low Stock') }}</x-ui.badge>
+                    <x-ui.badge variant="danger" :dot="true">{{ __('Critical') }}</x-ui.badge>
                 </div>
             </div>
 
@@ -194,9 +194,9 @@
                     @php
                         $initialPercent = $item['capacity'] > 0 ? min(100, (int) round(($item['available'] / $item['capacity']) * 100)) : 0;
                         $initialStatusLabel = match ($item['status']) {
-                            'critical' => 'Critical',
-                            'low' => 'Low Stock',
-                            default => 'Normal',
+                            'critical' => __('Critical'),
+                            'low' => __('Low Stock'),
+                            default => __('Normal'),
                         };
                         $firstMatchingBucket = $stockBuckets->firstWhere('blood_group', $item['group']);
                         $stockId = $firstMatchingBucket?->id ?? 1;
@@ -223,10 +223,10 @@
                             <div class="flex items-baseline justify-between gap-2">
                                 <p class="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white">
                                     <span x-text="groups[{{ $index }}].available">{{ $item['available'] }}</span>
-                                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400">units</span>
+                                    <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ __('units') }}</span>
                                 </p>
                                 <span class="text-xs font-medium tabular-nums text-slate-500 dark:text-slate-400">
-                                    Min {{ $item['minLevel'] }}
+                                    {{ __('Min :min', ['min' => $item['minLevel']]) }}
                                 </span>
                             </div>
 
@@ -249,7 +249,7 @@
 
                         <div class="flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
                             <span class="text-slate-500 dark:text-slate-400 tabular-nums">
-                                Reserved:
+                                {{ __('Reserved:') }}
                                 <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="groups[{{ $index }}].reserved">{{ $item['reserved'] }}</span>
                             </span>
 
@@ -259,8 +259,8 @@
                                     @click="openAdjustModal('{{ $item['group'] }}', '{{ $stockId }}')"
                                     class="inline-flex items-center gap-1 font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400 dark:hover:text-crimson-300 cursor-pointer"
                                 >
-                                    <span>Adjust</span>
-                                    <x-icons.icon name="chevron-right" class="size-3.5" />
+                                    <span>{{ __('Adjust') }}</span>
+                                    <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
                                 </button>
                             @endif
                         </div>
@@ -277,48 +277,48 @@
                         <div>
                             <div class="flex items-center gap-2">
                                 <h3 id="inventory-table-heading" class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Detailed Blood Inventory
+                                    {{ __('Detailed Blood Inventory') }}
                                 </h3>
                                 <x-ui.badge variant="neutral">
                                     <span x-text="filteredIndices.length + ' of ' + groups.length">8 of 8</span>
                                 </x-ui.badge>
                             </div>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                Filter by blood group or stock threshold and adjust available or reserved units.
+                                {{ __('Filter by blood group or stock threshold and adjust available or reserved units.') }}
                             </p>
                         </div>
 
                         <div class="flex flex-wrap items-center gap-2.5">
                             <div class="relative w-full sm:w-56">
-                                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 dark:text-slate-500">
+                                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-slate-400 dark:text-slate-500">
                                     <x-icons.icon name="magnifying-glass" class="size-4" />
                                 </div>
                                 <input
                                     type="search"
                                     x-model="search"
-                                    placeholder="Search group or status..."
-                                    aria-label="Search blood inventory"
-                                    class="block w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
+                                    placeholder="{{ __('Search group or status...') }}"
+                                    aria-label="{{ __('Search blood inventory') }}"
+                                    class="block w-full rounded-lg border border-slate-300 bg-white py-2 ps-9 pe-3 text-xs text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                                 />
                             </div>
 
                             <select
                                 x-model="statusFilter"
-                                aria-label="Filter by stock status"
+                                aria-label="{{ __('Filter by stock status') }}"
                                 class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
-                                <option value="all">All Statuses</option>
-                                <option value="normal">Normal</option>
-                                <option value="low">Low Stock</option>
-                                <option value="critical">Critical</option>
+                                <option value="all">{{ __('All Statuses') }}</option>
+                                <option value="normal">{{ __('Normal') }}</option>
+                                <option value="low">{{ __('Low Stock') }}</option>
+                                <option value="critical">{{ __('Critical') }}</option>
                             </select>
 
                             <select
                                 x-model="groupFilter"
-                                aria-label="Filter by blood group"
+                                aria-label="{{ __('Filter by blood group') }}"
                                 class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
-                                <option value="all">All Groups</option>
+                                <option value="all">{{ __('All Groups') }}</option>
                                 @foreach ($bloodGroups as $item)
                                     <option value="{{ $item['group'] }}">{{ $item['group'] }}</option>
                                 @endforeach
@@ -326,11 +326,11 @@
 
                             <select
                                 x-model.number="perPage"
-                                aria-label="Rows per page"
+                                aria-label="{{ __('Rows per page') }}"
                                 class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
-                                <option value="4">4 / page</option>
-                                <option value="8">8 / page</option>
+                                <option value="4">{{ __('4 / page') }}</option>
+                                <option value="8">{{ __('8 / page') }}</option>
                             </select>
 
                             <button
@@ -340,23 +340,23 @@
                                 @click="resetFilters()"
                                 class="rounded-lg px-2.5 py-2 text-xs font-medium text-crimson-600 hover:bg-crimson-50 dark:text-crimson-400 dark:hover:bg-crimson-950/50 cursor-pointer transition"
                             >
-                                Reset
+                                {{ __('Reset') }}
                             </button>
                         </div>
                     </div>
                 </x-slot:header>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                        <thead class="bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                    <table class="min-w-full divide-y divide-slate-200 text-start text-sm dark:divide-slate-800">
+                        <thead class="bg-slate-50/70 text-start text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                             <tr>
-                                <th scope="col" class="px-5 py-3.5">Blood Group</th>
-                                <th scope="col" class="px-5 py-3.5">Available Units</th>
-                                <th scope="col" class="px-5 py-3.5">Reserved Units</th>
-                                <th scope="col" class="px-5 py-3.5">Minimum Stock Level</th>
-                                <th scope="col" class="px-5 py-3.5">Stock Status</th>
-                                <th scope="col" class="px-5 py-3.5">Last Updated</th>
-                                <th scope="col" class="px-5 py-3.5 text-right">Actions</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Blood Group') }}</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Available Units') }}</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Reserved Units') }}</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Minimum Stock Level') }}</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Stock Status') }}</th>
+                                <th scope="col" class="px-5 py-3.5">{{ __('Last Updated') }}</th>
+                                <th scope="col" class="px-5 py-3.5 text-end">{{ __('Actions') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -373,13 +373,13 @@
                                         <x-bdms.blood-group-badge :group="$item['group']" size="sm" />
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 font-semibold tabular-nums text-slate-900 dark:text-white">
-                                        <span x-text="groups[{{ $index }}].available">{{ $item['available'] }}</span> units
+                                        <span x-text="groups[{{ $index }}].available">{{ $item['available'] }}</span> {{ __('units') }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 tabular-nums text-slate-600 dark:text-slate-300">
-                                        <span x-text="groups[{{ $index }}].reserved">{{ $item['reserved'] }}</span> units
+                                        <span x-text="groups[{{ $index }}].reserved">{{ $item['reserved'] }}</span> {{ __('units') }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 tabular-nums text-slate-600 dark:text-slate-300">
-                                        {{ $item['minLevel'] }} units
+                                        {{ $item['minLevel'] }} {{ __('units') }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5">
                                         <span
@@ -392,14 +392,14 @@
                                                 aria-hidden="true"
                                             ></span>
                                             <span x-text="statusText(groups[{{ $index }}].status)">
-                                                {{ $item['status'] === 'critical' ? 'Critical' : ($item['status'] === 'low' ? 'Low Stock' : 'Normal') }}
+                                                {{ $item['status'] === 'critical' ? __('Critical') : ($item['status'] === 'low' ? __('Low Stock') : __('Normal')) }}
                                             </span>
                                         </span>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-xs text-slate-500 dark:text-slate-400" x-text="groups[{{ $index }}].lastUpdated">
                                         {{ $item['lastUpdated'] }}
                                     </td>
-                                    <td class="whitespace-nowrap px-5 py-3.5 text-right">
+                                    <td class="whitespace-nowrap px-5 py-3.5 text-end">
                                         @if (auth()->user()?->hasPermission('inventory.adjust'))
                                             <x-ui.button
                                                 variant="outline"
@@ -407,10 +407,10 @@
                                                 @click="openAdjustModal('{{ $item['group'] }}', '{{ $stockId }}')"
                                             >
                                                 <x-icons.icon name="adjustments" class="size-3.5" />
-                                                <span>Adjust</span>
+                                                <span>{{ __('Adjust') }}</span>
                                             </x-ui.button>
                                         @else
-                                            <span class="text-xs text-slate-400 dark:text-slate-600">Read-only</span>
+                                            <span class="text-xs text-slate-400 dark:text-slate-600">{{ __('Read-only') }}</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -419,11 +419,11 @@
                             <tr x-show="filteredIndices.length === 0" x-cloak>
                                 <td colspan="7" class="px-5 py-10 text-center">
                                     <p class="text-sm font-medium text-slate-700 dark:text-slate-300">
-                                        No blood groups match your current search or filters.
+                                        {{ __('No blood groups match your current search or filters.') }}
                                     </p>
                                     <div class="mt-3">
                                         <x-ui.button variant="outline" size="sm" @click="resetFilters()">
-                                            Reset Filters
+                                            {{ __('Reset Filters') }}
                                         </x-ui.button>
                                     </div>
                                 </td>
@@ -435,22 +435,22 @@
                 <x-slot:footer>
                     <div class="flex flex-col items-center justify-between gap-3 sm:flex-row">
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Showing
+                            {{ __('Showing') }}
                             <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="pageStart">1</span>–<span class="font-semibold text-slate-700 dark:text-slate-200" x-text="pageEnd">4</span>
-                            of
+                            {{ __('of') }}
                             <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="filteredIndices.length">8</span>
-                            blood groups
+                            {{ __('blood groups') }}
                         </p>
 
-                        <nav class="flex items-center gap-1.5" aria-label="Inventory pagination">
+                        <nav class="flex items-center gap-1.5" aria-label="{{ __('Inventory pagination') }}">
                             <button
                                 type="button"
                                 @click="prevPage()"
                                 :disabled="currentPage <= 1"
                                 class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
                             >
-                                <x-icons.icon name="chevron-left" class="size-3.5" />
-                                <span>Prev</span>
+                                <x-icons.icon name="chevron-left" class="size-3.5 rtl-flip" />
+                                <span>{{ __('Prev') }}</span>
                             </button>
 
                             <template x-for="page in totalPages" :key="page">
@@ -471,8 +471,8 @@
                                 :disabled="currentPage >= totalPages"
                                 class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 cursor-pointer"
                             >
-                                <span>Next</span>
-                                <x-icons.icon name="chevron-right" class="size-3.5" />
+                                <span>{{ __('Next') }}</span>
+                                <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
                             </button>
                         </nav>
                     </div>
@@ -488,12 +488,12 @@
                         <div>
                             <div class="flex items-center gap-2">
                                 <h3 id="blood-units-heading" class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Serialized Blood Units Directory
+                                    {{ __('Serialized Blood Units Directory') }}
                                 </h3>
-                                <x-ui.badge variant="neutral">{{ $units->total() }} units</x-ui.badge>
+                                <x-ui.badge variant="neutral">{{ __(':count units', ['count' => $units->total()]) }}</x-ui.badge>
                             </div>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                Real-time registry of individual physical blood bags, cold vault locations, and shelf-life expirations.
+                                {{ __('Real-time registry of individual physical blood bags, cold vault locations, and shelf-life expirations.') }}
                             </p>
                         </div>
 
@@ -505,7 +505,7 @@
                                     type="search"
                                     name="unit_search"
                                     value="{{ $filters['unit_search'] }}"
-                                    placeholder="Unit code..."
+                                    placeholder="{{ __('Unit code...') }}"
                                     class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
                             </div>
@@ -514,7 +514,7 @@
                                 name="unit_group"
                                 class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
-                                <option value="all">All Groups</option>
+                                <option value="all">{{ __('All Groups') }}</option>
                                 @foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $grp)
                                     <option value="{{ $grp }}" @selected($filters['unit_group'] === $grp)>{{ $grp }}</option>
                                 @endforeach
@@ -524,9 +524,9 @@
                                 name="unit_status"
                                 class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                             >
-                                <option value="all">All Statuses</option>
+                                <option value="all">{{ __('All Statuses') }}</option>
                                 @foreach (['Available', 'Reserved', 'Dispatched', 'Transfused', 'Expired', 'Discarded', 'Quarantined'] as $st)
-                                    <option value="{{ $st }}" @selected($filters['unit_status'] === $st)>{{ $st }}</option>
+                                    <option value="{{ $st }}" @selected($filters['unit_status'] === $st)>{{ __($st) }}</option>
                                 @endforeach
                             </select>
 
@@ -534,7 +534,7 @@
                                 type="submit"
                                 class="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 transition dark:bg-slate-700 cursor-pointer"
                             >
-                                Filter
+                                {{ __('Filter') }}
                             </button>
                         </form>
                     </div>
@@ -543,23 +543,23 @@
                 @if ($units->isEmpty())
                     <div class="px-6 py-12 text-center">
                         <x-icons.icon name="archive-box" class="mx-auto size-8 text-slate-400" />
-                        <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white">No physical blood units recorded yet</p>
+                        <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white">{{ __('No physical blood units recorded yet') }}</p>
                         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            Verified units will populate automatically as laboratory screening releases completed donations.
+                            {{ __('Verified units will populate automatically as laboratory screening releases completed donations.') }}
                         </p>
                     </div>
                 @else
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200 text-xs dark:divide-slate-800">
-                            <thead class="bg-slate-50/70 text-left font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                        <table class="min-w-full divide-y divide-slate-200 text-start text-xs dark:divide-slate-800">
+                            <thead class="bg-slate-50/70 text-start font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                                 <tr>
-                                    <th class="px-5 py-3.5">Unit Code</th>
-                                    <th class="px-5 py-3.5">Blood Group</th>
-                                    <th class="px-5 py-3.5">Component</th>
-                                    <th class="px-5 py-3.5">Status</th>
-                                    <th class="px-5 py-3.5">Expiration</th>
-                                    <th class="px-5 py-3.5">Location</th>
-                                    <th class="px-5 py-3.5 text-right">Actions</th>
+                                    <th class="px-5 py-3.5">{{ __('Unit Code') }}</th>
+                                    <th class="px-5 py-3.5">{{ __('Blood Group') }}</th>
+                                    <th class="px-5 py-3.5">{{ __('Component') }}</th>
+                                    <th class="px-5 py-3.5">{{ __('Status') }}</th>
+                                    <th class="px-5 py-3.5">{{ __('Expiration') }}</th>
+                                    <th class="px-5 py-3.5">{{ __('Location') }}</th>
+                                    <th class="px-5 py-3.5 text-end">{{ __('Actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -577,7 +577,7 @@
                                         $isPastExpiry = $unit->expires_at && $unit->expires_at->isPast();
                                     @endphp
                                     <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                                        <td class="whitespace-nowrap px-5 py-3 font-mono font-semibold text-slate-900 dark:text-white">
+                                        <td class="whitespace-nowrap px-5 py-3 font-mono font-semibold text-slate-900 dark:text-white dir-ltr text-start">
                                             <a href="{{ route('inventory.units.show', $unit->id) }}" class="hover:underline hover:text-crimson-600">
                                                 {{ $unit->unit_code }}
                                             </a>
@@ -590,7 +590,7 @@
                                         </td>
                                         <td class="whitespace-nowrap px-5 py-3">
                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 font-medium ring-1 ring-inset {{ $unitBadge }}">
-                                                {{ $unit->unit_status }}
+                                                {{ __($unit->unit_status) }}
                                             </span>
                                         </td>
                                         <td class="whitespace-nowrap px-5 py-3">
@@ -598,16 +598,16 @@
                                                 {{ $unit->expires_at?->format('M d, Y') }}
                                             </span>
                                             @if ($isPastExpiry && $unit->unit_status === 'Available')
-                                                <span class="ml-1 text-2xs font-bold text-rose-600 dark:text-rose-400">(Expired)</span>
+                                                <span class="ms-1 text-2xs font-bold text-rose-600 dark:text-rose-400">({{ __('Expired') }})</span>
                                             @endif
                                         </td>
                                         <td class="whitespace-nowrap px-5 py-3 text-slate-500 dark:text-slate-400">
-                                            {{ $unit->storage_location ?? 'Vault Unassigned' }}
+                                            {{ $unit->storage_location ?? __('Vault Unassigned') }}
                                         </td>
-                                        <td class="whitespace-nowrap px-5 py-3 text-right">
+                                        <td class="whitespace-nowrap px-5 py-3 text-end">
                                             <div class="flex items-center justify-end gap-1.5">
                                                 <x-ui.button variant="outline" size="sm" :href="route('inventory.units.show', $unit->id)">
-                                                    View
+                                                    {{ __('View') }}
                                                 </x-ui.button>
 
                                                 @if (auth()->user()?->hasPermission('inventory.adjust'))
@@ -618,7 +618,7 @@
                                                                 type="submit"
                                                                 class="rounded-lg bg-amber-600 px-2.5 py-1.5 font-semibold text-white shadow-xs hover:bg-amber-700 transition cursor-pointer"
                                                             >
-                                                                Expire
+                                                                {{ __('Expire') }}
                                                             </button>
                                                         </form>
                                                     @endif
@@ -627,7 +627,7 @@
                                                         <form
                                                             method="POST"
                                                             action="{{ route('inventory.units.discard', $unit->id) }}"
-                                                            onsubmit="return confirm('Confirm discard for {{ $unit->unit_code }}?');"
+                                                            onsubmit="return confirm('{{ __('Confirm discard for :code?', ['code' => $unit->unit_code]) }}');"
                                                         >
                                                             @csrf
                                                             <input type="hidden" name="reason" value="Administrative biohazard disposal from inventory directory." />
@@ -635,7 +635,7 @@
                                                                 type="submit"
                                                                 class="rounded-lg border border-rose-300 bg-rose-50 px-2 py-1 font-semibold text-rose-700 hover:bg-rose-100 transition dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 cursor-pointer"
                                                             >
-                                                                Discard
+                                                                {{ __('Discard') }}
                                                             </button>
                                                         </form>
                                                     @endif
@@ -664,14 +664,14 @@
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h3 id="inventory-history-heading" class="text-base font-semibold text-slate-900 dark:text-white">
-                                Recent Inventory History
+                                {{ __('Recent Inventory History') }}
                             </h3>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                Audit log of blood stock additions, removals, and hospital reservations.
+                                {{ __('Audit log of blood stock additions, removals, and hospital reservations.') }}
                             </p>
                         </div>
 
-                        <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-950" role="group" aria-label="Filter history by operation">
+                        <div class="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-950" role="group" aria-label="{{ __('Filter history by operation') }}">
                             @foreach (['all' => 'All', 'Added' => 'Added', 'Removed' => 'Removed', 'Reserved' => 'Reserved'] as $value => $label)
                                 <button
                                     type="button"
@@ -681,7 +681,7 @@
                                         : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'"
                                     class="rounded-md px-2.5 py-1 text-xs font-medium transition cursor-pointer"
                                 >
-                                    {{ $label }}
+                                    {{ __($label) }}
                                 </button>
                             @endforeach
                         </div>
@@ -689,15 +689,15 @@
                 </x-slot:header>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                        <thead class="bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                    <table class="min-w-full divide-y divide-slate-200 text-start text-sm dark:divide-slate-800">
+                        <thead class="bg-slate-50/70 text-start text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                             <tr>
-                                <th scope="col" class="px-5 py-3">Blood Group</th>
-                                <th scope="col" class="px-5 py-3">Operation</th>
-                                <th scope="col" class="px-5 py-3">Units</th>
-                                <th scope="col" class="px-5 py-3">Description</th>
-                                <th scope="col" class="px-5 py-3">Responsible User</th>
-                                <th scope="col" class="px-5 py-3 text-right">Date</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Blood Group') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Operation') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Units') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Description') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Responsible User') }}</th>
+                                <th scope="col" class="px-5 py-3 text-end">{{ __('Date') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
@@ -714,25 +714,25 @@
                                         <span
                                             :class="operationBadgeClasses(entry.operation)"
                                             class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset"
-                                            x-text="entry.operation"
+                                            x-text="window.__ ? window.__(entry.operation) : entry.operation"
                                         ></span>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 font-semibold tabular-nums text-slate-900 dark:text-white">
                                         <span x-text="entry.operation === 'Added' ? '+' + entry.units : (entry.operation === 'Removed' ? '-' + entry.units : entry.units)"></span>
-                                        <span class="font-normal text-slate-500 dark:text-slate-400" x-text="entry.units === 1 ? ' unit' : ' units'"></span>
+                                        <span class="font-normal text-slate-500 dark:text-slate-400" x-text="entry.units === 1 ? (' ' + (window.__ ? window.__('unit') : 'unit')) : (' ' + (window.__ ? window.__('units') : 'units'))"></span>
                                     </td>
                                     <td class="px-5 py-3.5 text-xs text-slate-600 dark:text-slate-300 max-w-md">
                                         <span x-text="entry.description"></span>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-xs font-medium text-slate-800 dark:text-slate-200" x-text="entry.user"></td>
-                                    <td class="whitespace-nowrap px-5 py-3.5 text-right text-xs text-slate-500 dark:text-slate-400" x-text="entry.date"></td>
+                                    <td class="whitespace-nowrap px-5 py-3.5 text-end text-xs text-slate-500 dark:text-slate-400" x-text="entry.date"></td>
                                 </tr>
                             </template>
 
                             <tr x-show="filteredHistory.length === 0" x-cloak>
                                 <td colspan="6" class="px-5 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                                    <span x-text="history.length === 0 ? 'No inventory transactions recorded yet.' : 'No inventory activities recorded for this operation type.'">
-                                        No inventory transactions recorded yet.
+                                    <span x-text="history.length === 0 ? (window.__ ? window.__('No inventory transactions recorded yet.') : 'No inventory transactions recorded yet.') : (window.__ ? window.__('No inventory activities recorded for this operation type.') : 'No inventory activities recorded for this operation type.')">
+                                        {{ __('No inventory transactions recorded yet.') }}
                                     </span>
                                 </td>
                             </tr>
@@ -744,7 +744,7 @@
 
         {{-- 6. Adjust Inventory Modal --}}
         @if (auth()->user()?->hasPermission('inventory.adjust'))
-            <x-ui.modal name="adjust-inventory" title="Adjust Blood Inventory" maxWidth="lg">
+            <x-ui.modal name="adjust-inventory" :title="__('Adjust Blood Inventory')" maxWidth="lg">
                 <div x-data="{
                     activeTab: 'thresholds',
                     stockId: '{{ $stockBuckets->first()?->id ?? 1 }}',
@@ -760,9 +760,9 @@
                             type="button"
                             @click="activeTab = 'thresholds'"
                             :class="activeTab === 'thresholds' ? 'border-b-2 border-crimson-600 text-crimson-600' : 'text-slate-500 hover:text-slate-700'"
-                            class="pb-2 mr-4 transition"
+                            class="pb-2 me-4 transition"
                         >
-                            Threshold &amp; Capacity Settings
+                            {{ __('Threshold & Capacity Settings') }}
                         </button>
                         <button
                             type="button"
@@ -770,7 +770,7 @@
                             :class="activeTab === 'decrement' ? 'border-b-2 border-crimson-600 text-crimson-600' : 'text-slate-500 hover:text-slate-700'"
                             class="pb-2 transition"
                         >
-                            Authorized Decrement / Discard
+                            {{ __('Authorized Decrement / Discard') }}
                         </button>
                     </div>
 
@@ -784,7 +784,7 @@
                         @csrf
                         <div class="space-y-1.5">
                             <label for="stock-bucket-select" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Select Stock Bucket <span class="text-crimson-600">*</span>
+                                {{ __('Select Stock Bucket') }} <span class="text-crimson-600">*</span>
                             </label>
                             <select
                                 id="stock-bucket-select"
@@ -793,7 +793,7 @@
                             >
                                 @foreach ($stockBuckets as $bucket)
                                     <option value="{{ $bucket->id }}">
-                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} (Available: {{ $bucket->available_units }}, Reserved: {{ $bucket->reserved_units }})
+                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} ({{ __('Available') }}: {{ $bucket->available_units }}, {{ __('Reserved') }}: {{ $bucket->reserved_units }})
                                     </option>
                                 @endforeach
                             </select>
@@ -802,7 +802,7 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-1">
                                 <label for="threshold-min-level" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                    Minimum Stock Level <span class="text-crimson-600">*</span>
+                                    {{ __('Minimum Stock Level') }} <span class="text-crimson-600">*</span>
                                 </label>
                                 <input
                                     id="threshold-min-level"
@@ -816,7 +816,7 @@
                             </div>
                             <div class="space-y-1">
                                 <label for="threshold-target-capacity" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                    Target Capacity <span class="text-crimson-600">*</span>
+                                    {{ __('Target Capacity') }} <span class="text-crimson-600">*</span>
                                 </label>
                                 <input
                                     id="threshold-target-capacity"
@@ -832,10 +832,10 @@
 
                         <div class="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <x-ui.button type="button" variant="outline" @click="$dispatch('close-modal', 'adjust-inventory')">
-                                Cancel
+                                {{ __('Cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary">
-                                Save Thresholds
+                                {{ __('Save Thresholds') }}
                             </x-ui.button>
                         </div>
                     </form>
@@ -850,7 +850,7 @@
                         @csrf
                         <div class="space-y-1.5">
                             <label for="decrement-bucket-select" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                Target Stock Bucket <span class="text-crimson-600">*</span>
+                                {{ __('Target Stock Bucket') }} <span class="text-crimson-600">*</span>
                             </label>
                             <select
                                 id="decrement-bucket-select"
@@ -859,7 +859,7 @@
                             >
                                 @foreach ($stockBuckets as $bucket)
                                     <option value="{{ $bucket->id }}">
-                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} (Available: {{ $bucket->available_units }})
+                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} ({{ __('Available') }}: {{ $bucket->available_units }})
                                     </option>
                                 @endforeach
                             </select>
@@ -868,7 +868,7 @@
                         <div class="grid grid-cols-2 gap-4">
                             <div class="space-y-1">
                                 <label for="adjust-units-delta" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                    Units to Decrement <span class="text-crimson-600">*</span>
+                                    {{ __('Units to Decrement') }} <span class="text-crimson-600">*</span>
                                 </label>
                                 <input
                                     id="adjust-units-delta"
@@ -880,28 +880,28 @@
                                     required
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
-                                <p class="text-2xs text-slate-400">Must be a negative number (e.g. -1, -2).</p>
+                                <p class="text-2xs text-slate-400">{{ __('Must be a negative number (e.g. -1, -2).') }}</p>
                             </div>
 
                             <div class="space-y-1">
                                 <label for="adjust-target-status" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                    Reason Category <span class="text-crimson-600">*</span>
+                                    {{ __('Reason Category') }} <span class="text-crimson-600">*</span>
                                 </label>
                                 <select
                                     id="adjust-target-status"
                                     name="target_unit_status"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 >
-                                    <option value="Discarded">Discarded (Compromised Bag)</option>
-                                    <option value="Expired">Expired (Shelf Life)</option>
-                                    <option value="Dispatched">Dispatched (Manual Transfer)</option>
+                                    <option value="Discarded">{{ __('Discarded (Compromised Bag)') }}</option>
+                                    <option value="Expired">{{ __('Expired (Shelf Life)') }}</option>
+                                    <option value="Dispatched">{{ __('Dispatched (Manual Transfer)') }}</option>
                                 </select>
                             </div>
                         </div>
 
                         <div class="space-y-1">
                             <label for="adjust-justification" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                Mandatory Justification Description <span class="text-crimson-600">*</span>
+                                {{ __('Mandatory Justification Description') }} <span class="text-crimson-600">*</span>
                             </label>
                             <textarea
                                 id="adjust-justification"
@@ -909,21 +909,21 @@
                                 rows="3"
                                 minlength="3"
                                 required
-                                placeholder="Audit reason for stock removal (min 3 characters)..."
+                                placeholder="{{ __('Audit reason for stock removal (min 3 characters)...') }}"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             ></textarea>
                         </div>
 
                         <div class="rounded-lg bg-amber-50 p-2.5 text-2xs text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-                            <strong>Critical Stock Integrity Notice:</strong> Manual positive additions are strictly forbidden. All available blood units must originate through authorized laboratory screening release.
+                            <strong>{{ __('Critical Stock Integrity Notice:') }}</strong> {{ __('Manual positive additions are strictly forbidden. All available blood units must originate through authorized laboratory screening release.') }}
                         </div>
 
                         <div class="flex items-center justify-end gap-2.5 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <x-ui.button type="button" variant="outline" @click="$dispatch('close-modal', 'adjust-inventory')">
-                                Cancel
+                                {{ __('Cancel') }}
                             </x-ui.button>
                             <x-ui.button type="submit" variant="primary">
-                                Apply Decrement
+                                {{ __('Apply Decrement') }}
                             </x-ui.button>
                         </div>
                     </form>

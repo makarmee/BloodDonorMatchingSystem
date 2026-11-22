@@ -30,7 +30,7 @@
 
     <div class="flex-1 min-w-0">
         @if ($title)
-            <p class="font-semibold">{{ $title }}</p>
+            <p class="font-semibold">{{ __($title) }}</p>
         @endif
         <div @class(['mt-0.5 opacity-90' => $title])>
             {{ $slot }}
@@ -42,7 +42,7 @@
             type="button"
             @click="open = false"
             class="rounded-md p-1 opacity-70 hover:opacity-100 transition cursor-pointer"
-            aria-label="Dismiss alert"
+            aria-label="{{ __('Dismiss alert') }}"
         >
             <x-icons.icon name="x-mark" class="size-4" />
         </button>

@@ -20,44 +20,44 @@
     ];
 @endphp
 
-<x-app-layout :title="'Donation Camp · ' . $camp['id']" page-title="Camp Details" active-role="staff">
+<x-app-layout :title="__('Donation Camp') . ' · ' . $camp['id']" :page-title="__('Camp Details')" active-role="staff">
     <x-slot:header>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <div class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                     <a href="{{ route('camps.index') }}" class="transition hover:text-crimson-600 dark:hover:text-crimson-400">
-                        Donation Camps
+                        {{ __('Donation Camps') }}
                     </a>
-                    <x-icons.icon name="chevron-right" class="size-3.5" />
-                    <span class="font-mono text-slate-700 dark:text-slate-200">{{ $camp['id'] }}</span>
+                    <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
+                    <span class="font-mono text-slate-700 dark:text-slate-200 dir-ltr">{{ $camp['id'] }}</span>
                 </div>
 
                 <div class="mt-2 flex flex-wrap items-center gap-2.5">
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                         {{ $camp['name'] }}
                     </h1>
-                    <span class="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <span class="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200 dir-ltr">
                         {{ $camp['id'] }}
                     </span>
                     <x-ui.badge :variant="$statusVariant" :dot="true">
-                        {{ $camp['status'] }}
+                        {{ __($camp['status']) }}
                     </x-ui.badge>
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ $camp['venueName'] }}, {{ $camp['city'] }} &middot; {{ $camp['startDateFormatted'] }} to {{ $camp['endDateFormatted'] }} &middot; {{ $camp['startTime'] }}&ndash;{{ $camp['endTime'] }}
+                    {{ $camp['venueName'] }}, {{ $camp['city'] }} &middot; {{ $camp['startDateFormatted'] }} {{ __('to') }} {{ $camp['endDateFormatted'] }} &middot; <span class="dir-ltr">{{ $camp['startTime'] }}&ndash;{{ $camp['endTime'] }}</span>
                 </p>
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
                 <x-ui.button variant="outline" size="md" :href="route('camps.index')">
-                    <x-icons.icon name="arrow-left" class="size-4" />
-                    <span>Back to Camps</span>
+                    <x-icons.icon name="arrow-left" class="size-4 rtl-flip" />
+                    <span>{{ __('Back to Camps') }}</span>
                 </x-ui.button>
 
                 <x-ui.button variant="primary" size="md" :href="route('camps.edit', $camp['id'])">
                     <x-icons.icon name="pencil" class="size-4" />
-                    <span>Edit Camp</span>
+                    <span>{{ __('Edit Camp') }}</span>
                 </x-ui.button>
             </div>
         </div>
@@ -98,7 +98,7 @@
             <button
                 type="button"
                 @click="dismissFeedback()"
-                aria-label="Dismiss status message"
+                :aria-label="__('Dismiss status message')"
                 class="rounded-lg p-1 opacity-70 transition hover:opacity-100 cursor-pointer"
             >
                 <x-icons.icon name="x-mark" class="size-4" />
@@ -114,10 +114,10 @@
                         <div class="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Camp Overview &amp; Operations
+                                    {{ __('Camp Overview & Operations') }}
                                 </h2>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    Venue details, schedule window, coordinator contact, and preview status controls.
+                                    {{ __('Venue details, schedule window, coordinator contact, and preview status controls.') }}
                                 </p>
                             </div>
 
@@ -125,7 +125,7 @@
                                 class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset"
                                 :class="statusBadgeClasses(status)"
                                 x-text="status"
-                            >{{ $camp['status'] }}</span>
+                            >{{ __($camp['status']) }}</span>
                         </div>
                     </x-slot:header>
 
@@ -137,7 +137,7 @@
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
                                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                                    Location &amp; Venue
+                                    {{ __('Location & Venue') }}
                                 </p>
                                 <p class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">
                                     {{ $camp['venueName'] }}
@@ -146,7 +146,7 @@
                                     {{ $camp['fullAddress'] }}
                                 </p>
                                 <p class="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                    City: {{ $camp['city'] }}
+                                    {{ __('City') }}: {{ $camp['city'] }}
                                 </p>
                                 @if (! empty($camp['locationNotes']))
                                     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
@@ -157,36 +157,36 @@
 
                             <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-800/40">
                                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                                    Schedule &amp; Organizer
+                                    {{ __('Schedule & Organizer') }}
                                 </p>
                                 <dl class="mt-1.5 space-y-1.5 text-sm">
                                     <div class="flex items-center justify-between gap-2">
-                                        <dt class="text-slate-500 dark:text-slate-400">Dates</dt>
+                                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Dates') }}</dt>
                                         <dd class="font-medium text-slate-900 dark:text-white">
                                             {{ $camp['startDateFormatted'] }} &ndash; {{ $camp['endDateFormatted'] }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
-                                        <dt class="text-slate-500 dark:text-slate-400">Hours</dt>
-                                        <dd class="font-mono text-xs font-semibold text-slate-900 dark:text-white">
+                                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Hours') }}</dt>
+                                        <dd class="font-mono text-xs font-semibold text-slate-900 dark:text-white dir-ltr">
                                             {{ $camp['startTime'] }} &ndash; {{ $camp['endTime'] }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
-                                        <dt class="text-slate-500 dark:text-slate-400">Organizer</dt>
+                                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Organizer') }}</dt>
                                         <dd class="font-medium text-slate-900 dark:text-white">
                                             {{ $camp['organizerName'] }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
-                                        <dt class="text-slate-500 dark:text-slate-400">Phone</dt>
-                                        <dd class="text-slate-700 dark:text-slate-300">
+                                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Phone') }}</dt>
+                                        <dd class="text-slate-700 dark:text-slate-300 dir-ltr text-start">
                                             {{ $camp['organizerContact'] }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
-                                        <dt class="text-slate-500 dark:text-slate-400">Email</dt>
-                                        <dd class="truncate text-slate-700 dark:text-slate-300">
+                                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Email') }}</dt>
+                                        <dd class="truncate text-slate-700 dark:text-slate-300 dir-ltr text-start">
                                             {{ $camp['organizerEmail'] }}
                                         </dd>
                                     </div>
@@ -197,7 +197,7 @@
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div class="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
                                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                                    Requirements for Donors
+                                    {{ __('Requirements for Donors') }}
                                 </p>
                                 <p class="mt-1.5 text-sm text-slate-700 dark:text-slate-300">
                                     {{ $camp['donorRequirements'] }}
@@ -206,10 +206,10 @@
 
                             <div class="rounded-xl border border-slate-200/80 p-4 dark:border-slate-800">
                                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                                    Walk-in Policy &amp; Notes
+                                    {{ __('Walk-in Policy & Notes') }}
                                 </p>
                                 <p class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">
-                                    {{ $camp['allowWalkIn'] ? 'Walk-in donors allowed during Ongoing status' : 'Pre-registered donors only (no walk-ins)' }}
+                                    {{ $camp['allowWalkIn'] ? __('Walk-in donors allowed during Ongoing status') : __('Pre-registered donors only (no walk-ins)') }}
                                 </p>
                                 @if (! empty($camp['additionalNotes']))
                                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -224,10 +224,10 @@
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <p class="text-xs font-semibold tracking-wider text-slate-600 uppercase dark:text-slate-300">
-                                        Camp Lifecycle Status Actions (Preview)
+                                        {{ __('Camp Lifecycle Status Actions (Preview)') }}
                                     </p>
                                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                        Switch status in preview mode. Completing or cancelling a camp retains all donor registration history.
+                                        {{ __('Switch status in preview mode. Completing or cancelling a camp retains all donor registration history.') }}
                                     </p>
                                 </div>
 
@@ -241,7 +241,7 @@
                                                 : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'"
                                             class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition cursor-pointer"
                                         >
-                                            {{ $campStatusOption }}
+                                            {{ __($campStatusOption) }}
                                         </button>
                                     @endforeach
                                 </div>
@@ -257,42 +257,44 @@
                             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                        Donor Registration List
+                                        {{ __('Donor Registration List') }}
                                     </h2>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                                        <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="activeRegistrationsCount">{{ $camp['registeredDonors'] }}</span> active /
-                                        <span x-text="registrations.length">{{ count($camp['registrations']) }}</span> total records (cancelled registrations excluded from active capacity)
+                                        {!! __(':active active / :total total records (cancelled registrations excluded from active capacity)', [
+                                            'active' => '<span class="font-semibold text-slate-700 dark:text-slate-200" x-text="activeRegistrationsCount">' . $camp['registeredDonors'] . '</span>',
+                                            'total' => '<span x-text="registrations.length">' . count($camp['registrations']) . '</span>'
+                                        ]) !!}
                                     </p>
                                 </div>
 
                                 <x-ui.badge variant="neutral">
-                                    <span x-text="filteredRegistrations.length">{{ count($camp['registrations']) }}</span> shown
+                                    <span x-text="filteredRegistrations.length">{{ count($camp['registrations']) }}</span> {{ __('shown') }}
                                 </x-ui.badge>
                             </div>
 
                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                                 <div class="sm:col-span-2">
-                                    <label for="camp-reg-search" class="sr-only">Search registrations</label>
+                                    <label for="camp-reg-search" class="sr-only">{{ __('Search registrations') }}</label>
                                     <x-ui.input
                                         id="camp-reg-search"
                                         name="reg_search"
                                         type="search"
                                         icon="magnifying-glass"
-                                        placeholder="Search Registration ID, Donor Name, or Donor ID..."
+                                        :placeholder="__('Search Registration ID, Donor Name, or Donor ID...')"
                                         x-model.debounce.150ms="registrationSearch"
                                     />
                                 </div>
 
                                 <div>
-                                    <label for="camp-reg-attendance-filter" class="sr-only">Filter by attendance status</label>
+                                    <label for="camp-reg-attendance-filter" class="sr-only">{{ __('Filter by attendance status') }}</label>
                                     <select
                                         id="camp-reg-attendance-filter"
                                         x-model="attendanceFilter"
                                         class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                     >
-                                        <option value="all">All Attendance Statuses</option>
+                                        <option value="all">{{ __('All Attendance Statuses') }}</option>
                                         @foreach ($attendanceStatuses as $attStatus)
-                                            <option value="{{ $attStatus }}">{{ $attStatus }}</option>
+                                            <option value="{{ $attStatus }}">{{ __($attStatus) }}</option>
                                         @endforeach
                                     </select>
                                 </div>
@@ -301,22 +303,22 @@
                     </x-slot:header>
 
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
+                        <table class="min-w-full divide-y divide-slate-200 text-start text-sm dark:divide-slate-800">
                             <thead class="bg-slate-50/80 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:bg-slate-800/50 dark:text-slate-400">
                                 <tr>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Registration ID</th>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Donor Name</th>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Donor ID</th>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Blood Group</th>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Registration Date</th>
-                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">Attendance Status</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Registration ID') }}</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Donor Name') }}</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Donor ID') }}</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Blood Group') }}</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Registration Date') }}</th>
+                                    <th scope="col" class="px-5 py-3 whitespace-nowrap">{{ __('Attendance Status') }}</th>
                                 </tr>
                             </thead>
 
                             <tbody class="divide-y divide-slate-200 bg-white dark:divide-slate-800 dark:bg-slate-900">
                                 <template x-for="reg in filteredRegistrations" :key="reg.id">
                                     <tr class="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
-                                        <td class="px-5 py-3.5 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200" x-text="reg.id"></td>
+                                        <td class="px-5 py-3.5 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200 dir-ltr text-start" x-text="reg.id"></td>
 
                                         <td class="px-5 py-3.5 whitespace-nowrap">
                                             <a
@@ -326,7 +328,7 @@
                                             ></a>
                                         </td>
 
-                                        <td class="px-5 py-3.5 font-mono text-xs whitespace-nowrap text-slate-600 dark:text-slate-300">
+                                        <td class="px-5 py-3.5 font-mono text-xs whitespace-nowrap text-slate-600 dark:text-slate-300 dir-ltr text-start">
                                             <a
                                                 :href="@js($donorShowUrlTemplate).replace('__DONOR__', encodeURIComponent(reg.donorId))"
                                                 class="hover:text-crimson-600 dark:hover:text-crimson-400"
@@ -352,13 +354,13 @@
                                                 ></span>
 
                                                 <select
-                                                    :aria-label="'Update attendance for ' + reg.donorName"
+                                                    :aria-label="'{{ __('Update attendance for') }} ' + reg.donorName"
                                                     :value="reg.attendanceStatus"
                                                     @change="updateAttendanceStatus(reg.id, $event.target.value)"
                                                     class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                                                 >
                                                     @foreach ($attendanceStatuses as $attStatus)
-                                                        <option value="{{ $attStatus }}">{{ $attStatus }}</option>
+                                                        <option value="{{ $attStatus }}">{{ __($attStatus) }}</option>
                                                     @endforeach
                                                 </select>
                                             </div>
@@ -390,7 +392,7 @@
                         x-cloak
                         class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                     >
-                        No donor registrations match your current search or attendance filter.
+                        {{ __('No donor registrations match your current search or attendance filter.') }}
                     </div>
                 </x-ui.card>
 
@@ -400,15 +402,15 @@
                         <div class="flex items-center justify-between gap-3">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Camp Activity &amp; History
+                                    {{ __('Camp Activity & History') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Chronological timeline of schedule creation, registrations, attendance checks, and lifecycle updates.
+                                    {{ __('Chronological timeline of schedule creation, registrations, attendance checks, and lifecycle updates.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge variant="neutral">
-                                <span x-text="history.length">{{ count($camp['history']) }}</span> events
+                                <span x-text="history.length">{{ count($camp['history']) }}</span> {{ __('events') }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
@@ -420,7 +422,7 @@
                                     <p class="text-sm font-semibold text-slate-900 dark:text-white" x-text="entry.event"></p>
                                     <p class="text-sm text-slate-600 dark:text-slate-300" x-text="entry.notes"></p>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                                        Actor: <span class="font-medium text-slate-700 dark:text-slate-200" x-text="entry.actor"></span>
+                                        {{ __('Actor') }}: <span class="font-medium text-slate-700 dark:text-slate-200" x-text="entry.actor"></span>
                                     </p>
                                 </div>
 
@@ -448,10 +450,10 @@
                     <x-slot:header>
                         <div>
                             <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                Capacity Overview
+                                {{ __('Capacity Overview') }}
                             </h2>
                             <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                Live slot allocation excluding cancelled bookings.
+                                {{ __('Live slot allocation excluding cancelled bookings.') }}
                             </p>
                         </div>
                     </x-slot:header>
@@ -459,29 +461,29 @@
                     <div class="space-y-5">
                         <div class="grid grid-cols-3 gap-3 text-center">
                             <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">Maximum Capacity</p>
+                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">{{ __('Maximum Capacity') }}</p>
                                 <p class="mt-1 text-xl font-bold tabular-nums text-slate-900 dark:text-white" x-text="capacity">{{ $camp['capacity'] }}</p>
                             </div>
 
                             <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">Registered Donors</p>
+                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">{{ __('Registered Donors') }}</p>
                                 <p class="mt-1 text-xl font-bold tabular-nums text-crimson-600 dark:text-crimson-400" x-text="activeRegistrationsCount">{{ $camp['registeredDonors'] }}</p>
                             </div>
 
                             <div class="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-800/40">
-                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">Available Slots</p>
+                                <p class="text-[11px] font-medium text-slate-500 uppercase dark:text-slate-400">{{ __('Available Slots') }}</p>
                                 <p class="mt-1 text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400" x-text="availableSlots">{{ $camp['availableSlots'] }}</p>
                             </div>
                         </div>
 
                         <div>
                             <div class="mb-2 flex items-center justify-between text-xs font-medium">
-                                <span class="text-slate-600 dark:text-slate-300">Registration Progress</span>
-                                <span class="font-semibold tabular-nums text-slate-900 dark:text-white" x-text="progressPercent + '%'">{{ $initialPercent }}%</span>
+                                <span class="text-slate-600 dark:text-slate-300">{{ __('Registration Progress') }}</span>
+                                <span class="font-semibold tabular-nums text-slate-900 dark:text-white dir-ltr" x-text="progressPercent + '%'">{{ $initialPercent }}%</span>
                             </div>
                             <div
                                 role="progressbar"
-                                aria-label="Camp registration progress"
+                                aria-label="{{ __('Camp registration progress') }}"
                                 aria-valuemin="0"
                                 aria-valuemax="100"
                                 :aria-valuenow="progressPercent"
@@ -497,7 +499,7 @@
                         </div>
 
                         <div class="flex items-center justify-between rounded-xl border border-slate-200/80 px-4 py-3 text-sm dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400">Registration Deadline</span>
+                            <span class="text-slate-500 dark:text-slate-400">{{ __('Registration Deadline') }}</span>
                             <span class="font-semibold text-slate-900 dark:text-white">{{ $camp['registrationDeadlineFormatted'] }}</span>
                         </div>
                     </div>
@@ -509,10 +511,10 @@
                         <x-slot:header>
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Registration Management
+                                    {{ __('Registration Management') }}
                                 </h2>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    Assign an existing registered sample donor to this camp in preview mode.
+                                    {{ __('Assign an existing registered sample donor to this camp in preview mode.') }}
                                 </p>
                             </div>
                         </x-slot:header>
@@ -532,7 +534,7 @@
                                     <p class="font-semibold" x-text="feedback?.title"></p>
                                     <p class="mt-0.5 opacity-90" x-text="feedback?.message"></p>
                                 </div>
-                                <button type="button" @click="dismissFeedback()" aria-label="Dismiss registration alert" class="opacity-70 hover:opacity-100 cursor-pointer">
+                                <button type="button" @click="dismissFeedback()" :aria-label="__('Dismiss registration alert')" class="opacity-70 hover:opacity-100 cursor-pointer">
                                     <x-icons.icon name="x-mark" class="size-4" />
                                 </button>
                             </div>
@@ -550,7 +552,7 @@
                             <form @submit.prevent="registerDonor()" class="space-y-4">
                                 <div class="relative">
                                     <label for="camp-donor-search" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                        Select Sample Donor <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                        {{ __('Select Sample Donor') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                                     </label>
 
                                     <div class="mt-1.5">
@@ -562,7 +564,7 @@
                                             @focus="donorDropdownOpen = true"
                                             @click="donorDropdownOpen = true"
                                             @click.outside="donorDropdownOpen = false"
-                                            placeholder="Search by donor name, ID, or blood group..."
+                                            :placeholder="__('Search by donor name, ID, or blood group...')"
                                             class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                                         />
                                     </div>
@@ -577,11 +579,11 @@
                                             <button
                                                 type="button"
                                                 @click="selectDonor(donor.id)"
-                                                class="flex w-full items-center justify-between gap-2 px-3.5 py-2 text-left text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                                                class="flex w-full items-center justify-between gap-2 px-3.5 py-2 text-start text-sm transition hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                                             >
                                                 <div class="min-w-0">
                                                     <p class="truncate font-medium text-slate-900 dark:text-white" x-text="donor.name"></p>
-                                                    <p class="font-mono text-xs text-slate-500 dark:text-slate-400" x-text="donor.id"></p>
+                                                    <p class="font-mono text-xs text-slate-500 dark:text-slate-400 dir-ltr text-start" x-text="donor.id"></p>
                                                 </div>
                                                 <span
                                                     class="shrink-0 rounded-md bg-crimson-50 px-2 py-0.5 text-xs font-bold text-crimson-700 dark:bg-crimson-950/70 dark:text-crimson-300"
@@ -594,7 +596,7 @@
                                             x-show="filteredDonors.length === 0"
                                             class="px-3.5 py-3 text-center text-xs text-slate-500 dark:text-slate-400"
                                         >
-                                            No matching sample donors found.
+                                            {{ __('No matching sample donors found.') }}
                                         </div>
                                     </div>
 
@@ -615,20 +617,20 @@
                                     <div class="flex items-start justify-between gap-3">
                                         <div>
                                             <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                                                Selected Donor Summary
+                                                {{ __('Selected Donor Summary') }}
                                             </p>
                                             <p class="mt-1 text-sm font-semibold text-slate-900 dark:text-white" x-text="selectedDonor?.name"></p>
                                             <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                                                <span>Donor ID: <strong class="font-mono text-slate-900 dark:text-white" x-text="selectedDonor?.id"></strong></span>
+                                                <span>{{ __('Donor ID') }}: <strong class="font-mono text-slate-900 dark:text-white dir-ltr" x-text="selectedDonor?.id"></strong></span>
                                                 <span>&middot;</span>
-                                                <span>Blood Group: <strong class="text-crimson-600 dark:text-crimson-400" x-text="selectedDonor?.bloodGroup"></strong></span>
+                                                <span>{{ __('Blood Group') }}: <strong class="text-crimson-600 dark:text-crimson-400" x-text="selectedDonor?.bloodGroup"></strong></span>
                                             </div>
                                         </div>
 
                                         <button
                                             type="button"
                                             @click="selectedDonorId = ''; errors = {};"
-                                            aria-label="Clear selected donor"
+                                            :aria-label="__('Clear selected donor')"
                                             class="rounded-lg p-1 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 dark:hover:bg-slate-700 dark:hover:text-slate-200 cursor-pointer"
                                         >
                                             <x-icons.icon name="x-mark" class="size-4" />
@@ -642,7 +644,7 @@
                                     class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-crimson-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs transition hover:bg-crimson-700 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
                                 >
                                     <x-icons.icon name="plus" class="size-4" />
-                                    <span>Register Donor to Camp</span>
+                                    <span>{{ __('Register Donor to Camp') }}</span>
                                 </button>
                             </form>
                         </div>
@@ -652,4 +654,3 @@
         </div>
     </div>
 </x-app-layout>
-

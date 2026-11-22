@@ -1,9 +1,9 @@
-<x-app-layout page-title="Blood Unit Details" :active-role="$activeRole">
+<x-app-layout :page-title="__('Blood Unit Details')" :active-role="$activeRole">
     <x-slot:header>
         <div class="flex items-center justify-between gap-4">
             <div>
                 <div class="flex items-center gap-3">
-                    <span class="font-mono text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <span class="font-mono text-xl font-bold tracking-tight text-slate-900 dark:text-white dir-ltr text-start">
                         {{ $unit->unit_code }}
                     </span>
                     <x-bdms.blood-group-badge :group="$unit->blood_group" size="md" />
@@ -19,18 +19,18 @@
                         };
                     @endphp
                     <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $statusBadgeClass }}">
-                        {{ $unit->unit_status }}
+                        {{ __($unit->unit_status) }}
                     </span>
                 </div>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Complete serialized unit lifecycle, screening release provenance, allocations, and audit history.
+                    {{ __('Complete serialized unit lifecycle, screening release provenance, allocations, and audit history.') }}
                 </p>
             </div>
 
             <div class="flex items-center gap-2">
                 <x-ui.button variant="outline" size="sm" :href="route('inventory.index')">
-                    <x-icons.icon name="arrow-left" class="size-4" />
-                    <span>Back to Inventory</span>
+                    <x-icons.icon name="arrow-left" class="size-4 rtl-flip" />
+                    <span>{{ __('Back to Inventory') }}</span>
                 </x-ui.button>
             </div>
         </div>
@@ -47,7 +47,7 @@
 
         @if ($errors->any())
             <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-200">
-                <ul class="list-disc pl-5 space-y-1">
+                <ul class="list-disc ps-5 space-y-1">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -61,32 +61,32 @@
             <x-ui.card>
                 <x-slot:header>
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        Blood Bag Specifications
+                        {{ __('Blood Bag Specifications') }}
                     </h3>
                 </x-slot:header>
                 <dl class="divide-y divide-slate-100 text-xs dark:divide-slate-800">
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Blood Component</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Blood Component') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
                             {{ $unit->bloodComponent?->name }} ({{ $unit->bloodComponent?->code }})
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Volume</dt>
-                        <dd class="font-medium text-slate-900 dark:text-white">
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Volume') }}</dt>
+                        <dd class="font-medium text-slate-900 dark:text-white dir-ltr">
                             {{ $unit->volume_ml }} mL
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Storage Location</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Storage Location') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
-                            {{ $unit->storage_location ?? 'Vault Unassigned' }}
+                            {{ $unit->storage_location ?? __('Vault Unassigned') }}
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Storage Requirements</dt>
-                        <dd class="font-medium text-slate-900 dark:text-white text-right max-w-48">
-                            {{ $unit->bloodComponent?->storage_requirements ?? 'Monitored Cold Vault' }}
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Storage Requirements') }}</dt>
+                        <dd class="font-medium text-slate-900 dark:text-white text-end max-w-48">
+                            {{ $unit->bloodComponent?->storage_requirements ?? __('Monitored Cold Vault') }}
                         </dd>
                     </div>
                 </dl>
@@ -96,38 +96,38 @@
             <x-ui.card>
                 <x-slot:header>
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        Intake &amp; Screening Provenance
+                        {{ __('Intake & Screening Provenance') }}
                     </h3>
                 </x-slot:header>
                 <dl class="divide-y divide-slate-100 text-xs dark:divide-slate-800">
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Donation Code</dt>
-                        <dd class="font-mono font-medium text-slate-900 dark:text-white">
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Donation Code') }}</dt>
+                        <dd class="font-mono font-medium text-slate-900 dark:text-white dir-ltr">
                             {{ $unit->donation?->donation_code ?? 'N/A' }}
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Collected At</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Collected At') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
                             {{ $unit->collected_at?->format('M d, Y • H:i') ?? 'N/A' }}
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Collection Center</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Collection Center') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
-                            {{ $unit->donation?->center?->name ?? 'Regional Collection Facility' }}
+                            {{ $unit->donation?->center?->name ?? __('Regional Collection Facility') }}
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Released by Officer</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Released by Officer') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
-                            {{ $unit->releasedBy?->name ?? 'System Authorized' }}
+                            {{ $unit->releasedBy?->name ?? __('System Authorized') }}
                         </dd>
                     </div>
                     <div class="flex justify-between py-2.5">
-                        <dt class="text-slate-500 dark:text-slate-400">Released to Stock</dt>
+                        <dt class="text-slate-500 dark:text-slate-400">{{ __('Released to Stock') }}</dt>
                         <dd class="font-medium text-slate-900 dark:text-white">
-                            {{ $unit->released_at?->format('M d, Y • H:i') ?? 'Pending Release' }}
+                            {{ $unit->released_at?->format('M d, Y • H:i') ?? __('Pending Release') }}
                         </dd>
                     </div>
                 </dl>
@@ -137,23 +137,23 @@
             <x-ui.card class="flex flex-col justify-between">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        Expiration &amp; Actions
+                        {{ __('Expiration & Actions') }}
                     </h3>
                     <div class="mt-3 space-y-2 text-xs">
                         <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400">Expiration Date</span>
+                            <span class="text-slate-500 dark:text-slate-400">{{ __('Expiration Date') }}</span>
                             <span class="font-semibold text-slate-900 dark:text-white">
                                 {{ $unit->expires_at?->format('M d, Y • H:i') }}
                             </span>
                         </div>
                         <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400">Status Boundary</span>
+                            <span class="text-slate-500 dark:text-slate-400">{{ __('Status Boundary') }}</span>
                             @if ($unit->expires_at && $unit->expires_at->isPast())
-                                <span class="font-semibold text-rose-600 dark:text-rose-400">Expired</span>
+                                <span class="font-semibold text-rose-600 dark:text-rose-400">{{ __('Expired') }}</span>
                             @elseif ($unit->expires_at && $unit->expires_at->lte(now()->addDays(7)))
-                                <span class="font-semibold text-amber-600 dark:text-amber-400">Expiring in {{ (int) ceil(now()->diffInHours($unit->expires_at) / 24) }} days</span>
+                                <span class="font-semibold text-amber-600 dark:text-amber-400">{{ __('Expiring in :days days', ['days' => (int) ceil(now()->diffInHours($unit->expires_at) / 24)]) }}</span>
                             @else
-                                <span class="font-semibold text-emerald-600 dark:text-emerald-400">Within Valid Window</span>
+                                <span class="font-semibold text-emerald-600 dark:text-emerald-400">{{ __('Within Valid Window') }}</span>
                             @endif
                         </div>
                     </div>
@@ -169,7 +169,7 @@
                                     class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-amber-700 transition cursor-pointer"
                                 >
                                     <x-icons.icon name="clock" class="size-4" />
-                                    <span>Mark as Expired</span>
+                                    <span>{{ __('Mark as Expired') }}</span>
                                 </button>
                             </form>
                         @endif
@@ -178,14 +178,14 @@
                             <form
                                 method="POST"
                                 action="{{ route('inventory.units.discard', $unit->id) }}"
-                                onsubmit="return confirm('Are you sure you want to discard blood unit {{ $unit->unit_code }}? This action is permanent and auditable.');"
+                                onsubmit="return confirm('{{ __('Are you sure you want to discard blood unit :code? This action is permanent and auditable.', ['code' => $unit->unit_code]) }}');"
                                 class="space-y-2"
                             >
                                 @csrf
                                 <input
                                     type="text"
                                     name="reason"
-                                    placeholder="Discard reason (min 3 chars)..."
+                                    placeholder="{{ __('Discard reason (min 3 chars)...') }}"
                                     required
                                     minlength="3"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
@@ -195,7 +195,7 @@
                                     class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300 cursor-pointer"
                                 >
                                     <x-icons.icon name="trash" class="size-4" />
-                                    <span>Discard Unit</span>
+                                    <span>{{ __('Discard Unit') }}</span>
                                 </button>
                             </form>
                         @endif
@@ -210,19 +210,19 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                            Hospital Request Allocations
+                            {{ __('Hospital Request Allocations') }}
                         </h3>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Active holds, releases, or dispatch fulfillment linkages for this blood bag.
+                            {{ __('Active holds, releases, or dispatch fulfillment linkages for this blood bag.') }}
                         </p>
                     </div>
-                    <x-ui.badge variant="neutral">{{ $unit->allocations->count() }} records</x-ui.badge>
+                    <x-ui.badge variant="neutral">{{ __(':count records', ['count' => $unit->allocations->count()]) }}</x-ui.badge>
                 </div>
             </x-slot:header>
 
             @if ($unit->allocations->isEmpty())
                 <div class="px-6 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                    No hospital request allocations have referenced this blood unit.
+                    {{ __('No hospital request allocations have referenced this blood unit.') }}
                 </div>
             @else
                 <div class="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
@@ -230,7 +230,7 @@
                         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between px-6 py-3 gap-2">
                             <div class="space-y-1">
                                 <div class="flex items-center gap-2">
-                                    <span class="font-mono font-semibold text-slate-900 dark:text-white">
+                                    <span class="font-mono font-semibold text-slate-900 dark:text-white dir-ltr">
                                         {{ $alloc->allocation_code }}
                                     </span>
                                     <span class="rounded-full px-2 py-0.5 text-2xs font-semibold ring-1 ring-inset {{ match ($alloc->allocation_status) {
@@ -239,12 +239,12 @@
                                         'Released' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300',
                                         default => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300',
                                     } }}">
-                                        {{ $alloc->allocation_status }}
+                                        {{ __($alloc->allocation_status) }}
                                     </span>
                                 </div>
                                 <p class="text-slate-500 dark:text-slate-400">
-                                    Request: <strong class="text-slate-700 dark:text-slate-200">{{ $alloc->bloodRequest?->request_code }}</strong>
-                                    &middot; Hospital: {{ $alloc->bloodRequest?->hospital?->name }}
+                                    {{ __('Request:') }} <strong class="text-slate-700 dark:text-slate-200 dir-ltr">{{ $alloc->bloodRequest?->request_code }}</strong>
+                                    &middot; {{ __('Hospital:') }} {{ $alloc->bloodRequest?->hospital?->name }}
                                 </p>
                             </div>
                             <span class="text-slate-500 dark:text-slate-400">
@@ -262,37 +262,37 @@
                 <div class="flex items-center justify-between">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                            Unit Transaction Ledger
+                            {{ __('Unit Transaction Ledger') }}
                         </h3>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Immutable append-only movements and state transitions recorded for this blood bag.
+                            {{ __('Immutable append-only movements and state transitions recorded for this blood bag.') }}
                         </p>
                     </div>
-                    <x-ui.badge variant="neutral">{{ $unit->transactions->count() }} transactions</x-ui.badge>
+                    <x-ui.badge variant="neutral">{{ __(':count transactions', ['count' => $unit->transactions->count()]) }}</x-ui.badge>
                 </div>
             </x-slot:header>
 
             @if ($unit->transactions->isEmpty())
                 <div class="px-6 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                    No ledger transactions recorded for this blood unit.
+                    {{ __('No ledger transactions recorded for this blood unit.') }}
                 </div>
             @else
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-xs dark:divide-slate-800">
-                        <thead class="bg-slate-50/70 text-left font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                    <table class="min-w-full divide-y divide-slate-200 text-start text-xs dark:divide-slate-800">
+                        <thead class="bg-slate-50/70 text-start font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                             <tr>
-                                <th class="px-5 py-3">Txn Code</th>
-                                <th class="px-5 py-3">Operation</th>
-                                <th class="px-5 py-3">Delta</th>
-                                <th class="px-5 py-3">Description</th>
-                                <th class="px-5 py-3">Actor</th>
-                                <th class="px-5 py-3 text-right">Date</th>
+                                <th class="px-5 py-3">{{ __('Txn Code') }}</th>
+                                <th class="px-5 py-3">{{ __('Operation') }}</th>
+                                <th class="px-5 py-3">{{ __('Delta') }}</th>
+                                <th class="px-5 py-3">{{ __('Description') }}</th>
+                                <th class="px-5 py-3">{{ __('Actor') }}</th>
+                                <th class="px-5 py-3 text-end">{{ __('Date') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
                             @foreach ($unit->transactions as $txn)
                                 <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                                    <td class="whitespace-nowrap px-5 py-3 font-mono font-medium text-slate-900 dark:text-white">
+                                    <td class="whitespace-nowrap px-5 py-3 font-mono font-medium text-slate-900 dark:text-white dir-ltr text-start">
                                         {{ $txn->transaction_code }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3">
@@ -305,7 +305,7 @@
                                             'Expired' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300',
                                             default => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300',
                                         } }}">
-                                            {{ $txn->operation_type }}
+                                            {{ __($txn->operation_type) }}
                                         </span>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3 font-semibold tabular-nums {{ $txn->units_delta > 0 ? 'text-emerald-600' : ($txn->units_delta < 0 ? 'text-rose-600' : 'text-slate-600') }}">
@@ -317,7 +317,7 @@
                                     <td class="whitespace-nowrap px-5 py-3 text-slate-800 dark:text-slate-200">
                                         {{ $txn->actor_name }}
                                     </td>
-                                    <td class="whitespace-nowrap px-5 py-3 text-right text-slate-500 dark:text-slate-400">
+                                    <td class="whitespace-nowrap px-5 py-3 text-end text-slate-500 dark:text-slate-400">
                                         {{ $txn->occurred_at?->format('M d, Y • H:i') }}
                                     </td>
                                 </tr>

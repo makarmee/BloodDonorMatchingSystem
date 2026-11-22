@@ -18,40 +18,40 @@
     };
 @endphp
 
-<x-app-layout :title="'Donation Details · ' . $donation['id']" page-title="Donation Details" active-role="staff">
+<x-app-layout :title="__('Donation Details') . ' · ' . $donation['id']" :page-title="__('Donation Details')" active-role="staff">
     <x-slot:header>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <div class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                     <a href="{{ route('donations.index') }}" class="transition hover:text-crimson-600 dark:hover:text-crimson-400">
-                        Donations Log
+                        {{ __('Donations Log') }}
                     </a>
-                    <x-icons.icon name="chevron-right" class="size-3.5" />
-                    <span class="font-mono text-slate-700 dark:text-slate-200">{{ $donation['id'] }}</span>
+                    <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
+                    <span class="font-mono text-slate-700 dark:text-slate-200 dir-ltr">{{ $donation['id'] }}</span>
                 </div>
 
                 <div class="mt-2 flex flex-wrap items-center gap-2.5">
-                    <h1 class="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <h1 class="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white dir-ltr">
                         {{ $donation['id'] }}
                     </h1>
                     <x-bdms.blood-group-badge :group="$donation['bloodGroup']" size="md" />
                     <x-ui.badge :variant="$screeningVariant" :dot="true">
-                        Screening: {{ $donation['screeningStatus'] }}
+                        {{ __('Screening') }}: {{ __($donation['screeningStatus']) }}
                     </x-ui.badge>
                     <x-ui.badge :variant="$collectionVariant" :dot="true">
-                        Collection: {{ $donation['collectionStatus'] }}
+                        {{ __('Collection') }}: {{ __($donation['collectionStatus']) }}
                     </x-ui.badge>
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ $donation['donationType'] }} &middot; {{ $donation['quantityMl'] }} ml &middot; {{ $donation['donationDateFormatted'] }} at {{ $donation['collectionLocation'] }}
+                    {{ __($donation['donationType']) }} &middot; {{ $donation['quantityMl'] }} {{ __('ml') }} &middot; {{ $donation['donationDateFormatted'] }} {{ __('at') }} {{ $donation['collectionLocation'] }}
                 </p>
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
                 <x-ui.button variant="outline" size="md" :href="route('donations.index')">
-                    <x-icons.icon name="arrow-left" class="size-4" />
-                    <span>Back to Donations</span>
+                    <x-icons.icon name="arrow-left" class="size-4 rtl-flip" />
+                    <span>{{ __('Back to Donations') }}</span>
                 </x-ui.button>
 
                 @if ($donation['collectionStatus'] === 'Scheduled')
@@ -62,7 +62,7 @@
                         @click="$dispatch('open-modal', 'complete-donation-modal')"
                     >
                         <x-icons.icon name="check-circle" class="size-4" />
-                        <span>Complete Collection</span>
+                        <span>{{ __('Complete Collection') }}</span>
                     </x-ui.button>
 
                     <button
@@ -71,13 +71,13 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-xs transition hover:bg-rose-50 dark:border-slate-700 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-slate-700 cursor-pointer"
                     >
                         <x-icons.icon name="no-symbol" class="size-3.5" />
-                        <span>Cancel Collection</span>
+                        <span>{{ __('Cancel Collection') }}</span>
                     </button>
                 @endif
 
                 <x-ui.button variant="outline" size="md" :href="route('donations.edit', $donation['id'])">
                     <x-icons.icon name="pencil" class="size-4" />
-                    <span>Edit Donation</span>
+                    <span>{{ __('Edit Donation') }}</span>
                 </x-ui.button>
             </div>
         </div>
@@ -96,50 +96,50 @@
         <section aria-label="Donation summary metrics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Blood Group
+                    {{ __('Blood Group') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between">
                     <x-bdms.blood-group-badge :group="$donation['bloodGroup']" size="lg" />
                     <span class="text-xs font-medium text-slate-500 dark:text-slate-400">
-                        Matched Donor Type
+                        {{ __('Matched Donor Type') }}
                     </span>
                 </div>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Donation Date &amp; Volume
+                    {{ __('Donation Date & Volume') }}
                 </p>
                 <p class="mt-3 text-xl font-bold text-slate-900 dark:text-white">
-                    {{ $donation['quantityMl'] }} ml
+                    {{ $donation['quantityMl'] }} {{ __('ml') }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ $donation['donationType'] }} &middot; {{ $donation['donationDateFormatted'] }}
+                    {{ __($donation['donationType']) }} &middot; {{ $donation['donationDateFormatted'] }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Screening Status
+                    {{ __('Screening Status') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between gap-2">
                     <x-ui.badge :variant="$screeningVariant" :dot="true">
-                        {{ $donation['screeningStatus'] }}
+                        {{ __($donation['screeningStatus']) }}
                     </x-ui.badge>
                     <x-icons.icon name="shield-check" class="size-5 text-slate-400 dark:text-slate-500" />
                 </div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Explicit laboratory verification status
+                    {{ __('Explicit laboratory verification status') }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Collection Status
+                    {{ __('Collection Status') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between gap-2">
                     <x-ui.badge :variant="$collectionVariant" :dot="true">
-                        {{ $donation['collectionStatus'] }}
+                        {{ __($donation['collectionStatus']) }}
                     </x-ui.badge>
                     <x-icons.icon name="heart-pulse" class="size-5 text-slate-400 dark:text-slate-500" />
                 </div>
@@ -157,47 +157,47 @@
                     <x-slot:header>
                         <div class="flex items-center justify-between gap-2">
                             <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                Donor Information
+                                {{ __('Donor Information') }}
                             </h2>
                             <x-ui.badge :variant="$eligibilityVariant" :dot="true">
-                                {{ $donation['donorEligibilityStatus'] }}
+                                {{ __($donation['donorEligibilityStatus']) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
 
                     <dl class="divide-y divide-slate-100 text-sm dark:divide-slate-800">
                         <div class="flex items-center justify-between gap-4 py-2.5 first:pt-0">
-                            <dt class="text-slate-500 dark:text-slate-400">Donor ID</dt>
-                            <dd class="font-mono font-semibold text-slate-900 dark:text-white">{{ $donation['donorId'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Donor ID') }}</dt>
+                            <dd class="font-mono font-semibold text-slate-900 dark:text-white dir-ltr text-start">{{ $donation['donorId'] }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
-                            <dt class="text-slate-500 dark:text-slate-400">Full Name</dt>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Full Name') }}</dt>
                             <dd class="font-semibold text-slate-900 dark:text-white">{{ $donation['donorName'] }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
-                            <dt class="text-slate-500 dark:text-slate-400">Blood Group</dt>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Blood Group') }}</dt>
                             <dd>
                                 <x-bdms.blood-group-badge :group="$donation['bloodGroup']" size="sm" />
                             </dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
-                            <dt class="text-slate-500 dark:text-slate-400">Phone</dt>
-                            <dd class="text-slate-700 dark:text-slate-200">{{ $donation['donorPhone'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Phone') }}</dt>
+                            <dd class="text-slate-700 dark:text-slate-200 dir-ltr text-start">{{ $donation['donorPhone'] }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5 last:pb-0">
-                            <dt class="text-slate-500 dark:text-slate-400">Email</dt>
-                            <dd class="truncate text-slate-700 dark:text-slate-200">{{ $donation['donorEmail'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Email') }}</dt>
+                            <dd class="truncate text-slate-700 dark:text-slate-200 dir-ltr text-start">{{ $donation['donorEmail'] }}</dd>
                         </div>
                     </dl>
 
                     <x-slot:footer>
                         <x-ui.button variant="outline" size="sm" :href="route('donors.show', $donation['donorId'])" class="w-full justify-center">
                             <x-icons.icon name="user" class="size-4" />
-                            <span>View Donor Profile</span>
+                            <span>{{ __('View Donor Profile') }}</span>
                         </x-ui.button>
                     </x-slot:footer>
                 </x-ui.card>
@@ -205,7 +205,7 @@
                 <x-ui.card>
                     <x-slot:header>
                         <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                            Collection Session Metadata
+                            {{ __('Collection Session Metadata') }}
                         </h2>
                     </x-slot:header>
 
@@ -213,9 +213,9 @@
                         <div class="flex items-start gap-3">
                             <x-icons.icon name="droplet" class="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
                             <div>
-                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Donation Type &amp; Volume</dt>
+                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Donation Type & Volume') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">
-                                    {{ $donation['donationType'] }} &middot; {{ $donation['quantityMl'] }} ml
+                                    {{ __($donation['donationType']) }} &middot; {{ $donation['quantityMl'] }} {{ __('ml') }}
                                 </dd>
                             </div>
                         </div>
@@ -223,10 +223,10 @@
                         <div class="flex items-start gap-3">
                             <x-icons.icon name="calendar" class="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
                             <div>
-                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Donation Date</dt>
+                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Donation Date') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">
                                     {{ $donation['donationDateFormatted'] }}
-                                    <span class="ml-1 font-mono text-xs text-slate-400 dark:text-slate-500">({{ $donation['donationDate'] }})</span>
+                                    <span class="ms-1 font-mono text-xs text-slate-400 dark:text-slate-500 dir-ltr">({{ $donation['donationDate'] }})</span>
                                 </dd>
                             </div>
                         </div>
@@ -234,7 +234,7 @@
                         <div class="flex items-start gap-3">
                             <x-icons.icon name="map-pin" class="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
                             <div>
-                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Collection Location</dt>
+                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Collection Location') }}</dt>
                                 <dd class="mt-0.5 text-slate-700 dark:text-slate-200">{{ $donation['collectionLocation'] }}</dd>
                             </div>
                         </div>
@@ -242,7 +242,7 @@
                         <div class="flex items-start gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                             <x-icons.icon name="user" class="mt-0.5 size-4 shrink-0 text-slate-400 dark:text-slate-500" />
                             <div>
-                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Staff Member</dt>
+                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Staff Member') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $donation['staffMember'] }}</dd>
                             </div>
                         </div>
@@ -257,15 +257,15 @@
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Screening Information &amp; Notes
+                                    {{ __('Screening Information & Notes') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Clinical laboratory verification status and serology/hematology remarks.
+                                    {{ __('Clinical laboratory verification status and serology/hematology remarks.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge :variant="$screeningVariant" :dot="true">
-                                {{ $donation['screeningStatus'] }}
+                                {{ __($donation['screeningStatus']) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
@@ -273,15 +273,15 @@
                     <div class="space-y-4 text-sm">
                         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                             <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                                Screening Notes
+                                {{ __('Screening Notes') }}
                             </p>
                             <p class="mt-1.5 leading-relaxed text-slate-800 dark:text-slate-200">
-                                {{ $donation['screeningNotes'] ?: 'No laboratory screening notes recorded.' }}
+                                {{ $donation['screeningNotes'] ?: __('No laboratory screening notes recorded.') }}
                             </p>
                         </div>
 
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Laboratory screening decisions are recorded explicitly by medical staff and never assumed from collection status alone.
+                            {{ __('Laboratory screening decisions are recorded explicitly by medical staff and never assumed from collection status alone.') }}
                         </p>
                     </div>
                 </x-ui.card>
@@ -291,15 +291,15 @@
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Collection Information &amp; Notes
+                                    {{ __('Collection Information & Notes') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Phlebotomy session status, container handling, and clinical observations.
+                                    {{ __('Phlebotomy session status, container handling, and clinical observations.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge :variant="$collectionVariant" :dot="true">
-                                {{ $donation['collectionStatus'] }}
+                                {{ __($donation['collectionStatus']) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
@@ -307,27 +307,27 @@
                     <div class="space-y-4 text-sm">
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Component</p>
-                                <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $donation['donationType'] }}</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Component') }}</p>
+                                <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ __($donation['donationType']) }}</p>
                             </div>
 
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Measured Quantity</p>
-                                <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $donation['quantityMl'] }} ml</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Measured Quantity') }}</p>
+                                <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $donation['quantityMl'] }} {{ __('ml') }}</p>
                             </div>
 
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">Attending Staff</p>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Attending Staff') }}</p>
                                 <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $donation['staffMember'] }}</p>
                             </div>
                         </div>
 
                         <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
                             <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                                Collection Notes
+                                {{ __('Collection Notes') }}
                             </p>
                             <p class="mt-1.5 leading-relaxed text-slate-800 dark:text-slate-200">
-                                {{ $donation['collectionNotes'] ?: 'No collection notes recorded.' }}
+                                {{ $donation['collectionNotes'] ?: __('No collection notes recorded.') }}
                             </p>
                         </div>
                     </div>
@@ -337,16 +337,16 @@
 
         @if ($donation['collectionStatus'] === 'Scheduled' && isset($donationModel))
             {{-- Complete Collection Modal --}}
-            <x-ui.modal name="complete-donation-modal" title="Complete Phlebotomy Collection" max-width="md">
+            <x-ui.modal name="complete-donation-modal" :title="__('Complete Phlebotomy Collection')" max-width="md">
                 <form method="POST" action="{{ route('donations.complete', $donationModel) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
-                        Record collection completion for donation <strong>{{ $donation['id'] }}</strong>. This creates the primary blood unit in quarantine and initializes the mandatory laboratory screening panel.
+                        {!! __('Record collection completion for donation :id. This creates the primary blood unit in quarantine and initializes the mandatory laboratory screening panel.', ['id' => '<strong class="dir-ltr">' . $donation['id'] . '</strong>']) !!}
                     </p>
 
                     <div>
                         <label for="complete-quantity" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Volume Collected (ml)
+                            {{ __('Volume Collected (ml)') }}
                         </label>
                         <input
                             type="number"
@@ -361,13 +361,13 @@
 
                     <div>
                         <label for="complete-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Collection / Phlebotomy Notes
+                            {{ __('Collection / Phlebotomy Notes') }}
                         </label>
                         <textarea
                             id="complete-notes"
                             name="collection_notes"
                             rows="3"
-                            placeholder="Vein accessibility, donor tolerance, vitals observations..."
+                            placeholder="{{ __('Vein accessibility, donor tolerance, vitals observations...') }}"
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         ></textarea>
                     </div>
@@ -378,35 +378,35 @@
                             @click="$dispatch('close-modal', 'complete-donation-modal')"
                             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            Cancel
+                            {{ __('Cancel') }}
                         </button>
                         <button
                             type="submit"
                             class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
                         >
-                            Confirm Completion
+                            {{ __('Confirm Completion') }}
                         </button>
                     </div>
                 </form>
             </x-ui.modal>
 
             {{-- Cancel Donation Modal --}}
-            <x-ui.modal name="cancel-donation-modal" title="Cancel Scheduled Donation" max-width="md">
+            <x-ui.modal name="cancel-donation-modal" :title="__('Cancel Scheduled Donation')" max-width="md">
                 <form method="POST" action="{{ route('donations.cancel', $donationModel) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
-                        Cancel scheduled donation <strong>{{ $donation['id'] }}</strong>.
+                        {!! __('Cancel scheduled donation :id.', ['id' => '<strong class="dir-ltr">' . $donation['id'] . '</strong>']) !!}
                     </p>
 
                     <div>
                         <label for="cancel-reason" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Reason for Cancellation
+                            {{ __('Reason for Cancellation') }}
                         </label>
                         <textarea
                             id="cancel-reason"
                             name="reason"
                             rows="3"
-                            placeholder="Donor did not appear, medically deferred prior to phlebotomy, or requested cancellation..."
+                            placeholder="{{ __('Donor did not appear, medically deferred prior to phlebotomy, or requested cancellation...') }}"
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         ></textarea>
                     </div>
@@ -417,13 +417,13 @@
                             @click="$dispatch('close-modal', 'cancel-donation-modal')"
                             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            Keep Scheduled
+                            {{ __('Keep Scheduled') }}
                         </button>
                         <button
                             type="submit"
                             class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-rose-700 cursor-pointer"
                         >
-                            Confirm Cancellation
+                            {{ __('Confirm Cancellation') }}
                         </button>
                     </div>
                 </form>
@@ -431,4 +431,3 @@
         @endif
     </div>
 </x-app-layout>
-

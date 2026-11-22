@@ -49,7 +49,7 @@
     @endif
 
     @if ($errors->any())
-        <x-ui.alert variant="danger" title="Validation errors occurred" class="mb-4">
+        <x-ui.alert variant="danger" :title="__('Validation errors occurred')" class="mb-4">
             <ul class="list-disc pl-5 text-xs space-y-1">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
@@ -59,14 +59,20 @@
     @endif
 
     @if ($isEdit && in_array($campStatus, ['Completed', 'Cancelled'], true))
-        <x-ui.alert variant="warning" :title="$campStatus . ' Camp Modification Notice'">
-            This donation camp is currently marked <strong>{{ $campStatus }}</strong>. Editing schedule or capacity parameters in preview mode requires administrative verification, and all existing donor registration history ({{ count($campRecord['registrations'] ?? []) }} record(s)) remains preserved.
+        <x-ui.alert variant="warning" :title="__(':status Camp Modification Notice', ['status' => __($campStatus)])">
+            {!! __('This donation camp is currently marked :status. Editing schedule or capacity parameters in preview mode requires administrative verification, and all existing donor registration history (:count record(s)) remains preserved.', [
+                'status' => '<strong>' . __($campStatus) . '</strong>',
+                'count' => count($campRecord['registrations'] ?? [])
+            ]) !!}
         </x-ui.alert>
     @endif
 
     @if ($isEdit && $existingRegistrationsCount > 0)
-        <x-ui.alert variant="info" title="Preserved Donor Registrations Guard">
-            <strong>{{ $existingRegistrationsCount }} active donor registration(s)</strong> are already booked for this camp and remain preserved. Maximum donor capacity cannot be reduced below {{ $existingRegistrationsCount }}.
+        <x-ui.alert variant="info" :title="__('Preserved Donor Registrations Guard')">
+            {!! __('This camp already has :count active donor registration(s) booked and preserved. Maximum donor capacity cannot be reduced below :min.', [
+                'count' => '<strong>' . $existingRegistrationsCount . ' ' . __('active donor registration(s)') . '</strong>',
+                'min' => $existingRegistrationsCount
+            ]) !!}
         </x-ui.alert>
     @endif
 
@@ -104,7 +110,7 @@
         <button
             type="button"
             @click="dismissFeedback()"
-            aria-label="Dismiss message"
+            :aria-label="__('Dismiss message')"
             class="rounded-lg p-1 opacity-70 transition hover:opacity-100 cursor-pointer"
         >
             <x-icons.icon name="x-mark" class="size-4" />
@@ -127,10 +133,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        1. Camp Information
+                        {{ __('1. Camp Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Drive title, operational overview, and coordinator contact details.
+                        {{ __('Drive title, operational overview, and coordinator contact details.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -140,8 +146,8 @@
                     <x-ui.input
                         id="camp-name"
                         name="name"
-                        label="Camp Name"
-                        placeholder="e.g. Central Plaza Community Blood Drive"
+                        :label="__('Camp Name')"
+                        :placeholder="__('e.g. Central Plaza Community Blood Drive')"
                         icon="calendar"
                         :value="$initialForm['name']"
                         required
@@ -161,9 +167,9 @@
                     <x-ui.textarea
                         id="camp-description"
                         name="description"
-                        label="Description"
+                        :label="__('Description')"
                         rows="3"
-                        placeholder="Describe phlebotomy setup, target blood groups, and drive scope..."
+                        :placeholder="__('Describe phlebotomy setup, target blood groups, and drive scope...')"
                         :value="$initialForm['description']"
                         required
                         x-model="form.description"
@@ -182,8 +188,8 @@
                     <x-ui.input
                         id="camp-organizer-name"
                         name="organizer_name"
-                        label="Organizer Name"
-                        placeholder="e.g. Elena Martinez"
+                        :label="__('Organizer Name')"
+                        :placeholder="__('e.g. Elena Martinez')"
                         icon="user"
                         :value="$initialForm['organizerName']"
                         required
@@ -204,7 +210,7 @@
                         id="camp-organizer-contact"
                         name="organizer_contact"
                         type="tel"
-                        label="Organizer Contact Number"
+                        :label="__('Organizer Contact Number')"
                         placeholder="+1 (555) 210-8840"
                         icon="phone"
                         :value="$initialForm['organizerContact']"
@@ -226,7 +232,7 @@
                         id="camp-organizer-email"
                         name="organizer_email"
                         type="email"
-                        label="Organizer Email"
+                        :label="__('Organizer Email')"
                         placeholder="coordinator@organization.org"
                         icon="envelope"
                         :value="$initialForm['organizerEmail']"
@@ -250,10 +256,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        2. Location Information
+                        {{ __('2. Location Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Venue identification, street address, city/district, and access instructions.
+                        {{ __('Venue identification, street address, city/district, and access instructions.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -263,8 +269,8 @@
                     <x-ui.input
                         id="camp-venue-name"
                         name="venue_name"
-                        label="Venue Name"
-                        placeholder="e.g. Central Medical Plaza Pavilion"
+                        :label="__('Venue Name')"
+                        :placeholder="__('e.g. Central Medical Plaza Pavilion')"
                         icon="building-hospital"
                         :value="$initialForm['venueName']"
                         required
@@ -284,8 +290,8 @@
                     <x-ui.input
                         id="camp-city"
                         name="city"
-                        label="City"
-                        placeholder="e.g. Metro Center"
+                        :label="__('City')"
+                        :placeholder="__('e.g. Metro Center')"
                         icon="map-pin"
                         :value="$initialForm['city']"
                         required
@@ -305,8 +311,8 @@
                     <x-ui.input
                         id="camp-full-address"
                         name="full_address"
-                        label="Full Address"
-                        placeholder="Street number, concourse, wing or hall"
+                        :label="__('Full Address')"
+                        :placeholder="__('Street number, concourse, wing or hall')"
                         icon="map-pin"
                         :value="$initialForm['fullAddress']"
                         required
@@ -326,10 +332,10 @@
                     <x-ui.textarea
                         id="camp-location-notes"
                         name="location_notes"
-                        label="Additional Location Notes"
+                        :label="__('Additional Location Notes')"
                         rows="2"
-                        placeholder="Parking validation, accessibility ramp, security desk check-in..."
-                        hint="Optional donor wayfinding notes."
+                        :placeholder="__('Parking validation, accessibility ramp, security desk check-in...')"
+                        :hint="__('Optional donor wayfinding notes.')"
                         :value="$initialForm['locationNotes']"
                         x-model="form.locationNotes"
                     />
@@ -342,10 +348,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        3. Schedule
+                        {{ __('3. Schedule') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Operating dates and phlebotomy hours. End date must be on or after start date.
+                        {{ __('Operating dates and phlebotomy hours. End date must be on or after start date.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -356,7 +362,7 @@
                         id="camp-start-date"
                         name="start_date"
                         type="date"
-                        label="Start Date"
+                        :label="__('Start Date')"
                         :value="$initialForm['startDate']"
                         required
                         x-model="form.startDate"
@@ -376,7 +382,7 @@
                         id="camp-end-date"
                         name="end_date"
                         type="date"
-                        label="End Date"
+                        :label="__('End Date')"
                         :value="$initialForm['endDate']"
                         required
                         x-model="form.endDate"
@@ -396,7 +402,7 @@
                         id="camp-start-time"
                         name="start_time"
                         type="time"
-                        label="Start Time"
+                        :label="__('Start Time')"
                         :value="$initialForm['startTime']"
                         required
                         x-model="form.startTime"
@@ -416,7 +422,7 @@
                         id="camp-end-time"
                         name="end_time"
                         type="time"
-                        label="End Time"
+                        :label="__('End Time')"
                         :value="$initialForm['endTime']"
                         required
                         x-model="form.endTime"
@@ -438,10 +444,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        4. Capacity &amp; Registration
+                        {{ __('4. Capacity & Registration') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Maximum donor slots, pre-registration cutoff date, and ongoing walk-in policy.
+                        {{ __('Maximum donor slots, pre-registration cutoff date, and ongoing walk-in policy.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -454,10 +460,10 @@
                         type="number"
                         min="{{ $isEdit ? max(1, $existingRegistrationsCount) : 1 }}"
                         step="1"
-                        label="Maximum Donor Capacity"
+                        :label="__('Maximum Donor Capacity')"
                         placeholder="e.g. 50"
                         icon="users"
-                        hint="{{ $isEdit && $existingRegistrationsCount > 0 ? 'Must be at least ' . $existingRegistrationsCount . ' (existing active registrations).' : 'Positive integer representing total donor booking slots.' }}"
+                        :hint="$isEdit && $existingRegistrationsCount > 0 ? __('Must be at least :min (existing active registrations).', ['min' => $existingRegistrationsCount]) : __('Positive integer representing total donor booking slots.')"
                         :value="$initialForm['capacity']"
                         required
                         x-model="form.capacity"
@@ -477,8 +483,8 @@
                         id="camp-registration-deadline"
                         name="registration_deadline"
                         type="date"
-                        label="Registration Deadline"
-                        hint="Must be on or before the camp start date."
+                        :label="__('Registration Deadline')"
+                        :hint="__('Must be on or before the camp start date.')"
                         :value="$initialForm['registrationDeadline']"
                         required
                         x-model="form.registrationDeadline"
@@ -495,10 +501,10 @@
 
                 <div class="md:col-span-2">
                     <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                        Allow Walk-in Donors <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                        {{ __('Allow Walk-in Donors') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                     </span>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Determines whether ongoing camps permit same-day donor registration while available slots remain.
+                        {{ __('Determines whether ongoing camps permit same-day donor registration while available slots remain.') }}
                     </p>
 
                     <div class="mt-2.5 flex flex-wrap gap-3">
@@ -518,7 +524,7 @@
                                 @change="validateField('allowWalkIn')"
                                 class="size-4 border-slate-300 text-crimson-600 focus:ring-crimson-500"
                             />
-                            <span>Yes &mdash; Permit walk-ins when ongoing</span>
+                            <span>{{ __('Yes — Permit walk-ins when ongoing') }}</span>
                         </label>
 
                         <label
@@ -537,7 +543,7 @@
                                 @change="validateField('allowWalkIn')"
                                 class="size-4 border-slate-300 text-crimson-600 focus:ring-crimson-500"
                             />
-                            <span>No &mdash; Pre-registered donors only</span>
+                            <span>{{ __('No — Pre-registered donors only') }}</span>
                         </label>
                     </div>
                     <p
@@ -555,10 +561,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        5. Additional Information
+                        {{ __('5. Additional Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Eligibility prerequisites for donors and coordinator logistics notes.
+                        {{ __('Eligibility prerequisites for donors and coordinator logistics notes.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -568,9 +574,9 @@
                     <x-ui.textarea
                         id="camp-donor-requirements"
                         name="donor_requirements"
-                        label="Requirements for Donors"
+                        :label="__('Requirements for Donors')"
                         rows="3"
-                        placeholder="e.g. Photo ID, minimum 50 kg weight, light meal and hydration prior to arrival..."
+                        :placeholder="__('e.g. Photo ID, minimum 50 kg weight, light meal and hydration prior to arrival...')"
                         :value="$initialForm['donorRequirements']"
                         required
                         x-model="form.donorRequirements"
@@ -589,10 +595,10 @@
                     <x-ui.textarea
                         id="camp-additional-notes"
                         name="additional_notes"
-                        label="Additional Notes"
+                        :label="__('Additional Notes')"
                         rows="3"
-                        placeholder="Optional mobile van parking, cold-chain courier schedules, or outreach tags..."
-                        hint="Optional coordination notes."
+                        :placeholder="__('Optional mobile van parking, cold-chain courier schedules, or outreach tags...')"
+                        :hint="__('Optional coordination notes.')"
                         :value="$initialForm['additionalNotes']"
                         x-model="form.additionalNotes"
                     />
@@ -601,7 +607,7 @@
                 @if ($isEdit)
                     <div>
                         <label for="camp-status" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                            Camp Status
+                            {{ __('Camp Status') }}
                         </label>
                         <select
                             id="camp-status"
@@ -609,7 +615,7 @@
                             class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                         >
                             @foreach ($statuses as $st)
-                                <option value="{{ $st }}" {{ $campStatus === $st ? 'selected' : '' }}>{{ $st }}</option>
+                                <option value="{{ $st }}" {{ $campStatus === $st ? 'selected' : '' }}>{{ __($st) }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -623,17 +629,17 @@
                         @click="resetForm()"
                         class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                     >
-                        Reset Fields
+                        {{ __('Reset Fields') }}
                     </button>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                         <x-ui.button variant="outline" size="md" :href="$cancelUrl">
-                            Cancel
+                            {{ __('Cancel') }}
                         </x-ui.button>
 
                         <x-ui.button variant="primary" size="md" type="submit">
                             <x-icons.icon name="check" class="size-4" />
-                            <span>{{ $isEdit ? 'Save Camp Changes' : 'Create Donation Camp' }}</span>
+                            <span>{{ $isEdit ? __('Save Camp Changes') : __('Create Donation Camp') }}</span>
                         </x-ui.button>
                     </div>
                 </div>
@@ -641,4 +647,3 @@
         </x-ui.card>
     </form>
 </div>
-

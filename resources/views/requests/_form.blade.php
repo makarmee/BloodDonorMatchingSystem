@@ -22,7 +22,7 @@
         ->all();
 
     $priorityOptions = collect($priorities)
-        ->mapWithKeys(fn (string $priority): array => [$priority => $priority])
+        ->mapWithKeys(fn (string $priority): array => [$priority => __($priority)])
         ->all();
 
     $existingFulfilled = (int) ($requestRecord['fulfilledUnits'] ?? 0);
@@ -46,8 +46,11 @@
     class="space-y-6"
 >
     @if ($isEdit && $existingFulfilled > 0)
-        <x-ui.alert variant="info" title="Fulfillment Consistency Guard Active">
-            This request already has <strong>{{ $existingFulfilled }} fulfilled units</strong> recorded. Requested units cannot be edited below {{ $existingFulfilled }} to preserve fulfillment consistency.
+        <x-ui.alert variant="info" :title="__('Fulfillment Consistency Guard Active')">
+            {!! __('This request already has :count fulfilled units recorded. Requested units cannot be edited below :min to preserve fulfillment consistency.', [
+                'count' => '<strong>' . $existingFulfilled . ' ' . __('fulfilled units') . '</strong>',
+                'min' => $existingFulfilled
+            ]) !!}
         </x-ui.alert>
     @endif
 
@@ -85,7 +88,7 @@
         <button
             type="button"
             @click="dismissFeedback()"
-            aria-label="Dismiss message"
+            :aria-label="__('Dismiss message')"
             class="rounded-lg p-1 opacity-70 transition hover:opacity-100 cursor-pointer"
         >
             <x-icons.icon name="x-mark" class="size-4" />
@@ -107,10 +110,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        Hospital Information
+                        {{ __('Hospital Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Requesting medical institution, transfusion contact officer, and delivery address.
+                        {{ __('Requesting medical institution, transfusion contact officer, and delivery address.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -120,8 +123,8 @@
                     <x-ui.input
                         id="request-hospital-name"
                         name="hospital_name"
-                        label="Hospital Name"
-                        placeholder="e.g. City General Hospital"
+                        :label="__('Hospital Name')"
+                        :placeholder="__('e.g. City General Hospital')"
                         icon="building-hospital"
                         :value="$initialForm['hospitalName']"
                         required
@@ -141,8 +144,8 @@
                     <x-ui.input
                         id="request-contact-person"
                         name="contact_person"
-                        label="Contact Person"
-                        placeholder="e.g. Dr. Elena Morales"
+                        :label="__('Contact Person')"
+                        :placeholder="__('e.g. Dr. Elena Morales')"
                         icon="user"
                         :value="$initialForm['contactPerson']"
                         required
@@ -163,7 +166,7 @@
                         id="request-contact-number"
                         name="contact_number"
                         type="tel"
-                        label="Contact Number"
+                        :label="__('Contact Number')"
                         placeholder="+1 (555) 289-4100"
                         icon="phone"
                         :value="$initialForm['contactNumber']"
@@ -185,7 +188,7 @@
                         id="request-email"
                         name="email"
                         type="email"
-                        label="Email"
+                        :label="__('Email')"
                         placeholder="transfusion@hospital.org"
                         icon="envelope"
                         :value="$initialForm['email']"
@@ -206,8 +209,8 @@
                     <x-ui.input
                         id="request-hospital-address"
                         name="hospital_address"
-                        label="Hospital Address"
-                        placeholder="Street address, ward/wing, district"
+                        :label="__('Hospital Address')"
+                        :placeholder="__('Street address, ward/wing, district')"
                         icon="map-pin"
                         :value="$initialForm['hospitalAddress']"
                         required
@@ -230,10 +233,10 @@
             <x-slot:header>
                 <div>
                     <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                        Request Information
+                        {{ __('Request Information') }}
                     </h2>
                     <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Specify blood group, required quantity, clinical urgency priority, and fulfillment deadline.
+                        {{ __('Specify blood group, required quantity, clinical urgency priority, and fulfillment deadline.') }}
                     </p>
                 </div>
             </x-slot:header>
@@ -243,8 +246,8 @@
                     <x-ui.select
                         id="request-blood-group"
                         name="blood_group"
-                        label="Blood Group"
-                        placeholder="Select blood group"
+                        :label="__('Blood Group')"
+                        :placeholder="__('Select blood group')"
                         :options="$bloodGroupOptions"
                         :value="$initialForm['bloodGroup']"
                         required
@@ -265,9 +268,9 @@
                         id="request-units"
                         name="requested_units"
                         type="number"
-                        label="Number of Units Required"
+                        :label="__('Number of Units Required')"
                         placeholder="e.g. 4"
-                        hint="{{ $isEdit && $existingFulfilled > 0 ? 'Minimum allowed: ' . $existingFulfilled . ' (already fulfilled).' : 'Enter a positive integer quantity.' }}"
+                        :hint="$isEdit && $existingFulfilled > 0 ? __('Minimum allowed: :min (already fulfilled).', ['min' => $existingFulfilled]) : __('Enter a positive integer quantity.')"
                         icon="droplet"
                         :min="max(1, $existingFulfilled)"
                         step="1"
@@ -290,7 +293,7 @@
                         id="request-required-date"
                         name="required_date"
                         type="date"
-                        label="Required Date"
+                        :label="__('Required Date')"
                         icon="calendar"
                         :value="$initialForm['requiredDate']"
                         required
@@ -310,8 +313,8 @@
                     <x-ui.select
                         id="request-priority"
                         name="priority"
-                        label="Priority"
-                        placeholder="Select priority"
+                        :label="__('Priority')"
+                        :placeholder="__('Select priority')"
                         :options="$priorityOptions"
                         :value="$initialForm['priority']"
                         required
@@ -331,9 +334,9 @@
                     <x-ui.textarea
                         id="request-reason"
                         name="request_reason"
-                        label="Request Reason"
+                        :label="__('Request Reason')"
                         rows="3"
-                        placeholder="e.g. Emergency trauma transfusion, scheduled cardiothoracic surgery, or oncology support..."
+                        :placeholder="__('e.g. Emergency trauma transfusion, scheduled cardiothoracic surgery, or oncology support...')"
                         :value="$initialForm['requestReason']"
                         required
                         x-model="form.requestReason"
@@ -352,10 +355,10 @@
                     <x-ui.textarea
                         id="request-additional-notes"
                         name="additional_notes"
-                        label="Additional Notes"
+                        :label="__('Additional Notes')"
                         rows="3"
-                        placeholder="Courier dispatch instructions, irradiation/CMV preferences, or ward delivery dock details..."
-                        hint="Optional logistics notes (up to 1000 characters)."
+                        :placeholder="__('Courier dispatch instructions, irradiation/CMV preferences, or ward delivery dock details...')"
+                        :hint="__('Optional logistics notes (up to 1000 characters).')"
                         :value="$initialForm['additionalNotes']"
                         x-model="form.additionalNotes"
                         @blur="validateField('additionalNotes')"
@@ -377,17 +380,17 @@
                         @click="resetForm()"
                         class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                     >
-                        Reset Fields
+                        {{ __('Reset Fields') }}
                     </button>
 
                     <div class="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
                         <x-ui.button variant="outline" size="md" :href="$cancelUrl">
-                            Cancel
+                            {{ __('Cancel') }}
                         </x-ui.button>
 
                         <x-ui.button variant="primary" size="md" type="submit">
                             <x-icons.icon name="check" class="size-4" />
-                            <span>{{ $isEdit ? 'Save Request Changes' : 'Submit Blood Request' }}</span>
+                            <span>{{ $isEdit ? __('Save Request Changes') : __('Submit Blood Request') }}</span>
                         </x-ui.button>
                     </div>
                 </div>
@@ -395,4 +398,3 @@
         </x-ui.card>
     </form>
 </div>
-

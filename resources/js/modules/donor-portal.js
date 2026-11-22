@@ -335,10 +335,11 @@ export function donorDashboard(initial = {}) {
             this.cancelCandidate = null;
             this.$dispatch('close-modal', 'donor-cancel-appointment-modal');
 
+            const t = typeof window !== 'undefined' && window.__ ? window.__ : ((k, r) => k);
             this.feedback = {
                 type: 'success',
-                title: 'Appointment cancelled (Preview mode)',
-                message: `Appointment ${targetId} (${label}) was marked Cancelled. Upcoming count updated and time slot released.`,
+                title: t('Appointment cancelled (Preview mode)'),
+                message: t('Appointment :id (:label) was marked Cancelled. Upcoming count updated and time slot released.', { id: targetId, label }),
             };
         },
 
@@ -483,10 +484,11 @@ export function donorAppointments(initial = {}) {
             this.cancelCandidate = null;
             this.$dispatch('close-modal', 'donor-cancel-appointment-modal');
 
+            const t = typeof window !== 'undefined' && window.__ ? window.__ : ((k, r) => k);
             this.feedback = {
                 type: 'success',
-                title: 'Appointment cancelled (Preview mode)',
-                message: `Appointment ${targetId} has been cancelled and moved out of your upcoming schedule. Completed and past records remain archived.`,
+                title: t('Appointment cancelled (Preview mode)'),
+                message: t('Appointment :id has been cancelled and moved out of your upcoming schedule. Completed and past records remain archived.', { id: targetId }),
             };
         },
 
@@ -626,12 +628,13 @@ export function appointmentForm(initial = {}) {
         },
 
         submitForm() {
+            const t = typeof window !== 'undefined' && window.__ ? window.__ : ((k, r) => k);
             const result = this.validateCurrentSelection();
             if (!result.valid) {
                 this.feedback = {
                     type: 'danger',
-                    title: 'Appointment validation error',
-                    message: result.message || 'Review highlighted appointment details before submitting.',
+                    title: t('Appointment validation error'),
+                    message: result.message || t('Review highlighted appointment details before submitting.'),
                 };
                 if (typeof window !== 'undefined' && window.scrollTo) {
                     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -665,8 +668,14 @@ export function appointmentForm(initial = {}) {
 
             this.feedback = {
                 type: 'success',
-                title: 'Appointment booked (Preview mode)',
-                message: `Reference ${newId} reserved for ${this.form.donationType} on ${newAppointment.dateFormatted} at ${this.form.time} (${locationName}). Your dashboard and appointments list have been updated.`,
+                title: t('Appointment booked (Preview mode)'),
+                message: t('Reference :id reserved for :type on :date at :time (:location). Your dashboard and appointments list have been updated.', {
+                    id: newId,
+                    type: t(this.form.donationType),
+                    date: newAppointment.dateFormatted,
+                    time: this.form.time,
+                    location: locationName,
+                }),
             };
 
             this.form.notes = '';

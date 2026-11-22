@@ -14,44 +14,44 @@
     $initialGroupStock = (int) ($sampleInventory[$bloodRequest['bloodGroup']] ?? 0);
 @endphp
 
-<x-app-layout :title="'Blood Request · ' . $bloodRequest['id']" page-title="Request Details">
+<x-app-layout :title="__('Blood Request') . ' · ' . $bloodRequest['id']" :page-title="__('Request Details')">
     <x-slot:header>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <div class="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                     <a href="{{ route('requests.index') }}" class="transition hover:text-crimson-600 dark:hover:text-crimson-400">
-                        Blood Requests
+                        {{ __('Blood Requests') }}
                     </a>
-                    <x-icons.icon name="chevron-right" class="size-3.5" />
-                    <span class="font-mono text-slate-700 dark:text-slate-200">{{ $bloodRequest['id'] }}</span>
+                    <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
+                    <span class="font-mono text-slate-700 dark:text-slate-200 dir-ltr">{{ $bloodRequest['id'] }}</span>
                 </div>
 
                 <div class="mt-2 flex flex-wrap items-center gap-2.5">
-                    <h1 class="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+                    <h1 class="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white dir-ltr">
                         {{ $bloodRequest['id'] }}
                     </h1>
                     <x-bdms.blood-group-badge :group="$bloodRequest['bloodGroup']" size="md" />
                     <x-ui.badge :variant="$priorityVariant" :dot="true">
-                        Priority: {{ $bloodRequest['priority'] }}
+                        {{ __('Priority') }}: {{ __($bloodRequest['priority']) }}
                     </x-ui.badge>
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ $bloodRequest['hospitalName'] }} &middot; Requested {{ $bloodRequest['requestDateFormatted'] }} &middot; Required by {{ $bloodRequest['requiredDateFormatted'] }}
+                    {{ $bloodRequest['hospitalName'] }} &middot; {{ __('Requested') }} {{ $bloodRequest['requestDateFormatted'] }} &middot; {{ __('Required by') }} {{ $bloodRequest['requiredDateFormatted'] }}
                 </p>
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
                 <x-ui.button variant="outline" size="md" :href="route('requests.index')">
-                    <x-icons.icon name="arrow-left" class="size-4" />
-                    <span>Back to Requests</span>
+                    <x-icons.icon name="arrow-left" class="size-4 rtl-flip" />
+                    <span>{{ __('Back to Requests') }}</span>
                 </x-ui.button>
 
                 @can('update', $bloodRequestRecord)
                     @if (! $isTerminal)
                         <x-ui.button variant="primary" size="md" :href="route('requests.edit', $bloodRequest['id'])">
                             <x-icons.icon name="pencil" class="size-4" />
-                            <span>Edit Request</span>
+                            <span>{{ __('Edit Request') }}</span>
                         </x-ui.button>
                     @endif
                 @endcan
@@ -63,7 +63,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                     >
                         <x-icons.icon name="no-symbol" class="size-3.5 text-slate-500" />
-                        <span>Cancel Request</span>
+                        <span>{{ __('Cancel Request') }}</span>
                     </button>
                 @endcan
             </div>
@@ -75,7 +75,7 @@
         <section aria-label="Request fulfillment summary" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Current Status
+                    {{ __('Current Status') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between gap-2">
                     <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset {{ match ($bloodRequest['status']) {
@@ -86,63 +86,63 @@
                         'Cancelled' => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
                         default => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-800/70',
                     } }}">
-                        {{ $bloodRequest['status'] }}
+                        {{ __($bloodRequest['status']) }}
                     </span>
                     <x-icons.icon name="clipboard-list" class="size-5 text-slate-400 dark:text-slate-500" />
                 </div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    Priority: <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $bloodRequest['priority'] }}</span>
+                    {{ __('Priority') }}: <span class="font-semibold text-slate-700 dark:text-slate-200">{{ __($bloodRequest['priority']) }}</span>
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Requested Units
+                    {{ __('Requested Units') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between">
                     <p class="text-2xl font-bold text-slate-900 dark:text-white">
-                        {{ $bloodRequest['requestedUnits'] }} units
+                        {{ $bloodRequest['requestedUnits'] }} {{ __('units') }}
                     </p>
                     <x-bdms.blood-group-badge :group="$bloodRequest['bloodGroup']" size="md" />
                 </div>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Required by {{ $bloodRequest['requiredDateFormatted'] }}
+                    {{ __('Required by') }} {{ $bloodRequest['requiredDateFormatted'] }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Reserved Units
+                    {{ __('Reserved Units') }}
                 </p>
                 <p class="mt-3 text-2xl font-bold text-sky-600 dark:text-sky-400">
-                    {{ $bloodRequest['reservedUnits'] }} units
+                    {{ $bloodRequest['reservedUnits'] }} {{ __('units') }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Held in inventory reserve
+                    {{ __('Held in inventory reserve') }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Fulfilled Units
+                    {{ __('Fulfilled Units') }}
                 </p>
                 <p class="mt-3 text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {{ $bloodRequest['fulfilledUnits'] }} units
+                    {{ $bloodRequest['fulfilledUnits'] }} {{ __('units') }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Dispatched toward order
+                    {{ __('Dispatched toward order') }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    Remaining Units
+                    {{ __('Remaining Units') }}
                 </p>
                 <p class="mt-3 text-2xl font-bold text-slate-900 dark:text-white">
-                    {{ $bloodRequest['remainingUnits'] }} units
+                    {{ $bloodRequest['remainingUnits'] }} {{ __('units') }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Requested minus fulfilled
+                    {{ __('Requested minus fulfilled') }}
                 </p>
             </x-ui.card>
         </section>
@@ -152,16 +152,18 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        Fulfillment Progress
+                        {{ __('Fulfillment Progress') }}
                     </h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $bloodRequest['fulfilledUnits'] }}</span>
-                        of {{ $bloodRequest['requestedUnits'] }} units fulfilled &middot;
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $bloodRequest['remainingUnits'] }}</span> remaining
+                        {!! __(':fulfilled of :requested units fulfilled &middot; :remaining remaining', [
+                            'fulfilled' => '<span class="font-semibold text-slate-700 dark:text-slate-200">' . $bloodRequest['fulfilledUnits'] . '</span>',
+                            'requested' => $bloodRequest['requestedUnits'],
+                            'remaining' => '<span class="font-semibold text-slate-700 dark:text-slate-200">' . $bloodRequest['remainingUnits'] . '</span>'
+                        ]) !!}
                     </p>
                 </div>
 
-                <span class="font-mono text-sm font-bold text-slate-900 dark:text-white">
+                <span class="font-mono text-sm font-bold text-slate-900 dark:text-white dir-ltr">
                     {{ $initialPercent }}%
                 </span>
             </div>
@@ -180,41 +182,41 @@
                 <x-ui.card>
                     <x-slot:header>
                         <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                            Hospital Information
+                            {{ __('Hospital Information') }}
                         </h2>
                     </x-slot:header>
 
                     <dl class="space-y-3 text-sm">
                         <div class="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <dt class="text-slate-500 dark:text-slate-400">Hospital</dt>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Hospital') }}</dt>
                             <dd class="font-semibold text-slate-900 dark:text-white">{{ $bloodRequest['hospitalName'] }}</dd>
                         </div>
 
                         <div class="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <dt class="text-slate-500 dark:text-slate-400">Contact Officer</dt>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Contact Officer') }}</dt>
                             <dd class="text-slate-800 dark:text-slate-200">{{ $bloodRequest['contactPerson'] }}</dd>
                         </div>
 
                         <div class="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <dt class="text-slate-500 dark:text-slate-400">Contact Phone</dt>
-                            <dd class="font-mono text-slate-800 dark:text-slate-200">{{ $bloodRequest['contactNumber'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Contact Phone') }}</dt>
+                            <dd class="font-mono text-slate-800 dark:text-slate-200 dir-ltr text-start">{{ $bloodRequest['contactNumber'] }}</dd>
                         </div>
 
                         <div class="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <dt class="text-slate-500 dark:text-slate-400">Email</dt>
-                            <dd class="font-mono text-xs text-slate-800 dark:text-slate-200">{{ $bloodRequest['email'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Email') }}</dt>
+                            <dd class="font-mono text-xs text-slate-800 dark:text-slate-200 dir-ltr text-start">{{ $bloodRequest['email'] }}</dd>
                         </div>
 
                         <div class="flex justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
-                            <dt class="text-slate-500 dark:text-slate-400">Requester Account</dt>
-                            <dd class="text-right text-xs text-slate-700 dark:text-slate-300">
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Requester Account') }}</dt>
+                            <dd class="text-end text-xs text-slate-700 dark:text-slate-300">
                                 {{ $bloodRequest['requesterName'] }}
                             </dd>
                         </div>
 
                         <div class="flex justify-between pt-1">
-                            <dt class="text-slate-500 dark:text-slate-400">Ward / Address</dt>
-                            <dd class="text-right text-slate-700 dark:text-slate-200">{{ $bloodRequest['hospitalAddress'] }}</dd>
+                            <dt class="text-slate-500 dark:text-slate-400">{{ __('Ward / Address') }}</dt>
+                            <dd class="text-end text-slate-700 dark:text-slate-200">{{ $bloodRequest['hospitalAddress'] }}</dd>
                         </div>
                     </dl>
                 </x-ui.card>
@@ -222,33 +224,33 @@
                 <x-ui.card>
                     <x-slot:header>
                         <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                            Clinical Request Details
+                            {{ __('Clinical Request Details') }}
                         </h2>
                     </x-slot:header>
 
                     <div class="space-y-4 text-sm">
                         <dl class="grid grid-cols-2 gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
                             <div>
-                                <dt class="text-xs text-slate-500 dark:text-slate-400">Request Date</dt>
+                                <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Request Date') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['requestDateFormatted'] }}</dd>
                             </div>
                             <div>
-                                <dt class="text-xs text-slate-500 dark:text-slate-400">Required Date</dt>
+                                <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Required Date') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['requiredDateFormatted'] }}</dd>
                             </div>
                             <div>
-                                <dt class="text-xs text-slate-500 dark:text-slate-400">Blood Group</dt>
+                                <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Blood Group') }}</dt>
                                 <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['bloodGroup'] }}</dd>
                             </div>
                             <div>
-                                <dt class="text-xs text-slate-500 dark:text-slate-400">Component</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['componentName'] ?? 'Whole Blood / RBC' }}</dd>
+                                <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Component') }}</dt>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['componentName'] ?? __('Whole Blood / RBC') }}</dd>
                             </div>
                         </dl>
 
                         <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 dark:border-slate-800 dark:bg-slate-800/50">
                             <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                                Clinical Reason
+                                {{ __('Clinical Reason') }}
                             </p>
                             <p class="mt-1 leading-relaxed text-slate-800 dark:text-slate-200">
                                 {{ $bloodRequest['requestReason'] }}
@@ -256,21 +258,21 @@
                         </div>
 
                         <div>
-                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Additional Notes</p>
+                            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Additional Notes') }}</p>
                             <p class="mt-1 leading-relaxed text-slate-700 dark:text-slate-300">
-                                {{ $bloodRequest['additionalNotes'] ?: 'No additional notes recorded.' }}
+                                {{ $bloodRequest['additionalNotes'] ?: __('No additional notes recorded.') }}
                             </p>
                         </div>
 
                         @if ($bloodRequest['reviewedBy'] || $bloodRequest['reviewedAt'])
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/50">
-                                <p class="font-semibold text-slate-700 dark:text-slate-200">Triage Review</p>
+                                <p class="font-semibold text-slate-700 dark:text-slate-200">{{ __('Triage Review') }}</p>
                                 <p class="mt-0.5 text-slate-600 dark:text-slate-400">
-                                    Reviewed by {{ $bloodRequest['reviewedBy'] ?? 'Staff' }} on {{ $bloodRequest['reviewedAt'] ?? '—' }}
+                                    {{ __('Reviewed by :user on :date', ['user' => $bloodRequest['reviewedBy'] ?? __('Staff'), 'date' => $bloodRequest['reviewedAt'] ?? '—']) }}
                                 </p>
                                 @if ($bloodRequest['rejectionReason'])
                                     <p class="mt-1 font-medium text-rose-600 dark:text-rose-400">
-                                        Rejection Reason: {{ $bloodRequest['rejectionReason'] }}
+                                        {{ __('Rejection Reason') }}: {{ $bloodRequest['rejectionReason'] }}
                                     </p>
                                 @endif
                             </div>
@@ -278,13 +280,13 @@
 
                         @if ($bloodRequest['cancelledBy'] || $bloodRequest['cancelledAt'])
                             <div class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-800 dark:bg-slate-800/50">
-                                <p class="font-semibold text-slate-700 dark:text-slate-200">Cancellation Record</p>
+                                <p class="font-semibold text-slate-700 dark:text-slate-200">{{ __('Cancellation Record') }}</p>
                                 <p class="mt-0.5 text-slate-600 dark:text-slate-400">
-                                    Cancelled by {{ $bloodRequest['cancelledBy'] ?? 'Requester' }} on {{ $bloodRequest['cancelledAt'] ?? '—' }}
+                                    {{ __('Cancelled by :user on :date', ['user' => $bloodRequest['cancelledBy'] ?? __('Requester'), 'date' => $bloodRequest['cancelledAt'] ?? '—']) }}
                                 </p>
                                 @if ($bloodRequest['cancellationReason'])
                                     <p class="mt-1 font-medium text-slate-600 dark:text-slate-300">
-                                        Reason: {{ $bloodRequest['cancellationReason'] }}
+                                        {{ __('Reason') }}: {{ $bloodRequest['cancellationReason'] }}
                                     </p>
                                 @endif
                             </div>
@@ -301,10 +303,10 @@
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Fulfillment Workflow
+                                    {{ __('Fulfillment Workflow') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Triage, reserve, release, and dispatch authorized blood units.
+                                    {{ __('Triage, reserve, release, and dispatch authorized blood units.') }}
                                 </p>
                             </div>
 
@@ -317,7 +319,7 @@
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
                                         >
                                             <x-icons.icon name="check" class="size-3.5" />
-                                            <span>Approve Request</span>
+                                            <span>{{ __('Approve Request') }}</span>
                                         </button>
 
                                         <button
@@ -326,7 +328,7 @@
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20 cursor-pointer"
                                         >
                                             <x-icons.icon name="x-mark" class="size-3.5" />
-                                            <span>Reject Request</span>
+                                            <span>{{ __('Reject Request') }}</span>
                                         </button>
                                     @endif
                                 @endcan
@@ -341,9 +343,9 @@
                                 <div class="flex items-start gap-3">
                                     <x-icons.icon name="lock-closed" class="mt-0.5 size-5 shrink-0 text-slate-500 dark:text-slate-400" />
                                     <div>
-                                        <p class="font-semibold">Fulfillment Locked</p>
+                                        <p class="font-semibold">{{ __('Fulfillment Locked') }}</p>
                                         <p class="mt-0.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                                            Rejected and Cancelled requests cannot receive additional fulfillment or status modifications.
+                                            {{ __('Rejected and Cancelled requests cannot receive additional fulfillment or status modifications.') }}
                                         </p>
                                     </div>
                                 </div>
@@ -354,9 +356,9 @@
                                     <div class="flex items-start gap-3">
                                         <x-icons.icon name="exclamation-triangle" class="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
                                         <div>
-                                            <p class="font-semibold">Insufficient sample inventory warning</p>
+                                            <p class="font-semibold">{{ __('Insufficient sample inventory warning') }}</p>
                                             <p class="mt-0.5 text-xs leading-relaxed">
-                                                Selected sample stock for {{ $bloodRequest['bloodGroup'] }} has {{ $initialGroupStock }} units available, while {{ $bloodRequest['remainingUnits'] }} remaining units are needed.
+                                                {{ __('Selected sample stock for :group has :stock units available, while :remaining remaining units are needed.', ['group' => $bloodRequest['bloodGroup'], 'stock' => $initialGroupStock, 'remaining' => $bloodRequest['remainingUnits']]) }}
                                             </p>
                                         </div>
                                     </div>
@@ -367,9 +369,9 @@
                                 <div class="flex items-start gap-3">
                                     <x-icons.icon name="clock" class="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
                                     <div>
-                                        <p class="font-semibold">Awaiting Triage Review</p>
+                                        <p class="font-semibold">{{ __('Awaiting Triage Review') }}</p>
                                         <p class="mt-0.5 text-xs leading-relaxed">
-                                            This request requires clinical triage review by blood bank staff before units can be reserved or dispatched.
+                                            {{ __('This request requires clinical triage review by blood bank staff before units can be reserved or dispatched.') }}
                                         </p>
                                     </div>
                                 </div>
@@ -387,18 +389,18 @@
                                         <div class="flex items-center gap-2">
                                             <x-icons.icon name="truck" class="size-4 text-crimson-600 dark:text-crimson-400" />
                                             <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                                                Record Fulfilled Units
+                                                {{ __('Record Fulfilled Units') }}
                                             </h3>
                                         </div>
                                         <span class="text-xs text-slate-500 dark:text-slate-400">
-                                            Remaining allowed: <strong class="text-slate-800 dark:text-slate-200">{{ $bloodRequest['remainingUnits'] }}</strong> unit(s)
+                                            {{ __('Remaining allowed: :count unit(s)', ['count' => $bloodRequest['remainingUnits']]) }}
                                         </span>
                                     </div>
 
                                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                         <div>
                                             <label for="dispatch-blood-group" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                Dispatched Blood Group <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                                {{ __('Dispatched Blood Group') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                                             </label>
                                             <select
                                                 id="dispatch-blood-group"
@@ -407,7 +409,7 @@
                                             >
                                                 @foreach ($bloodGroups as $group)
                                                     <option value="{{ $group }}" @selected($group === $bloodRequest['bloodGroup'])>
-                                                        {{ $group }} ({{ $sampleInventory[$group] ?? 0 }} units in stock)
+                                                        {{ $group }} ({{ $sampleInventory[$group] ?? 0 }} {{ __('units in stock') }})
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -415,7 +417,7 @@
 
                                         <div>
                                             <label for="dispatch-units" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                Units to Dispatch <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                                {{ __('Units to Dispatch') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                                             </label>
                                             <input
                                                 id="dispatch-units"
@@ -432,7 +434,7 @@
 
                                         <div>
                                             <label for="dispatch-date" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                Dispatch Date
+                                                {{ __('Dispatch Date') }}
                                             </label>
                                             <input
                                                 id="dispatch-date"
@@ -445,26 +447,26 @@
 
                                         <div>
                                             <label for="dispatch-courier" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                Courier / Transport Reference
+                                                {{ __('Courier / Transport Reference') }}
                                             </label>
                                             <input
                                                 id="dispatch-courier"
                                                 name="courier_reference"
                                                 type="text"
-                                                placeholder="e.g. Courier TR-208 / Cold Box #4"
+                                                placeholder="{{ __('e.g. Courier TR-208 / Cold Box #4') }}"
                                                 class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                             />
                                         </div>
 
                                         <div class="sm:col-span-2">
                                             <label for="dispatch-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                                                Dispatch Notes
+                                                {{ __('Dispatch Notes') }}
                                             </label>
                                             <textarea
                                                 id="dispatch-notes"
                                                 name="notes"
                                                 rows="2"
-                                                placeholder="Seal number, cold-chain temperature verification, or receiving hospital staff..."
+                                                placeholder="{{ __('Seal number, cold-chain temperature verification, or receiving hospital staff...') }}"
                                                 class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                             ></textarea>
                                         </div>
@@ -473,7 +475,7 @@
                                     <div class="flex items-center justify-end gap-3 pt-2">
                                         <x-ui.button variant="primary" size="md" type="submit">
                                             <x-icons.icon name="check" class="size-4" />
-                                            <span>Record Dispatch</span>
+                                            <span>{{ __('Record Dispatch') }}</span>
                                         </x-ui.button>
                                     </div>
                                 </form>
@@ -491,12 +493,12 @@
                                         <div class="flex items-center gap-2">
                                             <x-icons.icon name="archive-box" class="size-4 text-sky-600 dark:text-sky-400" />
                                             <h4 class="text-sm font-semibold text-slate-900 dark:text-white">
-                                                Place Reserve Hold
+                                                {{ __('Place Reserve Hold') }}
                                             </h4>
                                         </div>
                                         <div>
                                             <label for="reserve-quantity" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
-                                                Units to Hold <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                                {{ __('Units to Hold') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                                             </label>
                                             <input
                                                 id="reserve-quantity"
@@ -514,7 +516,7 @@
                                             class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-semibold text-white shadow-xs transition hover:bg-sky-700 cursor-pointer"
                                         >
                                             <x-icons.icon name="archive-box" class="size-3.5" />
-                                            <span>Reserve Units</span>
+                                            <span>{{ __('Reserve Units') }}</span>
                                         </button>
                                     </form>
 
@@ -528,17 +530,17 @@
                                         <div class="flex items-center gap-2">
                                             <x-icons.icon name="arrow-path" class="size-4 text-amber-600 dark:text-amber-400" />
                                             <h4 class="text-sm font-semibold text-slate-900 dark:text-white">
-                                                Release Reserved Holds
+                                                {{ __('Release Reserved Holds') }}
                                             </h4>
                                         </div>
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                                            Release active reserved units ({{ $bloodRequest['reservedUnits'] }} held) back to available inventory.
+                                            {{ __('Release active reserved units (:count held) back to available inventory.', ['count' => $bloodRequest['reservedUnits']]) }}
                                         </p>
                                         <div>
                                             <input
                                                 name="reason"
                                                 type="text"
-                                                placeholder="Release reason (min 5 chars)..."
+                                                placeholder="{{ __('Release reason (min 5 chars)...') }}"
                                                 class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                             />
                                         </div>
@@ -548,7 +550,7 @@
                                             class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/20 cursor-pointer"
                                         >
                                             <x-icons.icon name="arrow-path" class="size-3.5" />
-                                            <span>Release Reserved Holds</span>
+                                            <span>{{ __('Release Reserved Holds') }}</span>
                                         </button>
                                     </form>
                                 </div>
@@ -563,22 +565,22 @@
                         <div class="flex items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Dispatched Batches
+                                    {{ __('Dispatched Batches') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Recorded physical cold-chain deliveries fulfilling this order.
+                                    {{ __('Recorded physical cold-chain deliveries fulfilling this order.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge variant="neutral">
-                                {{ count($bloodRequest['fulfillments']) }} batches
+                                {{ __(':count batches', ['count' => count($bloodRequest['fulfillments'])]) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
 
                     @if (empty($bloodRequest['fulfillments']))
                         <div class="px-6 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                            No dispatch batches recorded yet.
+                            {{ __('No dispatch batches recorded yet.') }}
                         </div>
                     @else
                         <div class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -586,15 +588,15 @@
                                 <div class="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="space-y-1">
                                         <div class="flex flex-wrap items-center gap-2">
-                                            <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white">
+                                            <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white dir-ltr">
                                                 {{ $fulfillment['code'] }}
                                             </span>
                                             <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/70">
-                                                {{ $fulfillment['units'] }} unit(s) &middot; {{ $fulfillment['group'] }}
+                                                {{ __(':count unit(s)', ['count' => $fulfillment['units']]) }} &middot; {{ $fulfillment['group'] }}
                                             </span>
                                             @if ($fulfillment['courier'])
                                                 <span class="text-xs text-slate-500 dark:text-slate-400">
-                                                    Courier: <strong class="text-slate-700 dark:text-slate-200">{{ $fulfillment['courier'] }}</strong>
+                                                    {{ __('Courier') }}: <strong class="text-slate-700 dark:text-slate-200">{{ $fulfillment['courier'] }}</strong>
                                                 </span>
                                             @endif
                                         </div>
@@ -606,7 +608,7 @@
                                         @endif
 
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                                            Dispatched by <span class="font-medium text-slate-700 dark:text-slate-200">{{ $fulfillment['dispatchedBy'] }}</span>
+                                            {{ __('Dispatched by :user', ['user' => $fulfillment['dispatchedBy']]) }}
                                         </p>
                                     </div>
 
@@ -625,22 +627,22 @@
                         <div class="flex items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Inventory Allocations
+                                    {{ __('Inventory Allocations') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Active reserved holds and released blood unit allocations for this order.
+                                    {{ __('Active reserved holds and released blood unit allocations for this order.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge variant="neutral">
-                                {{ count($bloodRequest['allocations']) }} allocations
+                                {{ __(':count allocations', ['count' => count($bloodRequest['allocations'])]) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
 
                     @if (empty($bloodRequest['allocations']))
                         <div class="px-6 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                            No inventory unit allocations recorded yet.
+                            {{ __('No inventory unit allocations recorded yet.') }}
                         </div>
                     @else
                         <div class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -657,27 +659,27 @@
                                 <div class="flex flex-col gap-2 px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="space-y-1">
                                         <div class="flex flex-wrap items-center gap-2">
-                                            <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white">
+                                            <span class="font-mono text-sm font-semibold text-slate-900 dark:text-white dir-ltr">
                                                 {{ $allocation['code'] }}
                                             </span>
                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset {{ $allocBadgeClass }}">
-                                                {{ $allocation['status'] }}
+                                                {{ __($allocation['status']) }}
                                             </span>
                                             @if ($allocation['unitNumber'])
                                                 <span class="text-xs text-slate-600 dark:text-slate-300">
-                                                    Unit: <strong class="font-mono text-slate-800 dark:text-slate-200">{{ $allocation['unitNumber'] }}</strong>
+                                                    {{ __('Unit') }}: <strong class="font-mono text-slate-800 dark:text-slate-200 dir-ltr">{{ $allocation['unitNumber'] }}</strong>
                                                     @if ($allocation['bloodGroup'])
                                                         ({{ $allocation['bloodGroup'] }})
                                                     @endif
                                                 </span>
                                             @elseif ($allocation['bloodGroup'])
                                                 <span class="text-xs text-slate-600 dark:text-slate-300">
-                                                    Group: <strong class="text-slate-800 dark:text-slate-200">{{ $allocation['bloodGroup'] }}</strong>
+                                                    {{ __('Group') }}: <strong class="text-slate-800 dark:text-slate-200">{{ $allocation['bloodGroup'] }}</strong>
                                                 </span>
                                             @endif
                                         </div>
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                                            {{ $allocation['units'] }} unit(s) allocated
+                                            {{ __(':count unit(s) allocated', ['count' => $allocation['units']]) }}
                                         </p>
                                     </div>
 
@@ -698,22 +700,22 @@
                         <div class="flex items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    Status &amp; Fulfillment History
+                                    {{ __('Status & Fulfillment History') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    Chronological audit log of request approvals, dispatches, and transitions.
+                                    {{ __('Chronological audit log of request approvals, dispatches, and transitions.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge variant="neutral">
-                                {{ count($bloodRequest['history']) }} events
+                                {{ __(':count events', ['count' => count($bloodRequest['history'])]) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
 
                     @if (empty($bloodRequest['history']))
                         <div class="px-6 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                            No status history recorded yet.
+                            {{ __('No status history recorded yet.') }}
                         </div>
                     @else
                         <div class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -735,11 +737,11 @@
                                                 {{ $entry['event'] }}
                                             </span>
                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset {{ $histBadgeClass }}">
-                                                {{ $entry['status'] }}
+                                                {{ __($entry['status']) }}
                                             </span>
                                             @if ($entry['units'] > 0)
                                                 <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/70">
-                                                    +{{ $entry['units'] }} units
+                                                    +{{ $entry['units'] }} {{ __('units') }}
                                                 </span>
                                             @endif
                                         </div>
@@ -751,7 +753,7 @@
                                         @endif
 
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                                            Updated by <span class="font-medium text-slate-700 dark:text-slate-200">{{ $entry['actor'] }}</span>
+                                            {{ __('Updated by :user', ['user' => $entry['actor']]) }}
                                         </p>
                                     </div>
 
@@ -768,22 +770,25 @@
 
         {{-- Approve Request Modal --}}
         @can('review', $bloodRequestRecord)
-            <x-ui.modal name="approve-request-modal" title="Approve Blood Request" max-width="md">
+            <x-ui.modal name="approve-request-modal" :title="__('Approve Blood Request')" max-width="md">
                 <form method="POST" action="{{ route('requests.approve', $bloodRequestRecord->id) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
-                        Authorize triage approval for <strong>{{ $bloodRequest['id'] }}</strong> ({{ $bloodRequest['hospitalName'] }}). Units can then be reserved or dispatched.
+                        {!! __('Authorize triage approval for :id (:hospital). Units can then be reserved or dispatched.', [
+                            'id' => '<strong class="dir-ltr">' . $bloodRequest['id'] . '</strong>',
+                            'hospital' => $bloodRequest['hospitalName']
+                        ]) !!}
                     </p>
 
                     <div>
                         <label for="approve-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Approval Notes <span class="text-xs text-slate-400 font-normal">(Optional)</span>
+                            {{ __('Approval Notes') }} <span class="text-xs text-slate-400 font-normal">({{ __('Optional') }})</span>
                         </label>
                         <textarea
                             id="approve-notes"
                             name="notes"
                             rows="3"
-                            placeholder="Clinical clearance notes, special crossmatching requirements, or delivery schedule..."
+                            placeholder="{{ __('Clinical clearance notes, special crossmatching requirements, or delivery schedule...') }}"
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                         ></textarea>
                     </div>
@@ -794,29 +799,32 @@
                             @click="$dispatch('close-modal', 'approve-request-modal')"
                             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            Cancel
+                            {{ __('Cancel') }}
                         </button>
                         <button
                             type="submit"
                             class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
                         >
-                            Confirm Approval
+                            {{ __('Confirm Approval') }}
                         </button>
                     </div>
                 </form>
             </x-ui.modal>
 
             {{-- Reject Request Modal --}}
-            <x-ui.modal name="reject-request-modal" title="Reject Blood Request" max-width="md">
+            <x-ui.modal name="reject-request-modal" :title="__('Reject Blood Request')" max-width="md">
                 <form method="POST" action="{{ route('requests.reject', $bloodRequestRecord->id) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
-                        Provide a clinical reason for rejecting <strong>{{ $bloodRequest['id'] }}</strong> ({{ $bloodRequest['hospitalName'] }}). Rejected requests are permanently closed.
+                        {!! __('Provide a clinical reason for rejecting :id (:hospital). Rejected requests are permanently closed.', [
+                            'id' => '<strong class="dir-ltr">' . $bloodRequest['id'] . '</strong>',
+                            'hospital' => $bloodRequest['hospitalName']
+                        ]) !!}
                     </p>
 
                     <div>
                         <label for="rejection-reason" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Rejection Reason <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                            {{ __('Rejection Reason') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                         </label>
                         <textarea
                             id="rejection-reason"
@@ -824,7 +832,7 @@
                             rows="3"
                             required
                             minlength="5"
-                            placeholder="e.g. Duplicate order, incompatible protocol, or insufficient regional inventory..."
+                            placeholder="{{ __('e.g. Duplicate order, incompatible protocol, or insufficient regional inventory...') }}"
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                         ></textarea>
                     </div>
@@ -835,13 +843,13 @@
                             @click="$dispatch('close-modal', 'reject-request-modal')"
                             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            Cancel
+                            {{ __('Cancel') }}
                         </button>
                         <button
                             type="submit"
                             class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-rose-700 cursor-pointer"
                         >
-                            Confirm Rejection
+                            {{ __('Confirm Rejection') }}
                         </button>
                     </div>
                 </form>
@@ -850,16 +858,18 @@
 
         {{-- Cancel Request Modal --}}
         @can('cancel', $bloodRequestRecord)
-            <x-ui.modal name="cancel-request-modal" title="Cancel Blood Request" max-width="md">
+            <x-ui.modal name="cancel-request-modal" :title="__('Cancel Blood Request')" max-width="md">
                 <form method="POST" action="{{ route('requests.cancel', $bloodRequestRecord->id) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
-                        Cancel blood request <strong>{{ $bloodRequest['id'] }}</strong>. Any reserved inventory holds will be released back to available stock.
+                        {!! __('Cancel blood request :id. Any reserved inventory holds will be released back to available stock.', [
+                            'id' => '<strong class="dir-ltr">' . $bloodRequest['id'] . '</strong>'
+                        ]) !!}
                     </p>
 
                     <div>
                         <label for="cancellation-reason" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                            Cancellation Reason <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                            {{ __('Cancellation Reason') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                         </label>
                         <textarea
                             id="cancellation-reason"
@@ -867,7 +877,7 @@
                             rows="3"
                             required
                             minlength="5"
-                            placeholder="e.g. Patient discharged, surgical procedure postponed, or requirement satisfied..."
+                            placeholder="{{ __('e.g. Patient discharged, surgical procedure postponed, or requirement satisfied...') }}"
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
                         ></textarea>
                     </div>
@@ -878,13 +888,13 @@
                             @click="$dispatch('close-modal', 'cancel-request-modal')"
                             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            Keep Request
+                            {{ __('Keep Request') }}
                         </button>
                         <button
                             type="submit"
                             class="rounded-xl bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 cursor-pointer"
                         >
-                            Confirm Cancellation
+                            {{ __('Confirm Cancellation') }}
                         </button>
                     </div>
                 </form>

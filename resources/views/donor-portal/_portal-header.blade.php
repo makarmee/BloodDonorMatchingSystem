@@ -3,25 +3,25 @@
 
     $portalTabs = [
         [
-            'label' => 'Overview',
+            'label' => __('Overview'),
             'icon' => 'squares-2x2',
             'href' => route('donor-portal.dashboard', $donorQuery),
             'active' => request()->routeIs('donor-portal.dashboard'),
         ],
         [
-            'label' => 'My Appointments',
+            'label' => __('My Appointments'),
             'icon' => 'calendar',
             'href' => route('donor-portal.appointments.index', $donorQuery),
             'active' => request()->routeIs('donor-portal.appointments.*'),
         ],
         [
-            'label' => 'Donation History',
+            'label' => __('Donation History'),
             'icon' => 'heart-pulse',
             'href' => route('donor-portal.history', $donorQuery),
             'active' => request()->routeIs('donor-portal.history'),
         ],
         [
-            'label' => 'Eligibility',
+            'label' => __('Eligibility'),
             'icon' => 'shield-check',
             'href' => route('donor-portal.eligibility', $donorQuery),
             'active' => request()->routeIs('donor-portal.eligibility'),
@@ -45,18 +45,18 @@
                         <span class="text-base font-bold text-slate-900 dark:text-white">
                             {{ $donorProfile['name'] }}
                         </span>
-                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                        <span class="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200 dir-ltr">
                             {{ $donorProfile['id'] }}
                         </span>
                         <x-bdms.blood-group-badge :group="$donorProfile['bloodGroup']" size="sm" />
                         <x-ui.badge :variant="$accountStatusVariant" :dot="true">
-                            {{ $donorProfile['accountStatus'] }}
+                            {{ __($donorProfile['accountStatus']) }}
                         </x-ui.badge>
                     </div>
 
                     <div class="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-400">
-                        <span>Contact: <strong class="font-medium text-slate-800 dark:text-slate-200">{{ $donorProfile['maskedEmail'] }}</strong> &middot; <strong class="font-medium text-slate-800 dark:text-slate-200">{{ $donorProfile['maskedPhone'] }}</strong></span>
-                        <span>Registered: <strong class="font-medium text-slate-800 dark:text-slate-200">{{ $donorProfile['registrationDate'] }}</strong></span>
+                        <span>{{ __('Contact') }}: <strong class="font-medium text-slate-800 dark:text-slate-200 dir-ltr">{{ $donorProfile['maskedEmail'] }}</strong> &middot; <strong class="font-medium text-slate-800 dark:text-slate-200 dir-ltr">{{ $donorProfile['maskedPhone'] }}</strong></span>
+                        <span>{{ __('Registered') }}: <strong class="font-medium text-slate-800 dark:text-slate-200">{{ $donorProfile['registrationDate'] }}</strong></span>
                     </div>
                 </div>
             </div>
@@ -64,12 +64,12 @@
             <div class="flex flex-wrap items-center gap-2">
                 <x-ui.button variant="primary" size="sm" :href="route('donor-portal.appointments.create', $donorQuery)">
                     <x-icons.icon name="plus" class="size-4" />
-                    <span>Book Appointment</span>
+                    <span>{{ __('Book Appointment') }}</span>
                 </x-ui.button>
             </div>
         </div>
 
-        <nav aria-label="Donor portal navigation" class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-slate-200/80 pt-3 dark:border-slate-800">
+        <nav aria-label="{{ __('Donor portal navigation') }}" class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-slate-200/80 pt-3 dark:border-slate-800">
             @foreach ($portalTabs as $tab)
                 <a
                     href="{{ $tab['href'] }}"
@@ -86,4 +86,3 @@
         </nav>
     </div>
 </div>
-

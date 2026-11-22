@@ -27,7 +27,7 @@
     <div class="flex items-start justify-between gap-4">
         <div class="space-y-1 min-w-0">
             <p class="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                {{ $label }}
+                {{ __($label) }}
             </p>
             <p
                 @if ($valueBind) x-text="{{ $valueBind }}" @endif
@@ -44,7 +44,7 @@
 
     @if ($trend)
         <p class="mt-3 text-xs font-medium {{ $trendClasses }}">
-            {{ $trend }}
+            {{ __($trend) }}
         </p>
     @endif
 </x-ui.card>

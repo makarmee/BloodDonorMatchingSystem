@@ -17,10 +17,10 @@
         <div class="mx-auto w-full max-w-lg py-8">
             <div class="mb-6 text-center">
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Create your BDMS account
+                    {{ __('Create your BDMS account') }}
                 </h1>
                 <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
-                    Register as a blood donor or an authorized hospital requester.
+                    {{ __('Register as a blood donor or an authorized hospital requester.') }}
                 </p>
             </div>
 
@@ -34,7 +34,7 @@
                     @csrf
 
                     <div class="space-y-1.5">
-                        <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">Account type</span>
+                        <span class="block text-sm font-medium text-slate-700 dark:text-slate-200">{{ __('Account type') }}</span>
                         <div class="grid grid-cols-2 gap-2.5">
                             <label
                                 @click="role = 'donor'"
@@ -43,7 +43,7 @@
                             >
                                 <input type="radio" name="role" value="donor" x-model="role" class="sr-only">
                                 <x-icons.icon name="heart-pulse" class="size-4" />
-                                <span>Blood Donor</span>
+                                <span>{{ __('Blood Donor') }}</span>
                             </label>
 
                             <label
@@ -53,7 +53,7 @@
                             >
                                 <input type="radio" name="role" value="hospital" x-model="role" class="sr-only">
                                 <x-icons.icon name="building-hospital" class="size-4" />
-                                <span>Hospital Requester</span>
+                                <span>{{ __('Hospital Requester') }}</span>
                             </label>
                         </div>
                         @error('role')
@@ -62,7 +62,7 @@
                     </div>
 
                     <x-ui.input
-                        label="Full name"
+                        :label="__('Full name')"
                         name="name"
                         icon="user"
                         placeholder="Dr. Sarah Jenkins"
@@ -71,7 +71,7 @@
                     />
 
                     <x-ui.input
-                        label="Email address"
+                        :label="__('Email address')"
                         name="email"
                         type="email"
                         icon="envelope"
@@ -89,15 +89,15 @@
                     @endphp
                     <div x-show="role === 'donor'" class="grid gap-4 sm:grid-cols-2">
                         <x-ui.select
-                            label="Blood group"
+                            :label="__('Blood group')"
                             name="blood_group"
-                            placeholder="Select blood group"
+                            :placeholder="__('Select blood group')"
                             x-bind:disabled="role !== 'donor'"
                             :options="$bloodGroupOptions"
                         />
 
                         <x-ui.input
-                            label="Date of birth"
+                            :label="__('Date of birth')"
                             name="date_of_birth"
                             type="date"
                             x-bind:disabled="role !== 'donor'"
@@ -108,7 +108,7 @@
                     {{-- Hospital-specific fields --}}
                     <div x-show="role === 'hospital'" x-cloak class="space-y-4">
                         <x-ui.input
-                            label="Hospital / Clinic name"
+                            :label="__('Hospital / Clinic name')"
                             name="organization_name"
                             icon="building-hospital"
                             placeholder="City General Hospital"
@@ -118,7 +118,7 @@
 
                         <div class="grid gap-4 sm:grid-cols-2">
                             <x-ui.input
-                                label="Primary phone"
+                                :label="__('Primary phone')"
                                 name="phone"
                                 type="tel"
                                 icon="phone"
@@ -128,7 +128,7 @@
                             />
 
                             <x-ui.input
-                                label="City"
+                                :label="__('City')"
                                 name="city"
                                 icon="map-pin"
                                 placeholder="Metropolis"
@@ -138,7 +138,7 @@
                         </div>
 
                         <x-ui.input
-                            label="Address"
+                            :label="__('Address')"
                             name="address"
                             placeholder="100 Hospital Boulevard, Suite 400"
                             x-bind:disabled="role !== 'hospital'"
@@ -148,40 +148,40 @@
 
                     <div class="grid gap-4 sm:grid-cols-2">
                         <x-ui.input
-                            label="Password"
+                            :label="__('Password')"
                             name="password"
                             type="password"
                             icon="lock-closed"
-                            placeholder="Min. 8 characters"
+                            :placeholder="__('Min. 8 characters')"
                             required
                         />
 
                         <x-ui.input
-                            label="Confirm password"
+                            :label="__('Confirm password')"
                             name="password_confirmation"
                             type="password"
                             icon="lock-closed"
-                            placeholder="Repeat password"
+                            :placeholder="__('Repeat password')"
                             required
                         />
                     </div>
 
                     <x-ui.button type="submit" variant="primary" class="w-full">
-                        Create Account
+                        {{ __('Create Account') }}
                     </x-ui.button>
                 </form>
             </x-ui.card>
 
             <p class="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
-                Already registered?
+                {{ __('Already registered?') }}
                 <a href="{{ route('login') }}" class="font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400">
-                    Sign in
+                    {{ __('Sign in') }}
                 </a>
             </p>
         </div>
 
         <p class="text-center text-xs text-slate-400 dark:text-slate-500">
-            Staff accounts are provisioned by Blood Bank Administrators.
+            {{ __('Staff accounts are provisioned by Blood Bank Administrators.') }}
         </p>
     </div>
 </x-guest-layout>

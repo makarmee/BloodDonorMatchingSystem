@@ -1,12 +1,12 @@
-<x-app-layout title="Blood Requests Management" page-title="Blood Requests">
+<x-app-layout :title="__('Blood Requests Management')" :page-title="__('Blood Requests')">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    Blood Requests Management
+                    {{ __('Blood Requests Management') }}
                 </h1>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Triage hospital blood orders, monitor urgency levels, and track partial or full dispatch fulfillment.
+                    {{ __('Triage hospital blood orders, monitor urgency levels, and track partial or full dispatch fulfillment.') }}
                 </p>
             </div>
 
@@ -14,7 +14,7 @@
                 @can('create', App\Models\BloodRequest::class)
                     <x-ui.button variant="primary" size="md" :href="route('requests.create')">
                         <x-icons.icon name="plus" class="size-4" />
-                        <span>New Blood Request</span>
+                        <span>{{ __('New Blood Request') }}</span>
                     </x-ui.button>
                 @endcan
             </div>
@@ -25,54 +25,54 @@
         {{-- Overview Statistics Cards (6 required cards) --}}
         <section aria-label="Blood requests overview statistics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             <x-bdms.stat-card
-                label="Total Requests"
+                :label="__('Total Requests')"
                 :value="$summary['totalRequests']"
-                trend="All active and closed hospital orders"
+                :trend="__('All active and closed hospital orders')"
                 trend-tone="neutral"
                 icon="clipboard-list"
                 accent="crimson"
             />
 
             <x-bdms.stat-card
-                label="Pending Requests"
+                :label="__('Pending Requests')"
                 :value="$summary['pendingRequests']"
-                trend="Awaiting triage review & approval"
+                :trend="__('Awaiting triage review & approval')"
                 trend-tone="neutral"
                 icon="clock"
                 accent="amber"
             />
 
             <x-bdms.stat-card
-                label="Urgent Requests"
+                :label="__('Urgent Requests')"
                 :value="$summary['urgentRequests']"
-                trend="High & Critical priority orders"
+                :trend="__('High & Critical priority orders')"
                 trend-tone="down"
                 icon="exclamation-triangle"
                 accent="crimson"
             />
 
             <x-bdms.stat-card
-                label="Fulfilled Requests"
+                :label="__('Fulfilled Requests')"
                 :value="$summary['fulfilledRequests']"
-                trend="Completed full-volume hospital dispatches"
+                :trend="__('Completed full-volume hospital dispatches')"
                 trend-tone="up"
                 icon="check-circle"
                 accent="emerald"
             />
 
             <x-bdms.stat-card
-                label="Total Units Requested"
+                :label="__('Total Units Requested')"
                 :value="$summary['totalUnitsRequested']"
-                trend="Cumulative units across logged orders"
+                :trend="__('Cumulative units across logged orders')"
                 trend-tone="neutral"
                 icon="droplet"
                 accent="sky"
             />
 
             <x-bdms.stat-card
-                label="Total Units Fulfilled"
+                :label="__('Total Units Fulfilled')"
                 :value="$summary['totalUnitsFulfilled']"
-                trend="Dispatched units recorded across orders"
+                :trend="__('Dispatched units recorded across orders')"
                 trend-tone="up"
                 icon="building-hospital"
                 accent="emerald"
@@ -86,10 +86,10 @@
                     <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                Hospital Blood Requests Queue
+                                {{ __('Hospital Blood Requests Queue') }}
                             </h2>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Showing <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered">{{ count($requests) }}</span> of {{ count($requests) }} blood requests
+                                {{ __('Showing') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered">{{ count($requests) }}</span> {{ __('of :total blood requests', ['total' => count($requests)]) }}
                             </p>
                         </div>
 
@@ -102,18 +102,18 @@
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                             >
                                 <x-icons.icon name="x-mark" class="size-3.5" />
-                                <span>Clear all filters</span>
+                                <span>{{ __('Clear all filters') }}</span>
                             </button>
 
-                            <label for="requests-per-page" class="sr-only">Rows per page</label>
+                            <label for="requests-per-page" class="sr-only">{{ __('Rows per page') }}</label>
                             <select
                                 id="requests-per-page"
                                 x-model.number="perPage"
                                 class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-xs focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                             >
-                                <option value="5">5 / page</option>
-                                <option value="10">10 / page</option>
-                                <option value="25">25 / page</option>
+                                <option value="5">{{ __('5 / page') }}</option>
+                                <option value="10">{{ __('10 / page') }}</option>
+                                <option value="25">{{ __('25 / page') }}</option>
                             </select>
                         </div>
                     </div>
@@ -121,25 +121,25 @@
                     {{-- Search & Filter Controls --}}
                     <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
                         <div class="xl:col-span-2">
-                            <label for="request-search" class="sr-only">Search by request ID or hospital name</label>
+                            <label for="request-search" class="sr-only">{{ __('Search by request ID or hospital name') }}</label>
                             <x-ui.input
                                 id="request-search"
                                 name="search"
                                 type="search"
                                 icon="magnifying-glass"
-                                placeholder="Search Request ID or hospital name..."
+                                :placeholder="__('Search Request ID or hospital name...')"
                                 x-model.debounce.150ms="search"
                             />
                         </div>
 
                         <div>
-                            <label for="filter-request-blood-group" class="sr-only">Filter by blood group</label>
+                            <label for="filter-request-blood-group" class="sr-only">{{ __('Filter by blood group') }}</label>
                             <select
                                 id="filter-request-blood-group"
                                 x-model="bloodGroupFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Blood Groups</option>
+                                <option value="all">{{ __('All Blood Groups') }}</option>
                                 @foreach ($bloodGroups as $group)
                                     <option value="{{ $group }}">{{ $group }}</option>
                                 @endforeach
@@ -147,51 +147,51 @@
                         </div>
 
                         <div>
-                            <label for="filter-request-priority" class="sr-only">Filter by priority</label>
+                            <label for="filter-request-priority" class="sr-only">{{ __('Filter by priority') }}</label>
                             <select
                                 id="filter-request-priority"
                                 x-model="priorityFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Priorities</option>
+                                <option value="all">{{ __('All Priorities') }}</option>
                                 @foreach ($priorities as $priority)
-                                    <option value="{{ $priority }}">{{ $priority }}</option>
+                                    <option value="{{ $priority }}">{{ __($priority) }}</option>
                                 @endforeach
                             </select>
                         </div>
 
                         <div>
-                            <label for="filter-request-status" class="sr-only">Filter by status</label>
+                            <label for="filter-request-status" class="sr-only">{{ __('Filter by status') }}</label>
                             <select
                                 id="filter-request-status"
                                 x-model="statusFilter"
                                 class="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
-                                <option value="all">All Statuses</option>
+                                <option value="all">{{ __('All Statuses') }}</option>
                                 @foreach ($statuses as $status)
-                                    <option value="{{ $status }}">{{ $status }}</option>
+                                    <option value="{{ $status }}">{{ __($status) }}</option>
                                 @endforeach
                             </select>
                         </div>
 
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <label for="requests-date-from" class="sr-only">From request date</label>
+                                <label for="requests-date-from" class="sr-only">{{ __('From request date') }}</label>
                                 <input
                                     id="requests-date-from"
                                     type="date"
                                     x-model="dateFrom"
-                                    title="From request date"
+                                    title="{{ __('From request date') }}"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
                             </div>
                             <div>
-                                <label for="requests-date-to" class="sr-only">To request date</label>
+                                <label for="requests-date-to" class="sr-only">{{ __('To request date') }}</label>
                                 <input
                                     id="requests-date-to"
                                     type="date"
                                     x-model="dateTo"
-                                    title="To request date"
+                                    title="{{ __('To request date') }}"
                                     class="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2.5 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                                 />
                             </div>
@@ -201,19 +201,19 @@
             </x-slot:header>
 
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-800">
+                <table class="min-w-full divide-y divide-slate-200 text-start text-sm dark:divide-slate-800">
                     <thead class="bg-slate-50/80 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:bg-slate-800/50 dark:text-slate-400">
                         <tr>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Request ID</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Hospital Name</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Blood Group</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Requested Units</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Fulfilled Units</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Request Date</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Required Date</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Priority</th>
-                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">Request Status</th>
-                            <th scope="col" class="px-5 py-3.5 text-right whitespace-nowrap">Actions</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Request ID') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Hospital Name') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Blood Group') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Requested Units') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Fulfilled Units') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Request Date') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Required Date') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Priority') }}</th>
+                            <th scope="col" class="px-5 py-3.5 whitespace-nowrap">{{ __('Request Status') }}</th>
+                            <th scope="col" class="px-5 py-3.5 text-end whitespace-nowrap">{{ __('Actions') }}</th>
                         </tr>
                     </thead>
 
@@ -241,7 +241,7 @@
                                 x-show="isRowVisible({{ $index }})"
                                 class="transition hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                             >
-                                <td class="px-5 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200">
+                                <td class="px-5 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200 dir-ltr text-start">
                                     <a
                                         href="{{ route('requests.show', $item['id']) }}"
                                         class="hover:text-crimson-600 dark:hover:text-crimson-400"
@@ -269,10 +269,10 @@
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">
-                                    {{ $item['requestedUnits'] }} units
+                                    {{ $item['requestedUnits'] }} {{ __('units') }}
                                 </td>
 
-                                <td class="px-5 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                                <td class="px-5 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300 dir-ltr text-start">
                                     {{ $item['fulfilledUnits'] }} / {{ $item['requestedUnits'] }}
                                 </td>
 
@@ -286,28 +286,28 @@
 
                                 <td class="px-5 py-4 whitespace-nowrap">
                                     <x-ui.badge :variant="$priorityVariant" :dot="true">
-                                        {{ $item['priority'] }}
+                                        {{ __($item['priority']) }}
                                     </x-ui.badge>
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap">
                                     <x-ui.badge :variant="$statusVariant">
-                                        {{ $item['status'] }}
+                                        {{ __($item['status']) }}
                                     </x-ui.badge>
                                 </td>
 
-                                <td class="px-5 py-4 text-right whitespace-nowrap">
+                                <td class="px-5 py-4 text-end whitespace-nowrap">
                                     <div class="inline-flex items-center justify-end gap-2">
                                         <x-ui.button variant="ghost" size="sm" :href="route('requests.show', $item['id'])">
                                             <x-icons.icon name="eye" class="size-4" />
-                                            <span>View</span>
+                                            <span>{{ __('View') }}</span>
                                         </x-ui.button>
 
                                         @can('update', App\Models\BloodRequest::class)
                                             @if (! in_array($item['status'], ['Rejected', 'Cancelled', 'Fulfilled'], true))
                                                 <x-ui.button variant="outline" size="sm" :href="route('requests.edit', $item['id'])">
                                                     <x-icons.icon name="pencil" class="size-3.5" />
-                                                    <span>Edit</span>
+                                                    <span>{{ __('Edit') }}</span>
                                                 </x-ui.button>
                                             @endif
                                         @endcan
@@ -329,10 +329,10 @@
                     <x-icons.icon name="clipboard-list" class="size-6" />
                 </div>
                 <h3 class="mt-4 text-sm font-semibold text-slate-900 dark:text-white">
-                    No matching blood requests found
+                    {{ __('No matching blood requests found') }}
                 </h3>
                 <p class="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">
-                    Adjust your search text, blood group, priority, status, or request date range filter to locate orders.
+                    {{ __('Adjust your search text, blood group, priority, status, or request date range filter to locate orders.') }}
                 </p>
                 <button
                     type="button"
@@ -340,16 +340,16 @@
                     class="mt-4 inline-flex items-center gap-2 rounded-xl bg-crimson-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-crimson-700 cursor-pointer"
                 >
                     <x-icons.icon name="x-mark" class="size-4" />
-                    <span>Clear all filters</span>
+                    <span>{{ __('Clear all filters') }}</span>
                 </button>
             </div>
 
             <x-slot:footer>
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Showing <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingFrom"></span>
-                        to <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingTo"></span>
-                        of <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered"></span> requests
+                        {{ __('Showing') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingFrom"></span>
+                        {{ __('to') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="showingTo"></span>
+                        {{ __('of') }} <span class="font-semibold text-slate-700 dark:text-slate-200" x-text="totalFiltered"></span> {{ __('requests') }}
                     </p>
 
                     <nav aria-label="Blood requests pagination" class="flex items-center gap-1.5">
@@ -359,8 +359,8 @@
                             :disabled="safePage <= 1"
                             class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            <x-icons.icon name="chevron-left" class="size-3.5" />
-                            <span>Prev</span>
+                            <x-icons.icon name="chevron-left" class="size-3.5 rtl-flip" />
+                            <span>{{ __('Prev') }}</span>
                         </button>
 
                         <template x-for="page in pageNumbers" :key="page">
@@ -381,8 +381,8 @@
                             :disabled="safePage >= totalPages"
                             class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
                         >
-                            <span>Next</span>
-                            <x-icons.icon name="chevron-right" class="size-3.5" />
+                            <span>{{ __('Next') }}</span>
+                            <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
                         </button>
                     </nav>
                 </div>
@@ -390,4 +390,3 @@
         </x-ui.card>
     </div>
 </x-app-layout>
-

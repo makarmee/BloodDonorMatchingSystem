@@ -18,7 +18,7 @@
 <div class="space-y-1.5">
     @if ($label)
         <label for="{{ $selectId }}" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-            {{ $label }}
+            {{ __($label) }}
             @if ($required)
                 <span class="text-crimson-600 dark:text-crimson-400" aria-hidden="true">*</span>
             @endif
@@ -39,12 +39,12 @@
         ]) }}
     >
         @if ($placeholder)
-            <option value="">{{ $placeholder }}</option>
+            <option value="">{{ __($placeholder) }}</option>
         @endif
 
         @foreach ($options as $optionValue => $optionLabel)
             <option value="{{ $optionValue }}" @selected((string) $selectedValue === (string) $optionValue)>
-                {{ $optionLabel }}
+                {{ __($optionLabel) }}
             </option>
         @endforeach
 

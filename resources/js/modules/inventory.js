@@ -13,15 +13,17 @@ export function resolveStockStatus(available, minLevel) {
 }
 
 export function statusLabel(status) {
+    const t = typeof window !== 'undefined' && window.__ ? window.__ : ((k) => k);
+
     if (status === 'critical') {
-        return 'Critical';
+        return t('Critical');
     }
 
     if (status === 'low') {
-        return 'Low Stock';
+        return t('Low Stock');
     }
 
-    return 'Normal';
+    return t('Normal');
 }
 
 export function inventoryManager(initial) {

@@ -15,6 +15,6 @@
 @endphp
 
 <x-ui.badge :variant="$variant" :dot="true" {{ $attributes }}>
-    {{ ucfirst($normalized) }}
+    {{ __(ucfirst($normalized)) }}
 </x-ui.badge>
 

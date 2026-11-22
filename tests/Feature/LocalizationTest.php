@@ -121,4 +121,61 @@ class LocalizationTest extends TestCase
         $loginResponse->assertSee('dir="rtl"', false);
         $loginResponse->assertSee('ورود به سامانه BDMS');
     }
+
+    public function test_donor_portal_views_render_persian_with_rtl_layout(): void
+    {
+        $donorRole = Role::query()->where('slug', 'donor')->firstOrFail();
+        $donorUser = User::factory()->create(['is_active' => true]);
+        $donorUser->roles()->attach($donorRole);
+
+        $response = $this->actingAs($donorUser)
+            ->withSession(['locale' => 'fa'])
+            ->get(route('donor-portal.dashboard'));
+
+        $response->assertOk();
+        $response->assertSee('lang="fa"', false);
+        $response->assertSee('dir="rtl"', false);
+        $response->assertSee('مرور کلی پورتال اهداکنندگان');
+        $response->assertSee('نوبت‌های من');
+
+        $eligibilityResponse = $this->actingAs($donorUser)
+            ->withSession(['locale' => 'fa'])
+            ->get(route('donor-portal.eligibility'));
+
+        $eligibilityResponse->assertOk();
+        $eligibilityResponse->assertSee('اطلاعات شرایط اهدای خون');
+        $eligibilityResponse->assertSee('اعلان مجوز پزشکی اهدا');
+
+        $historyResponse = $this->actingAs($donorUser)
+            ->withSession(['locale' => 'fa'])
+            ->get(route('donor-portal.history'));
+
+        $historyResponse->assertOk();
+        $historyResponse->assertSee('سوابق اهدای خون من');
+
+        $appointmentsResponse = $this->actingAs($donorUser)
+            ->withSession(['locale' => 'fa'])
+            ->get(route('donor-portal.appointments.index'));
+
+        $appointmentsResponse->assertOk();
+        $appointmentsResponse->assertSee('نوبت‌های اهدای خون من');
+        $appointmentsResponse->assertSee('نوبت‌های پیش‌رو');
+    }
+
+    public function test_translation_files_have_exact_key_parity(): void
+    {
+        $fa = json_decode(file_get_contents(base_path('lang/fa.json')), true);
+        $en = json_decode(file_get_contents(base_path('lang/en.json')), true);
+
+        $this->assertIsArray($fa);
+        $this->assertIsArray($en);
+        $this->assertGreaterThan(1000, count($fa));
+        $this->assertSame(count($fa), count($en));
+
+        $missingInEn = array_diff_key($fa, $en);
+        $this->assertEmpty($missingInEn, 'Every key in fa.json must exist in en.json');
+
+        $missingInFa = array_diff_key($en, $fa);
+        $this->assertEmpty($missingInFa, 'Every key in en.json must exist in fa.json');
+    }
 }

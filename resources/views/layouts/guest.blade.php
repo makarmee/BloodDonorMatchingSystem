@@ -15,6 +15,8 @@
                     document.documentElement.classList.add('dark');
                 }
             })();
+            window.BDMS_LOCALE = '{{ app()->getLocale() }}';
+            window.BDMS_I18N = {!! app()->getLocale() === 'fa' && file_exists(base_path('lang/fa.json')) ? file_get_contents(base_path('lang/fa.json')) : '{}' !!};
         </script>
 
         @fonts

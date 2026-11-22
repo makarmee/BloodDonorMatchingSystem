@@ -1,13 +1,13 @@
-<x-app-layout :page-title="$portalData['pageTitle']" :active-role="$activeRole">
+<x-app-layout :page-title="__($portalData['pageTitle'])" :active-role="$activeRole">
     <x-slot:header>
         <div>
             <div class="flex items-center gap-2">
                 <h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                    {{ $portalData['pageTitle'] }}
+                    {{ __($portalData['pageTitle']) }}
                 </h2>
             </div>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                {{ $portalData['subtitle'] }}
+                {{ __($portalData['subtitle']) }}
             </p>
         </div>
 
@@ -16,31 +16,31 @@
                 @if (isset($hospital) && $hospital && $hospital->verification_status === 'Verified')
                     <x-ui.button variant="primary" size="sm" :href="route('requests.create')">
                         <x-icons.icon name="plus" class="size-4" />
-                        <span>New Blood Request</span>
+                        <span>{{ __('New Blood Request') }}</span>
                     </x-ui.button>
                 @else
-                    <x-ui.button variant="outline" size="sm" disabled title="Requires verified hospital status">
+                    <x-ui.button variant="outline" size="sm" disabled :title="__('Requires verified hospital status')">
                         <x-icons.icon name="lock-closed" class="size-4" />
-                        <span>Verification Pending</span>
+                        <span>{{ __('Verification Pending') }}</span>
                     </x-ui.button>
                 @endif
             @elseif ($activeRole === 'donor')
                 <x-ui.button variant="primary" size="sm" x-data @click="$dispatch('open-modal', 'quick-action-preview')">
                     <x-icons.icon name="calendar" class="size-4" />
-                    Book Appointment
+                    {{ __('Book Appointment') }}
                 </x-ui.button>
             @elseif ($activeRole === 'lab_officer')
                 <x-ui.button variant="primary" size="sm" :href="route('screening.index')">
                     <x-icons.icon name="shield-check" class="size-4" />
-                    Open Screening Queue
+                    {{ __('Open Screening Queue') }}
                 </x-ui.button>
             @elseif (in_array($activeRole, ['admin', 'staff'], true))
                 <x-ui.button variant="outline" size="sm" :href="route('home')">
-                    Public Stock View
+                    {{ __('Public Stock View') }}
                 </x-ui.button>
                 <x-ui.button variant="primary" size="sm" x-data @click="$dispatch('open-modal', 'quick-action-preview')">
                     <x-icons.icon name="plus" class="size-4" />
-                    Record Donation
+                    {{ __('Record Donation') }}
                 </x-ui.button>
             @endif
         </div>
@@ -50,26 +50,26 @@
         <x-ui.card>
             <div class="space-y-2 py-2">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                    No Portal Role Assigned
+                    {{ __('No Portal Role Assigned') }}
                 </h3>
                 <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Your account is authenticated, but you do not currently hold an active BDMS portal role. Please contact an administrator to assign appropriate permissions.
+                    {{ __('Your account is authenticated, but you do not currently hold an active BDMS portal role. Please contact an administrator to assign appropriate permissions.') }}
                 </p>
             </div>
         </x-ui.card>
     @else
         @if ($activeRole === 'hospital' && isset($hospital) && $hospital)
             @if ($hospital->verification_status === 'Pending')
-                <x-ui.alert variant="warning" title="Facility Verification Pending" :dismissible="false" class="mb-6">
-                    Your medical facility (<strong>{{ $hospital->name }}</strong>, Code: <code>{{ $hospital->hospital_code }}</code>) is currently pending administrative verification. Blood request submissions are disabled until an administrator approves your facility credentials.
+                <x-ui.alert variant="warning" :title="__('Facility Verification Pending')" :dismissible="false" class="mb-6">
+                    {!! __('Your medical facility (:name, Code: :code) is currently pending administrative verification. Blood request submissions are disabled until an administrator approves your facility credentials.', ['name' => '<strong>'.$hospital->name.'</strong>', 'code' => '<code class="dir-ltr">'.$hospital->hospital_code.'</code>']) !!}
                 </x-ui.alert>
             @elseif ($hospital->verification_status === 'Verified')
-                <x-ui.alert variant="success" title="Verified Hospital Partner" :dismissible="false" class="mb-6">
-                    Your medical facility (<strong>{{ $hospital->name }}</strong>) is verified and active. You are authorized to create blood requests.
+                <x-ui.alert variant="success" :title="__('Verified Hospital Partner')" :dismissible="false" class="mb-6">
+                    {!! __('Your medical facility (:name) is verified and active. You are authorized to create blood requests.', ['name' => '<strong>'.$hospital->name.'</strong>']) !!}
                 </x-ui.alert>
             @elseif ($hospital->verification_status === 'Suspended')
-                <x-ui.alert variant="danger" title="Facility Access Suspended" :dismissible="false" class="mb-6">
-                    Your medical facility's access is currently suspended. You cannot place new blood requests. Please contact the BDMS administration for assistance.
+                <x-ui.alert variant="danger" :title="__('Facility Access Suspended')" :dismissible="false" class="mb-6">
+                    {{ __('Your medical facility\'s access is currently suspended. You cannot place new blood requests. Please contact the BDMS administration for assistance.') }}
                 </x-ui.alert>
             @endif
         @endif
@@ -97,32 +97,32 @@
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                                {{ $activeRole === 'donor' ? 'Recent Donations & Visits' : 'Recent Blood Requests' }}
+                                {{ $activeRole === 'donor' ? __('Recent Donations & Visits') : __('Recent Blood Requests') }}
                             </h3>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Operational activity log and recent submissions
+                                {{ __('Operational activity log and recent submissions') }}
                             </p>
                         </div>
-                        <x-ui.badge variant="neutral">{{ count($portalData['recentActivity']) }} items</x-ui.badge>
+                        <x-ui.badge variant="neutral">{{ __(':count items', ['count' => count($portalData['recentActivity'])]) }}</x-ui.badge>
                     </div>
                 </x-slot:header>
 
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                        <thead class="bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
+                        <thead class="bg-slate-50/70 text-start text-xs font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-950/60 dark:text-slate-400">
                             <tr>
-                                <th scope="col" class="px-5 py-3">Ref</th>
-                                <th scope="col" class="px-5 py-3">{{ $activeRole === 'donor' ? 'Center / Event' : 'Hospital / Ward' }}</th>
-                                <th scope="col" class="px-5 py-3">Group</th>
-                                <th scope="col" class="px-5 py-3">Quantity</th>
-                                <th scope="col" class="px-5 py-3">Status</th>
-                                <th scope="col" class="px-5 py-3 text-right">Time</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Ref') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ $activeRole === 'donor' ? __('Center / Event') : __('Hospital / Ward') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Group') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Quantity') }}</th>
+                                <th scope="col" class="px-5 py-3">{{ __('Status') }}</th>
+                                <th scope="col" class="px-5 py-3 text-end">{{ __('Time') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
                             @forelse ($portalData['recentActivity'] as $row)
                                 <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                                    <td class="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
+                                    <td class="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300 dir-ltr text-start">
                                         {{ $row['reference'] }}
                                     </td>
                                     <td class="px-5 py-3.5 font-medium text-slate-900 dark:text-white">
@@ -137,14 +137,14 @@
                                     <td class="whitespace-nowrap px-5 py-3.5">
                                         <x-bdms.urgency-badge :level="$row['status']" />
                                     </td>
-                                    <td class="whitespace-nowrap px-5 py-3.5 text-right text-xs text-slate-500 dark:text-slate-400">
+                                    <td class="whitespace-nowrap px-5 py-3.5 text-end text-xs text-slate-500 dark:text-slate-400">
                                         {{ $row['time'] }}
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
                                     <td colspan="6" class="px-5 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
-                                        No recent operational activity recorded.
+                                        {{ __('No recent operational activity recorded.') }}
                                     </td>
                                 </tr>
                             @endforelse
@@ -160,7 +160,7 @@
                 <x-slot:header>
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
-                            Critical Stock Watch
+                            {{ __('Critical Stock Watch') }}
                         </h3>
                         <x-icons.icon name="droplet" class="size-4 text-crimson-600 dark:text-crimson-400" />
                     </div>
@@ -175,14 +175,14 @@
                         />
                     @empty
                         <p class="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
-                            No inventory stock levels recorded.
+                            {{ __('No inventory stock levels recorded.') }}
                         </p>
                     @endforelse
                 </div>
 
                 <x-slot:footer>
                     <p class="text-xs text-slate-500 dark:text-slate-400">
-                        Role-scoped access for <span class="font-semibold text-slate-700 dark:text-slate-200">{{ auth()->user()?->name ?? 'Authenticated User' }}</span>.
+                        {!! __('Role-scoped access for :user.', ['user' => '<span class="font-semibold text-slate-700 dark:text-slate-200">'.(auth()->user()?->name ?? __('Authenticated User')).'</span>']) !!}
                     </p>
                 </x-slot:footer>
             </x-ui.card>
@@ -190,13 +190,13 @@
     </div>
     @endif
 
-    <x-ui.modal name="quick-action-preview" title="Module Action Preview" maxWidth="md">
+    <x-ui.modal name="quick-action-preview" :title="__('Module Action Preview')" maxWidth="md">
         <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            This modal demonstrates the reusable <code class="rounded bg-slate-100 px-1.5 py-0.5 text-xs dark:bg-slate-800">&lt;x-ui.modal&gt;</code> component. Dedicated CRUD forms for Inventory, Donors, Donations, and Blood Requests can be built in the next phase.
+            {{ __('This modal demonstrates the reusable :component component. Dedicated CRUD forms for Inventory, Donors, Donations, and Blood Requests can be built in the next phase.', ['component' => 'x-ui.modal']) }}
         </p>
         <div class="mt-5 flex justify-end">
             <x-ui.button variant="primary" size="sm" @click="$dispatch('close-modal', 'quick-action-preview')">
-                Got it
+                {{ __('Got it') }}
             </x-ui.button>
         </div>
     </x-ui.modal>
