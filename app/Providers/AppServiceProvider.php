@@ -3,11 +3,15 @@
 namespace App\Providers;
 
 use App\Models\BloodRequest;
+use App\Models\Donation;
 use App\Models\Donor;
 use App\Models\Hospital;
+use App\Models\ScreeningRecord;
 use App\Policies\BloodRequestPolicy;
+use App\Policies\DonationPolicy;
 use App\Policies\DonorPolicy;
 use App\Policies\HospitalPolicy;
+use App\Policies\ScreeningRecordPolicy;
 use Closure;
 use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\Gate;
@@ -29,8 +33,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(BloodRequest::class, BloodRequestPolicy::class);
+        Gate::policy(Donation::class, DonationPolicy::class);
         Gate::policy(Donor::class, DonorPolicy::class);
         Gate::policy(Hospital::class, HospitalPolicy::class);
+        Gate::policy(ScreeningRecord::class, ScreeningRecordPolicy::class);
 
         if (! Builder::hasMacro('createWithChecks')) {
             /**

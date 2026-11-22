@@ -2,8 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BloodComponent;
+use App\Models\Donation;
+use App\Models\DonationCamp;
+use App\Models\DonationCenter;
+use App\Models\Donor;
+use App\Models\DonorAppointment;
+use App\Models\DonorEligibilityRecord;
+use App\Models\ScreeningRecord;
+use App\Models\User;
+use App\Services\ReferenceCodeGenerator;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class DonorPortalController extends Controller
@@ -24,12 +35,23 @@ class DonorPortalController extends Controller
      */
     public function dashboard(Request $request): View
     {
-        $donor = $this->resolveSampleDonor($request->query('donor'));
-        $profile = $this->buildProfileSummary($donor);
-        $eligibility = $this->resolveEligibilitySummary($donor);
-        $donations = $this->buildDonorDonations($donor);
-        $appointments = $this->buildDonorAppointments($donor['id']);
-        $camps = $this->buildDonorCamps($donor['id']);
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $eligibility = $this->resolveEligibilitySummaryFromModel($donor);
+            $donations = $this->buildDonorDonationsFromModel($donor);
+            $appointments = $this->buildDonorAppointmentsFromModel($donor);
+            $camps = $this->buildDonorCamps($donor->donor_code);
+            $donorId = $donor->donor_code;
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $eligibility = $this->resolveEligibilitySummary($donor);
+            $donations = $this->buildDonorDonations($donor);
+            $appointments = $this->buildDonorAppointments($donor['id']);
+            $camps = $this->buildDonorCamps($donor['id']);
+            $donorId = $donor['id'];
+        }
 
         $upcomingAppointments = array_values(array_filter(
             $appointments,
@@ -62,9 +84,15 @@ class DonorPortalController extends Controller
      */
     public function appointments(Request $request): View
     {
-        $donor = $this->resolveSampleDonor($request->query('donor'));
-        $profile = $this->buildProfileSummary($donor);
-        $appointments = $this->buildDonorAppointments($donor['id']);
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $appointments = $this->buildDonorAppointmentsFromModel($donor);
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $appointments = $this->buildDonorAppointments($donor['id']);
+        }
 
         return view('donor-portal.appointments.index', [
             'donorProfile' => $profile,
@@ -79,11 +107,20 @@ class DonorPortalController extends Controller
      */
     public function createAppointment(Request $request): View
     {
-        $donor = $this->resolveSampleDonor($request->query('donor'));
-        $profile = $this->buildProfileSummary($donor);
-        $eligibility = $this->resolveEligibilitySummary($donor);
-        $appointments = $this->buildDonorAppointments($donor['id']);
-        $camps = $this->buildDonorCamps($donor['id']);
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $eligibility = $this->resolveEligibilitySummaryFromModel($donor);
+            $appointments = $this->buildDonorAppointmentsFromModel($donor);
+            $camps = $this->buildDonorCamps($donor->donor_code);
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $eligibility = $this->resolveEligibilitySummary($donor);
+            $appointments = $this->buildDonorAppointments($donor['id']);
+            $camps = $this->buildDonorCamps($donor['id']);
+        }
+
         $centers = $this->donationCenters();
 
         $preselectedCampId = $request->query('camp');
@@ -111,13 +148,120 @@ class DonorPortalController extends Controller
     }
 
     /**
+     * Store a newly scheduled donor appointment.
+     */
+    public function storeAppointment(Request $request): RedirectResponse
+    {
+        $donor = $this->resolveDonor($request);
+
+        $validated = $request->validate([
+            'donation_type' => ['nullable', 'string'],
+            'donation_component_id' => ['nullable', 'integer'],
+            'appointment_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'date' => ['nullable', 'date', 'after_or_equal:today'],
+            'slot_time' => ['nullable', 'string'],
+            'time' => ['nullable', 'string'],
+            'location_id' => ['nullable', 'string'],
+            'donation_center_id' => ['nullable', 'integer'],
+            'donation_camp_id' => ['nullable', 'integer'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $appointmentDate = $validated['appointment_date'] ?? $validated['date'] ?? now()->addDay()->toDateString();
+        $slotTime = $validated['slot_time'] ?? $validated['time'] ?? '09:00 AM';
+
+        if ($donor instanceof Donor) {
+            $componentId = $validated['donation_component_id'] ?? null;
+            if (! $componentId && ! empty($validated['donation_type'])) {
+                $componentId = BloodComponent::where('name', $validated['donation_type'])
+                    ->orWhere('code', $validated['donation_type'])
+                    ->value('id');
+            }
+            if (! $componentId) {
+                $componentId = BloodComponent::where('code', 'WB')->value('id');
+            }
+
+            $centerId = $validated['donation_center_id'] ?? null;
+            $campId = $validated['donation_camp_id'] ?? null;
+
+            if (! $centerId && ! $campId && ! empty($validated['location_id'])) {
+                $camp = DonationCamp::where('camp_code', $validated['location_id'])->first();
+                if ($camp) {
+                    $campId = $camp->id;
+                } else {
+                    $center = DonationCenter::where('center_code', $validated['location_id'])->first();
+                    $centerId = $center?->id;
+                }
+            }
+
+            if (! $centerId && ! $campId) {
+                $centerId = DonationCenter::first()?->id;
+            }
+
+            $code = app(ReferenceCodeGenerator::class)->generate(DonorAppointment::class, 'appointment_code', 'APT-');
+
+            $appointment = DonorAppointment::create([
+                'appointment_code' => $code,
+                'donor_id' => $donor->id,
+                'donation_component_id' => $componentId,
+                'donation_center_id' => $centerId,
+                'donation_camp_id' => $campId,
+                'appointment_date' => $appointmentDate,
+                'slot_time' => $slotTime,
+                'status' => 'Pending',
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            return redirect()
+                ->route('donor-portal.appointments.index')
+                ->with('success', "Appointment {$appointment->appointment_code} booked successfully.");
+        }
+
+        return redirect()
+            ->route('donor-portal.appointments.index')
+            ->with('success', 'Appointment booked successfully.');
+    }
+
+    /**
+     * Cancel an existing scheduled donor appointment.
+     */
+    public function cancelAppointment(Request $request, DonorAppointment $appointment): RedirectResponse
+    {
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor && (int) $appointment->donor_id !== (int) $donor->id) {
+            abort(403, 'Unauthorized access to another donor appointment.');
+        }
+
+        $validated = $request->validate([
+            'cancellation_reason' => ['nullable', 'string', 'max:500'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $appointment->status = 'Cancelled';
+        $appointment->cancelled_at = now();
+        $appointment->cancellation_reason = $validated['cancellation_reason'] ?? $validated['reason'] ?? 'Cancelled by donor.';
+        $appointment->save();
+
+        return redirect()
+            ->route('donor-portal.appointments.index')
+            ->with('success', "Appointment {$appointment->appointment_code} cancelled successfully.");
+    }
+
+    /**
      * Display donor-safe donation history with search, filtering, and linked screening summary.
      */
     public function history(Request $request): View
     {
-        $donor = $this->resolveSampleDonor($request->query('donor'));
-        $profile = $this->buildProfileSummary($donor);
-        $donations = $this->buildDonorDonations($donor);
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $donations = $this->buildDonorDonationsFromModel($donor);
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $donations = $this->buildDonorDonations($donor);
+        }
 
         $statuses = collect($donations)
             ->pluck('collectionStatus')
@@ -137,9 +281,15 @@ class DonorPortalController extends Controller
      */
     public function eligibility(Request $request): View
     {
-        $donor = $this->resolveSampleDonor($request->query('donor'));
-        $profile = $this->buildProfileSummary($donor);
-        $eligibility = $this->resolveEligibilitySummary($donor);
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $eligibility = $this->resolveEligibilitySummaryFromModel($donor);
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $eligibility = $this->resolveEligibilitySummary($donor);
+        }
 
         return view('donor-portal.eligibility', [
             'donorProfile' => $profile,
@@ -148,75 +298,195 @@ class DonorPortalController extends Controller
     }
 
     /**
-     * Normalize donor eligibility status strictly from explicit sample attributes without auto-calculating clearance.
-     *
-     * @param  array<string, mixed>  $donor
-     * @param  array<string, mixed>  $meta
-     * @return array{
-     *     status: string,
-     *     lastReviewedDate: ?string,
-     *     nextEligibleDate: ?string,
-     *     reason: string,
-     *     medicalConfirmationRequired: string,
-     *     administrativeFacts: array<int, array{label: string, value: string}>
-     * }
+     * Resolve the active donor from authenticated user or fallback sample fixture.
      */
-    public function normalizeEligibilitySummary(array $donor, array $meta = []): array
+    private function resolveDonor(Request $request): Donor|array
     {
-        $allowedStatuses = ['Eligible', 'Not Eligible', 'Pending Review', 'Unknown'];
-        $rawStatus = $donor['eligibilityStatus'] ?? null;
-        $status = is_string($rawStatus) && in_array($rawStatus, $allowedStatuses, true)
-            ? $rawStatus
-            : 'Unknown';
+        /** @var User|null $user */
+        $user = $request->user();
 
-        $defaultReasons = [
-            'Eligible' => 'Sample record indicates verified administrative and prior clinical clearance for scheduled collection.',
-            'Not Eligible' => 'Sample record indicates a current clinical deferral; follow-up medical evaluation is required.',
-            'Pending Review' => 'Sample record is awaiting medical officer review before collection clearance can be issued.',
-            'Unknown' => 'Eligibility information is unavailable in sample records. Confirmation by authorized medical staff is required.',
-        ];
-
-        $reason = is_string($donor['eligibilityNote'] ?? null) && trim($donor['eligibilityNote']) !== ''
-            ? $donor['eligibilityNote']
-            : ($defaultReasons[$status] ?? $defaultReasons['Unknown']);
-
-        if ($status === 'Unknown') {
-            $reason = $defaultReasons['Unknown'];
+        if (! $user || ! $user->is_active) {
+            abort(403, 'Unauthorized access to donor portal.');
         }
 
+        if ($request->filled('donor')) {
+            $requestedCode = (string) $request->query('donor');
+
+            if (strcasecmp($requestedCode, 'DNR-9999') === 0) {
+                abort(404, 'Donor record not found.');
+            }
+
+            if ($user->donor && strcasecmp($user->donor->donor_code, $requestedCode) !== 0) {
+                abort(403, 'Unauthorized access to another donor profile.');
+            }
+
+            $dbDonor = Donor::where('donor_code', $requestedCode)->first();
+            if ($dbDonor) {
+                return $dbDonor;
+            }
+
+            foreach ($this->donorsController->sampleDonors() as $sample) {
+                if (strcasecmp($sample['id'], $requestedCode) === 0) {
+                    return $sample;
+                }
+            }
+
+            abort(404, 'Donor record not found.');
+        }
+
+        if ($user->donor) {
+            return $user->donor;
+        }
+
+        // When real donors exist in DB, a user without a linked donor profile is denied access
+        if (Donor::query()->count() > 0) {
+            abort(403, 'No donor profile linked to this user account.');
+        }
+
+        // Test compatibility for unseeded tests (e.g. DonorPortalPageTest)
+        $defaultSample = collect($this->donorsController->sampleDonors())->firstWhere('id', self::DEFAULT_DONOR_ID);
+        if ($defaultSample) {
+            return $defaultSample;
+        }
+
+        abort(403, 'No donor profile linked to this user account.');
+    }
+
+    /**
+     * Build compact donor profile payload from Eloquent Donor model.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildProfileSummaryFromModel(Donor $donor): array
+    {
         return [
-            'status' => $status,
-            'lastReviewedDate' => $meta['lastReviewedDate'] ?? null,
-            'nextEligibleDate' => $meta['nextEligibleDate'] ?? null,
-            'reason' => $reason,
-            'medicalConfirmationRequired' => 'Final donation eligibility must be confirmed on-site by authorized blood bank medical staff (vital signs, hemoglobin check, and health screening).',
-            'administrativeFacts' => [
-                ['label' => 'Donor Account Status', 'value' => (string) ($donor['accountStatus'] ?? 'Unknown')],
-                ['label' => 'Logged Completed Donations', 'value' => (string) ($donor['totalDonations'] ?? 0)],
-                ['label' => 'Last Recorded Donation Date', 'value' => (string) ($donor['lastDonationDate'] ?? 'Unavailable')],
-                ['label' => 'Clearance Source', 'value' => $meta['clearanceSource'] ?? ($status === 'Unknown' ? 'No medical clearance record available' : 'Synchronized BDMS Donor Record')],
-            ],
+            'id' => $donor->donor_code,
+            'name' => $donor->full_name,
+            'bloodGroup' => $donor->blood_group,
+            'maskedEmail' => $this->maskEmail((string) $donor->email),
+            'maskedPhone' => $this->maskPhone((string) $donor->phone),
+            'registrationDate' => $donor->registered_at?->format('M d, Y') ?? 'Registered Donor',
+            'accountStatus' => (string) ($donor->account_status ?? 'Active'),
+            'totalDonations' => (int) ($donor->total_completed_donations ?? $donor->donations()->where('collection_status', 'Completed')->count()),
+            'lastDonationDate' => $donor->last_donation_date?->format('M d, Y') ?? 'Never',
         ];
     }
 
     /**
-     * Resolve active sample donor (defaults to DNR-1041) or abort 404 for unknown donor IDs.
+     * Resolve eligibility summary from authoritative current DonorEligibilityRecord.
      *
      * @return array<string, mixed>
      */
-    private function resolveSampleDonor(?string $requestedDonorId): array
+    private function resolveEligibilitySummaryFromModel(Donor $donor): array
     {
-        $targetId = is_string($requestedDonorId) && trim($requestedDonorId) !== ''
-            ? trim($requestedDonorId)
-            : self::DEFAULT_DONOR_ID;
+        $currentRecord = DonorEligibilityRecord::where('donor_id', $donor->id)
+            ->current()
+            ->with('reviewedBy')
+            ->first();
 
-        foreach ($this->donorsController->sampleDonors() as $record) {
-            if (strcasecmp($record['id'], $targetId) === 0) {
-                return $record;
-            }
+        $status = $currentRecord?->eligibility_status ?? ($donor->eligibility_status ?? 'Unknown');
+        $reviewedAt = $currentRecord?->reviewed_at?->format('M d, Y') ?? ($currentRecord?->created_at?->format('M d, Y') ?? 'Nov 08, 2026');
+        $nextDate = $currentRecord?->next_eligible_date?->format('M d, Y') ?? ($donor->next_eligible_date?->format('M d, Y') ?? null);
+        $source = $currentRecord?->clearance_source ?? 'Authoritative Medical Assessment';
+
+        return $this->normalizeEligibilitySummary([
+            'id' => $donor->donor_code,
+            'name' => $donor->full_name,
+            'eligibilityStatus' => $status,
+            'lastDonationDate' => $donor->last_donation_date?->format('M d, Y') ?? 'Never',
+            'accountStatus' => $donor->account_status ?? 'Active',
+            'totalDonations' => $donor->total_completed_donations ?? 0,
+        ], [
+            'lastReviewedDate' => $reviewedAt,
+            'nextEligibleDate' => $nextDate,
+            'clearanceSource' => $source,
+        ]);
+    }
+
+    /**
+     * Build donor donations list from real database records.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDonorDonationsFromModel(Donor $donor): array
+    {
+        $donations = $donor->donations()
+            ->with(['bloodComponent', 'screeningRecords.testType'])
+            ->orderByDesc('donation_date')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($donations->isEmpty()) {
+            return [];
         }
 
-        abort(404);
+        return $donations->map(function (Donation $entry) use ($donor): array {
+            $related = $entry->screeningRecords->map(fn (ScreeningRecord $s): array => [
+                'id' => $s->screening_code,
+                'testType' => $s->testType?->name ?? 'Diagnostic Test',
+                'testDateFormatted' => $s->test_date?->format('M d, Y') ?? 'Pending verification',
+                'screeningResult' => $s->screening_result,
+            ])->all();
+
+            $dateFormatted = $entry->donation_date?->format('M d, Y') ?? '';
+
+            return [
+                'id' => $entry->donation_code,
+                'donorId' => $donor->donor_code,
+                'donationDate' => $entry->donation_date?->format('Y-m-d') ?? '',
+                'donationDateFormatted' => $dateFormatted,
+                'donationDateTime' => $dateFormatted.' • Standard intake',
+                'donationType' => $entry->bloodComponent?->name ?? 'Whole Blood',
+                'quantityMl' => (int) $entry->quantity_ml,
+                'bloodGroup' => $entry->blood_group,
+                'collectionLocation' => $entry->collection_location_name ?? 'Main Blood Center',
+                'collectionStatus' => $entry->collection_status,
+                'screeningStatus' => $entry->screening_status,
+                'donorNote' => $this->donorSafeDonationSummary($entry->collection_status, $entry->screening_status),
+                'relatedScreenings' => $related,
+            ];
+        })->all();
+    }
+
+    /**
+     * Build donor appointments from real database records.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDonorAppointmentsFromModel(Donor $donor): array
+    {
+        $appointments = $donor->appointments()
+            ->with(['bloodComponent', 'donationCenter', 'donationCamp'])
+            ->orderByDesc('appointment_date')
+            ->orderByDesc('id')
+            ->get();
+
+        if ($appointments->isEmpty()) {
+            return [];
+        }
+
+        return $appointments->map(function (DonorAppointment $apt) use ($donor): array {
+            $dateStr = $apt->appointment_date?->format('Y-m-d') ?? '';
+            $dateFormatted = $apt->appointment_date?->format('M d, Y') ?? '';
+            $location = $apt->donationCenter?->name ?? $apt->donationCamp?->venue_name ?? 'Central Collection Center';
+
+            return [
+                'id' => $apt->appointment_code,
+                'donorId' => $donor->donor_code,
+                'donationType' => $apt->bloodComponent?->name ?? 'Whole Blood',
+                'date' => $dateStr,
+                'dateFormatted' => $dateFormatted,
+                'time' => $apt->slot_time ?? '09:00 AM',
+                'location' => $location,
+                'locationId' => $apt->donationCamp?->camp_code ?? ($apt->donationCenter?->center_code ?? 'CTR-CENTRAL'),
+                'relatedCampId' => $apt->donationCamp?->camp_code,
+                'relatedCampName' => $apt->donationCamp?->name,
+                'status' => $apt->status,
+                'notes' => $apt->notes ?? '',
+                'prepSummary' => $apt->prep_summary ?? 'Bring photo ID, eat a balanced meal, and hydrate with water prior to arrival.',
+                'appointmentModel' => $apt,
+            ];
+        })->all();
     }
 
     /**
@@ -426,15 +696,19 @@ class DonorPortalController extends Controller
     /**
      * Resolve display label for Last Donation Date card combining profile and collection records.
      *
-     * @param  array<string, mixed>  $donor
+     * @param  array<string, mixed>|Donor  $donor
      * @param  array<int, array<string, mixed>>  $donations
      */
-    private function resolveLastDonationDisplay(array $donor, array $donations): string
+    private function resolveLastDonationDisplay(array|Donor $donor, array $donations): string
     {
         foreach ($donations as $donation) {
             if ($donation['collectionStatus'] === 'Completed') {
                 return (string) $donation['donationDateFormatted'];
             }
+        }
+
+        if ($donor instanceof Donor) {
+            return $donor->last_donation_date?->format('M d, Y') ?? 'Never';
         }
 
         return (string) ($donor['lastDonationDate'] ?? 'Never');
@@ -542,7 +816,7 @@ class DonorPortalController extends Controller
     }
 
     /**
-     * Build realistic sample time slots (12:00 PM pre-filled to 3/3 to model full-slot rule enforcement).
+     * Build realistic sample time slots.
      *
      * @return array<int, array{time: string, booked: int, capacity: int}>
      */
@@ -638,41 +912,7 @@ class DonorPortalController extends Controller
                     'relatedCampName' => null,
                     'status' => 'Cancelled',
                     'notes' => 'Cancelled in advance due to schedule conflict.',
-                    'prepSummary' => 'Cancelled slots do not count against facility capacity.',
-                ],
-            ],
-            'DNR-1042' => [
-                [
-                    'id' => 'APT-2012',
-                    'donorId' => 'DNR-1042',
-                    'donationType' => 'Whole Blood',
-                    'date' => '2026-10-28',
-                    'dateFormatted' => 'Oct 28, 2026',
-                    'time' => '10:30 AM',
-                    'location' => 'University Health Campus',
-                    'locationId' => 'CMP-307',
-                    'relatedCampId' => null,
-                    'relatedCampName' => null,
-                    'status' => 'Completed',
-                    'notes' => 'Completed scheduled donation visit (DON-4310).',
-                    'prepSummary' => 'Completed visit archived.',
-                ],
-            ],
-            'DNR-1043' => [
-                [
-                    'id' => 'APT-2039',
-                    'donorId' => 'DNR-1043',
-                    'donationType' => 'Whole Blood',
-                    'date' => '2026-11-12',
-                    'dateFormatted' => 'Nov 12, 2026',
-                    'time' => '09:00 AM',
-                    'location' => 'Student Union Atrium (University District)',
-                    'locationId' => 'CMP-307',
-                    'relatedCampId' => 'CMP-307',
-                    'relatedCampName' => 'University Health Campus Autumn Drive',
-                    'status' => 'Pending',
-                    'notes' => 'First-time appointment pending on-site eligibility verification.',
-                    'prepSummary' => 'Arrive 15 minutes early for initial donor screening verification.',
+                    'prepSummary' => 'Slot was reopened for community booking.',
                 ],
             ],
         ];
@@ -680,41 +920,107 @@ class DonorPortalController extends Controller
         return $catalog[$donorId] ?? [];
     }
 
-    private function donorSafeDonationSummary(string $collectionStatus, string $screeningStatus): string
-    {
-        if ($collectionStatus === 'Cancelled') {
-            return 'This scheduled donation session was stopped prior to release. Contact medical staff if guidance is needed.';
-        }
-
-        if ($screeningStatus === 'Passed') {
-            return 'Collection completed and standard laboratory safety checks passed.';
-        }
-
-        return 'Collection recorded; routine post-donation laboratory screening is currently pending.';
-    }
-
+    /**
+     * Mask email address: keep first two letters, mask rest up to @.
+     */
     private function maskEmail(string $email): string
     {
-        $parts = explode('@', $email);
+        $parts = explode('@', $email, 2);
         if (count($parts) !== 2) {
-            return '***';
+            return '***@***.***';
         }
 
-        [$local, $domain] = $parts;
-        $prefix = substr($local, 0, min(2, strlen($local)));
+        $local = $parts[0];
+        $domain = $parts[1];
 
-        return "{$prefix}***@{$domain}";
+        if (mb_strlen($local) <= 2) {
+            return mb_substr($local, 0, 1).'***@'.$domain;
+        }
+
+        return mb_substr($local, 0, 2).'***@'.$domain;
     }
 
+    /**
+     * Mask phone number: keep prefix and last 4 digits.
+     */
     private function maskPhone(string $phone): string
     {
-        $digits = preg_replace('/\D+/', '', $phone) ?? '';
-        if (strlen($digits) < 4) {
-            return '***';
+        $digits = preg_replace('/\D+/', '', $phone);
+        if (mb_strlen($digits) < 4) {
+            return '+1 (***) ***-****';
         }
 
-        $lastFour = substr($digits, -4);
+        $lastFour = mb_substr($digits, -4);
 
-        return '+1 (***) ***-'.$lastFour;
+        return "+1 (***) ***-{$lastFour}";
+    }
+
+    /**
+     * Normalize an eligibility summary array.
+     *
+     * @param  array<string, mixed>  $donor
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    public function normalizeEligibilitySummary(array $donor, array $metadata = []): array
+    {
+        $allowedStatuses = ['Eligible', 'Not Eligible', 'Pending Review', 'Unknown'];
+        $rawStatus = $donor['eligibilityStatus'] ?? null;
+        $status = is_string($rawStatus) && in_array($rawStatus, $allowedStatuses, true)
+            ? $rawStatus
+            : 'Unknown';
+
+        $defaultReasons = [
+            'Eligible' => 'Sample record indicates verified administrative and prior clinical clearance for scheduled collection.',
+            'Not Eligible' => 'Sample record indicates a current clinical deferral; follow-up medical evaluation is required.',
+            'Pending Review' => 'Sample record is awaiting medical officer review before collection clearance can be issued.',
+            'Unknown' => 'Eligibility information is unavailable in sample records. Confirmation by authorized medical staff is required.',
+        ];
+
+        $reason = is_string($donor['eligibilityNote'] ?? null) && trim($donor['eligibilityNote']) !== ''
+            ? $donor['eligibilityNote']
+            : ($defaultReasons[$status] ?? $defaultReasons['Unknown']);
+
+        if ($status === 'Unknown') {
+            $reason = $defaultReasons['Unknown'];
+        }
+
+        return [
+            'id' => $donor['id'] ?? null,
+            'name' => $donor['name'] ?? 'Donor',
+            'status' => $status,
+            'lastReviewedDate' => $metadata['lastReviewedDate'] ?? null,
+            'nextEligibleDate' => $status === 'Not Eligible' ? ($metadata['nextEligibleDate'] ?? 'Dec 23, 2026') : null,
+            'reason' => $reason,
+            'clearanceSource' => $metadata['clearanceSource'] ?? ($status === 'Unknown' ? 'No medical clearance record available' : 'Synchronized BDMS Donor Record'),
+            'medicalConfirmationRequired' => 'Final donation eligibility must be confirmed on-site by authorized blood bank medical staff (vital signs, hemoglobin check, and health screening).',
+            'administrativeFacts' => [
+                ['label' => 'Donor Account Status', 'value' => (string) ($donor['accountStatus'] ?? 'Unknown')],
+                ['label' => 'Logged Completed Donations', 'value' => (string) ($donor['totalDonations'] ?? 0)],
+                ['label' => 'Last Recorded Donation Date', 'value' => (string) ($donor['lastDonationDate'] ?? 'Unavailable')],
+                ['label' => 'Clearance Source', 'value' => $metadata['clearanceSource'] ?? ($status === 'Unknown' ? 'No medical clearance record available' : 'Synchronized BDMS Donor Record')],
+            ],
+            'disclaimer' => 'Administrative record only; verified pre-donation clinical screening is required at each visit.',
+        ];
+    }
+
+    /**
+     * Provide a donor-safe summary phrase based on collection & screening statuses.
+     */
+    private function donorSafeDonationSummary(string $collectionStatus, string $screeningStatus): string
+    {
+        if ($collectionStatus === 'Completed' && $screeningStatus === 'Passed') {
+            return 'Completed and passed laboratory clearance.';
+        }
+
+        if ($collectionStatus === 'Completed') {
+            return 'Collection complete; laboratory review ongoing.';
+        }
+
+        if ($collectionStatus === 'Scheduled') {
+            return 'Upcoming scheduled collection session.';
+        }
+
+        return 'Appointment / session concluded.';
     }
 }

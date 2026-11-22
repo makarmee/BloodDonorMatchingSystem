@@ -48,7 +48,35 @@
                     <span>Back to Screening</span>
                 </x-ui.button>
 
-                <x-ui.button variant="primary" size="md" :href="route('screening.create')">
+                @if ($sample['screeningResult'] === 'Pending' && isset($donationModel) && $donationModel)
+                    <x-ui.button
+                        variant="primary"
+                        size="md"
+                        type="button"
+                        @click="$dispatch('open-modal', 'record-result-modal')"
+                    >
+                        <x-icons.icon name="beaker" class="size-4" />
+                        <span>Record Result</span>
+                    </x-ui.button>
+                @endif
+
+                @if (isset($donationModel) && $donationModel)
+                    @can('releaseToInventory', $donationModel)
+                        @if (isset($readiness) && $readiness['is_ready_for_release'])
+                            <x-ui.button
+                                variant="primary"
+                                size="md"
+                                type="button"
+                                @click="$dispatch('open-modal', 'release-inventory-modal')"
+                            >
+                                <x-icons.icon name="check-badge" class="size-4" />
+                                <span>Release to Inventory</span>
+                            </x-ui.button>
+                        @endif
+                    @endcan
+                @endif
+
+                <x-ui.button variant="outline" size="md" :href="route('screening.create')">
                     <x-icons.icon name="plus" class="size-4" />
                     <span>Record Screening Test</span>
                 </x-ui.button>
@@ -57,10 +85,34 @@
     </x-slot:header>
 
     <div class="space-y-6">
-        {{-- Clinical Preview Notice --}}
-        <x-ui.alert variant="info" title="Sample Screening Record Notice">
-            These laboratory screening figures are frontend preview fixtures only and do not represent real clinical clearance or automated medical authorization.
-        </x-ui.alert>
+        @if (session('success'))
+            <x-ui.alert variant="success" :title="session('success')" />
+        @endif
+
+        @if (session('error'))
+            <x-ui.alert variant="danger" :title="session('error')" />
+        @endif
+
+        @if (isset($readiness) && $readiness)
+            @if ($readiness['is_ready_for_release'])
+                <x-ui.alert variant="success" title="Inventory Release Eligible">
+                    All mandatory laboratory screening assays are completed and passed. This donation's unit is eligible for release to active inventory.
+                </x-ui.alert>
+            @elseif (! empty($readiness['blocking_reasons']))
+                <x-ui.alert variant="warning" title="Inventory Release Blocked">
+                    <ul class="list-disc list-inside space-y-1">
+                        @foreach ($readiness['blocking_reasons'] as $reason)
+                            <li>{{ $reason }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            @endif
+        @else
+            {{-- Clinical Preview Notice --}}
+            <x-ui.alert variant="info" title="Sample Screening Record Notice">
+                These laboratory screening figures are frontend preview fixtures only and do not represent real clinical clearance or automated medical authorization.
+            </x-ui.alert>
+        @endif
 
         {{-- Summary Strip --}}
         <section aria-label="Screening summary metrics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -282,6 +334,138 @@
                 </x-ui.card>
             </div>
         </div>
+
+        @if (isset($donationModel) && $donationModel)
+            {{-- Release to Inventory Modal --}}
+            <x-ui.modal name="release-inventory-modal" title="Release Quarantined Unit to Inventory" max-width="md">
+                <form method="POST" action="{{ route('screening.donations.release', $donationModel) }}" class="space-y-4">
+                    @csrf
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Confirm release of donation <strong>{{ $donationModel->donation_code }}</strong> and its tested blood unit to available hospital inventory.
+                    </p>
+
+                    <div>
+                        <label for="release-storage" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Storage Location
+                        </label>
+                        <input
+                            type="text"
+                            id="release-storage"
+                            name="storage_location"
+                            placeholder="e.g. Cold Room 2, Rack A-4"
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                    </div>
+
+                    <div>
+                        <label for="release-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Screening / Release Notes
+                        </label>
+                        <textarea
+                            id="release-notes"
+                            name="screening_notes"
+                            rows="3"
+                            placeholder="Mandatory panel non-reactive; unit cleared for clinical distribution..."
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="$dispatch('close-modal', 'release-inventory-modal')"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
+                        >
+                            Confirm Inventory Release
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
+
+            @if ($sample['screeningResult'] === 'Pending')
+                {{-- Record Assay Result Modal --}}
+                <x-ui.modal name="record-result-modal" title="Record Laboratory Assay Result" max-width="md">
+                    <form method="POST" action="{{ route('screening.records.store') }}" class="space-y-4">
+                        @csrf
+                        <input type="hidden" name="donation_id" value="{{ $donationModel->donation_code }}" />
+                        @if (isset($screeningRecord) && $screeningRecord->exists)
+                            <input type="hidden" name="screening_record_id" value="{{ $screeningRecord->id }}" />
+                            <input type="hidden" name="test_type_id" value="{{ $screeningRecord->test_type_id }}" />
+                        @else
+                            <input type="hidden" name="test_type" value="{{ $sample['testType'] }}" />
+                        @endif
+
+                        <p class="text-sm text-slate-600 dark:text-slate-300">
+                            Record clinical findings for <strong>{{ $sample['testType'] }}</strong> assay on specimen <strong>{{ $sample['id'] }}</strong>.
+                        </p>
+
+                        <div>
+                            <label for="modal-screening-result" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Assay Result <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                            </label>
+                            <select
+                                id="modal-screening-result"
+                                name="screening_result"
+                                required
+                                class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            >
+                                <option value="">Select Result...</option>
+                                <option value="Passed">Passed (Non-Reactive / Negative)</option>
+                                <option value="Failed">Failed (Reactive / Positive)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="modal-assay-method" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Assay Method
+                            </label>
+                            <input
+                                type="text"
+                                id="modal-assay-method"
+                                name="assay_method"
+                                value="{{ $sample['assayMethod'] }}"
+                                class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            />
+                        </div>
+
+                        <div>
+                            <label for="modal-test-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                Test Observations &amp; Notes
+                            </label>
+                            <textarea
+                                id="modal-test-notes"
+                                name="test_notes"
+                                rows="3"
+                                placeholder="Optical density, batch analyzer ID, controls verified..."
+                                class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                            ></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                @click="$dispatch('close-modal', 'record-result-modal')"
+                                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                class="rounded-xl bg-crimson-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-crimson-700 cursor-pointer"
+                            >
+                                Save Result
+                            </button>
+                        </div>
+                    </form>
+                </x-ui.modal>
+            @endif
+        @endif
     </div>
 </x-app-layout>
 

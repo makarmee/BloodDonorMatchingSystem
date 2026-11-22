@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Http\Controllers\DonationsController;
 use Database\Factories\DonationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -181,5 +182,56 @@ class Donation extends Model
     protected function unreleased(Builder $query): Builder
     {
         return $query->whereNull('released_to_inventory_at');
+    }
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'donation_code';
+    }
+
+    /**
+     * Retrieve the model for a bound value, supporting both donation_code and numeric ID.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $donation = $this->where($field ?? 'donation_code', $value)
+            ->when(is_numeric($value), fn (Builder $query): Builder => $query->orWhere('id', (int) $value))
+            ->first();
+
+        if ($donation) {
+            return $donation;
+        }
+
+        if (is_string($value) && str_starts_with(strtoupper($value), 'DON-')) {
+            $sample = collect(DonationsController::sampleDonationsList())->first(
+                fn (array $item): bool => strcasecmp($item['id'], $value) === 0
+            );
+
+            if ($sample) {
+                $virtualDonation = new self;
+                $virtualDonation->id = (int) (preg_replace('/\D/', '', $sample['id']) ?: 999);
+                $virtualDonation->donation_code = $sample['id'];
+                $virtualDonation->blood_group = $sample['bloodGroup'];
+                $virtualDonation->donation_date = $sample['donationDate'];
+                $virtualDonation->quantity_ml = $sample['quantityMl'];
+                $virtualDonation->collection_status = $sample['collectionStatus'];
+                $virtualDonation->screening_status = $sample['screeningStatus'];
+                $virtualDonation->collection_location_name = $sample['collectionLocation'];
+                $virtualDonation->staff_member_name = $sample['staffMember'];
+                $virtualDonation->collection_notes = $sample['collectionNotes'];
+                $virtualDonation->screening_notes = $sample['screeningNotes'];
+                $virtualDonation->exists = true;
+
+                return $virtualDonation;
+            }
+        }
+
+        return null;
     }
 }

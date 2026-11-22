@@ -53,6 +53,20 @@
     })"
     class="space-y-6"
 >
+    @if (session('success'))
+        <x-ui.alert variant="success" :title="session('success')" class="mb-4" />
+    @endif
+
+    @if ($errors->any())
+        <x-ui.alert variant="danger" title="Validation errors occurred" class="mb-4">
+            <ul class="list-disc pl-5 text-xs space-y-1">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
     {{-- Reactive Preview Feedback Banner --}}
     <div
         x-show="feedback !== null"
@@ -94,7 +108,17 @@
         </button>
     </div>
 
-    <form @submit.prevent="submitForm()" novalidate class="space-y-6">
+    <form
+        method="POST"
+        action="{{ $isEdit ? route('donations.update', $donationRecord['id']) : route('donations.store') }}"
+        @submit="if (!validateAll()) { $event.preventDefault(); feedback = { type: 'danger', title: 'Validation errors found', message: 'Please complete or correct the highlighted donation fields before continuing.' }; window.scrollTo({ top: 0, behavior: 'smooth' }); }"
+        novalidate
+        class="space-y-6"
+    >
+        @csrf
+        @if ($isEdit)
+            @method('PUT')
+        @endif
         {{-- Section 1: Donor Information --}}
         <x-ui.card>
             <x-slot:header>

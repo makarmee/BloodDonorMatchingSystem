@@ -54,7 +54,28 @@
                     <span>Back to Donations</span>
                 </x-ui.button>
 
-                <x-ui.button variant="primary" size="md" :href="route('donations.edit', $donation['id'])">
+                @if ($donation['collectionStatus'] === 'Scheduled')
+                    <x-ui.button
+                        variant="primary"
+                        size="md"
+                        type="button"
+                        @click="$dispatch('open-modal', 'complete-donation-modal')"
+                    >
+                        <x-icons.icon name="check-circle" class="size-4" />
+                        <span>Complete Collection</span>
+                    </x-ui.button>
+
+                    <button
+                        type="button"
+                        @click="$dispatch('open-modal', 'cancel-donation-modal')"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-rose-700 shadow-xs transition hover:bg-rose-50 dark:border-slate-700 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-slate-700 cursor-pointer"
+                    >
+                        <x-icons.icon name="no-symbol" class="size-3.5" />
+                        <span>Cancel Collection</span>
+                    </button>
+                @endif
+
+                <x-ui.button variant="outline" size="md" :href="route('donations.edit', $donation['id'])">
                     <x-icons.icon name="pencil" class="size-4" />
                     <span>Edit Donation</span>
                 </x-ui.button>
@@ -63,6 +84,14 @@
     </x-slot:header>
 
     <div class="space-y-6">
+        @if (session('success'))
+            <x-ui.alert variant="success" :title="session('success')" />
+        @endif
+
+        @if (session('error'))
+            <x-ui.alert variant="danger" :title="session('error')" />
+        @endif
+
         {{-- Top Key Metrics --}}
         <section aria-label="Donation summary metrics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
@@ -305,6 +334,101 @@
                 </x-ui.card>
             </div>
         </div>
+
+        @if ($donation['collectionStatus'] === 'Scheduled' && isset($donationModel))
+            {{-- Complete Collection Modal --}}
+            <x-ui.modal name="complete-donation-modal" title="Complete Phlebotomy Collection" max-width="md">
+                <form method="POST" action="{{ route('donations.complete', $donationModel) }}" class="space-y-4">
+                    @csrf
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Record collection completion for donation <strong>{{ $donation['id'] }}</strong>. This creates the primary blood unit in quarantine and initializes the mandatory laboratory screening panel.
+                    </p>
+
+                    <div>
+                        <label for="complete-quantity" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Volume Collected (ml)
+                        </label>
+                        <input
+                            type="number"
+                            id="complete-quantity"
+                            name="quantity_ml"
+                            min="100"
+                            max="1000"
+                            value="{{ $donation['quantityMl'] }}"
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        />
+                    </div>
+
+                    <div>
+                        <label for="complete-notes" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Collection / Phlebotomy Notes
+                        </label>
+                        <textarea
+                            id="complete-notes"
+                            name="collection_notes"
+                            rows="3"
+                            placeholder="Vein accessibility, donor tolerance, vitals observations..."
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="$dispatch('close-modal', 'complete-donation-modal')"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-emerald-700 cursor-pointer"
+                        >
+                            Confirm Completion
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
+
+            {{-- Cancel Donation Modal --}}
+            <x-ui.modal name="cancel-donation-modal" title="Cancel Scheduled Donation" max-width="md">
+                <form method="POST" action="{{ route('donations.cancel', $donationModel) }}" class="space-y-4">
+                    @csrf
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
+                        Cancel scheduled donation <strong>{{ $donation['id'] }}</strong>.
+                    </p>
+
+                    <div>
+                        <label for="cancel-reason" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                            Reason for Cancellation
+                        </label>
+                        <textarea
+                            id="cancel-reason"
+                            name="reason"
+                            rows="3"
+                            placeholder="Donor did not appear, medically deferred prior to phlebotomy, or requested cancellation..."
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            @click="$dispatch('close-modal', 'cancel-donation-modal')"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer"
+                        >
+                            Keep Scheduled
+                        </button>
+                        <button
+                            type="submit"
+                            class="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-xs transition hover:bg-rose-700 cursor-pointer"
+                        >
+                            Confirm Cancellation
+                        </button>
+                    </div>
+                </form>
+            </x-ui.modal>
+        @endif
     </div>
 </x-app-layout>
 

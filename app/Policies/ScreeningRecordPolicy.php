@@ -27,6 +27,6 @@ class ScreeningRecordPolicy
             return false;
         }
 
-        return $user->hasPermission('screening.manage');
+        return $user->hasAnyRole(['admin', 'staff', 'lab_officer']) || $user->hasPermission('screening.manage');
     }
 }

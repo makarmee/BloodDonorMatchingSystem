@@ -2,32 +2,134 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Donation;
+use App\Models\ScreeningRecord;
+use App\Models\ScreeningTestType;
+use App\Models\User;
+use App\Services\ScreeningService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ScreeningController extends Controller
 {
+    public function __construct(
+        private ScreeningService $screeningService,
+    ) {}
+
     /**
      * Display the lab screening overview statistics and filterable sample queue.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $samples = $this->sampleScreenings();
+        $this->authorizeScreeningAccess($request);
 
-        $summary = [
-            'totalSamples' => count($samples),
-            'pendingTests' => count(array_filter(
-                $samples,
-                fn (array $sample): bool => $sample['screeningResult'] === 'Pending'
-            )),
-            'passedSamples' => count(array_filter(
-                $samples,
-                fn (array $sample): bool => $sample['screeningResult'] === 'Passed'
-            )),
-            'failedSamples' => count(array_filter(
-                $samples,
-                fn (array $sample): bool => $sample['screeningResult'] === 'Failed'
-            )),
-        ];
+        $totalCount = ScreeningRecord::query()->count();
+
+        if ($totalCount === 0) {
+            $samples = self::sampleScreeningList();
+
+            $summary = [
+                'totalSamples' => count($samples),
+                'pendingTests' => count(array_filter(
+                    $samples,
+                    fn (array $sample): bool => $sample['screeningResult'] === 'Pending'
+                )),
+                'passedSamples' => count(array_filter(
+                    $samples,
+                    fn (array $sample): bool => $sample['screeningResult'] === 'Passed'
+                )),
+                'failedSamples' => count(array_filter(
+                    $samples,
+                    fn (array $sample): bool => $sample['screeningResult'] === 'Failed'
+                )),
+            ];
+        } else {
+            $summary = [
+                'totalSamples' => $totalCount,
+                'pendingTests' => ScreeningRecord::query()->where('screening_result', 'Pending')->count(),
+                'passedSamples' => ScreeningRecord::query()->where('screening_result', 'Passed')->count(),
+                'failedSamples' => ScreeningRecord::query()->where('screening_result', 'Failed')->count(),
+            ];
+
+            $query = ScreeningRecord::query()
+                ->with(['donation.donor', 'donation.bloodComponent', 'donation.primaryBloodUnit', 'testType', 'performedBy'])
+                ->orderByDesc('test_date')
+                ->orderByDesc('id');
+
+            if ($request->filled('search')) {
+                $term = trim((string) $request->query('search'));
+                $query->where(function (Builder $b) use ($term): void {
+                    $b->where('screening_code', 'like', "%{$term}%")
+                        ->orWhere('lab_staff_name', 'like', "%{$term}%")
+                        ->orWhereHas('donation', function (Builder $d) use ($term): void {
+                            $d->where('donation_code', 'like', "%{$term}%")
+                                ->orWhereHas('donor', function (Builder $dn) use ($term): void {
+                                    $dn->where('full_name', 'like', "%{$term}%")
+                                        ->orWhere('donor_code', 'like', "%{$term}%");
+                                });
+                        });
+                });
+            }
+
+            if ($request->filled('blood_group') && $request->query('blood_group') !== 'all') {
+                $bg = (string) $request->query('blood_group');
+                $query->whereHas('donation', fn (Builder $d) => $d->where('blood_group', $bg));
+            }
+
+            $resultFilter = $request->query('result') ?? $request->query('screening_result');
+            if ($resultFilter && $resultFilter !== 'all') {
+                $query->where('screening_result', (string) $resultFilter);
+            }
+
+            if ($request->filled('test_type') && $request->query('test_type') !== 'all') {
+                $tt = (string) $request->query('test_type');
+                $query->whereHas('testType', fn (Builder $t) => $t->where('name', $tt));
+            }
+
+            if ($request->filled('date_from')) {
+                $query->where('test_date', '>=', (string) $request->query('date_from'));
+            }
+
+            if ($request->filled('date_to')) {
+                $query->where('test_date', '<=', (string) $request->query('date_to'));
+            }
+
+            $samples = $query->get()->map(function (ScreeningRecord $record): array {
+                $donation = $record->donation;
+                $donor = $donation?->donor;
+
+                return [
+                    'id' => $record->screening_code,
+                    'donationId' => $donation?->donation_code ?? '—',
+                    'donorId' => $donor?->donor_code ?? '—',
+                    'donorName' => $donor?->full_name ?? '—',
+                    'donorEmail' => $donor?->email ?? '',
+                    'donorPhone' => $donor?->phone ?? '',
+                    'bloodGroup' => $donation?->blood_group ?? 'O+',
+                    'collectionDate' => $donation?->donation_date?->format('Y-m-d') ?? '',
+                    'collectionDateFormatted' => $donation?->donation_date?->format('M d, Y') ?? '',
+                    'donationType' => $donation?->bloodComponent?->name ?? 'Whole Blood',
+                    'quantityMl' => (int) ($donation?->quantity_ml ?? 450),
+                    'collectionLocation' => $donation?->collection_location_name ?? 'Main Center',
+                    'collectionStatus' => $donation?->collection_status ?? 'Completed',
+                    'testDate' => $record->test_date?->format('Y-m-d'),
+                    'testDateFormatted' => $record->test_date?->format('M d, Y') ?? 'Awaiting test',
+                    'testType' => $record->testType?->name ?? 'HIV',
+                    'screeningResult' => $record->screening_result,
+                    'labStaff' => $record->lab_staff_name ?? $record->performedBy?->name ?? 'Laboratory Staff',
+                    'assayMethod' => $record->assay_method ?? 'Automated Chemiluminescent Assay',
+                    'specimenTube' => $record->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
+                    'testNotes' => $record->test_notes ?? '',
+                    'collectedAt' => $record->collected_at?->format('M d, Y • H:i') ?? '—',
+                    'loggedAt' => $record->logged_at?->format('M d, Y • H:i') ?? '—',
+                    'resultRecordedAt' => $record->result_recorded_at?->format('M d, Y • H:i') ?? 'Pending verification',
+                ];
+            })->all();
+        }
 
         return view('screening.index', [
             'samples' => $samples,
@@ -40,11 +142,49 @@ class ScreeningController extends Controller
     /**
      * Display the lab screening test recording form linked to sample donations.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->authorizeScreeningAccess($request);
+
+        $donations = Donation::query()
+            ->with(['donor', 'bloodComponent'])
+            ->where('collection_status', 'Completed')
+            ->latest('id')
+            ->limit(50)
+            ->get()
+            ->map(fn (Donation $d): array => [
+                'id' => $d->donation_code,
+                'donorId' => $d->donor?->donor_code ?? '—',
+                'donorName' => $d->donor?->full_name ?? '—',
+                'donorEmail' => $d->donor?->email ?? '',
+                'donorPhone' => $d->donor?->phone ?? '',
+                'bloodGroup' => $d->blood_group,
+                'collectionDate' => $d->donation_date?->format('Y-m-d') ?? '',
+                'collectionDateFormatted' => $d->donation_date?->format('M d, Y') ?? '',
+                'donationType' => $d->bloodComponent?->name ?? 'Whole Blood',
+                'quantityMl' => (int) $d->quantity_ml,
+                'collectionLocation' => $d->collection_location_name ?? 'Main Center',
+                'collectionStatus' => $d->collection_status,
+            ])
+            ->all();
+
+        if (empty($donations)) {
+            $donations = array_values($this->sampleDonationsById());
+        }
+
+        $testTypes = ScreeningTestType::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+
+        if (empty($testTypes)) {
+            $testTypes = $this->testTypeOptions();
+        }
+
         return view('screening.create', [
-            'donations' => array_values($this->sampleDonationsById()),
-            'testTypes' => $this->testTypeOptions(),
+            'donations' => $donations,
+            'testTypes' => $testTypes,
             'labStaffSuggestions' => $this->labStaffSuggestions(),
         ]);
     }
@@ -52,13 +192,165 @@ class ScreeningController extends Controller
     /**
      * Display detailed screening results, linked donation details, donor data, and audit timestamps.
      */
-    public function show(string $screening): View
+    public function show(Request $request, ScreeningRecord $screening): View
     {
-        $sample = $this->findScreeningOrFail($screening);
+        $this->authorizeScreeningAccess($request);
+
+        if ($screening->exists) {
+            $screening->load(['donation.donor', 'donation.bloodComponent', 'donation.primaryBloodUnit', 'donation.screeningRecords.testType', 'testType', 'performedBy']);
+
+            $donation = $screening->donation;
+            $donor = $donation?->donor;
+
+            $sample = [
+                'id' => $screening->screening_code,
+                'donationId' => $donation?->donation_code ?? '—',
+                'donorId' => $donor?->donor_code ?? '—',
+                'donorName' => $donor?->full_name ?? '—',
+                'donorEmail' => $donor?->email ?? '',
+                'donorPhone' => $donor?->phone ?? '',
+                'bloodGroup' => $donation?->blood_group ?? 'O+',
+                'collectionDate' => $donation?->donation_date?->format('Y-m-d') ?? '',
+                'collectionDateFormatted' => $donation?->donation_date?->format('M d, Y') ?? '',
+                'donationType' => $donation?->bloodComponent?->name ?? 'Whole Blood',
+                'quantityMl' => (int) ($donation?->quantity_ml ?? 450),
+                'collectionLocation' => $donation?->collection_location_name ?? 'Main Center',
+                'collectionStatus' => $donation?->collection_status ?? 'Completed',
+                'testDate' => $screening->test_date?->format('Y-m-d'),
+                'testDateFormatted' => $screening->test_date?->format('M d, Y') ?? 'Awaiting test',
+                'testType' => $screening->testType?->name ?? 'HIV',
+                'screeningResult' => $screening->screening_result,
+                'labStaff' => $screening->lab_staff_name ?? $screening->performedBy?->name ?? 'Laboratory Staff',
+                'assayMethod' => $screening->assay_method ?? 'Automated Chemiluminescent Assay',
+                'specimenTube' => $screening->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
+                'testNotes' => $screening->test_notes ?? '',
+                'collectedAt' => $screening->collected_at?->format('M d, Y • H:i') ?? '—',
+                'loggedAt' => $screening->logged_at?->format('M d, Y • H:i') ?? '—',
+                'resultRecordedAt' => $screening->result_recorded_at?->format('M d, Y • H:i') ?? 'Pending verification',
+            ];
+
+            $readiness = $donation ? $this->screeningService->evaluateReleaseReadiness($donation) : null;
+            $sisterRecords = $donation?->screeningRecords ?? collect();
+
+            return view('screening.show', [
+                'sample' => $sample,
+                'screeningRecord' => $screening,
+                'donationModel' => $donation,
+                'readiness' => $readiness,
+                'sisterRecords' => $sisterRecords,
+            ]);
+        }
+
+        $sample = $this->findScreeningOrFail($screening->screening_code);
 
         return view('screening.show', [
             'sample' => $sample,
+            'screeningRecord' => $screening,
+            'donationModel' => null,
+            'readiness' => null,
+            'sisterRecords' => collect(),
         ]);
+    }
+
+    /**
+     * Record a new screening test result or update an existing pending record.
+     */
+    public function storeRecord(Request $request): RedirectResponse
+    {
+        $actor = $this->authorizeScreeningAccess($request);
+
+        $validated = $request->validate([
+            'donation_id' => ['required', 'string'],
+            'test_type' => ['nullable', 'string'],
+            'test_type_id' => ['nullable', 'integer'],
+            'screening_result' => ['required', 'string', Rule::in(['Pending', 'Passed', 'Failed'])],
+            'is_confirmatory' => ['nullable', 'boolean'],
+            'test_date' => ['nullable', 'date'],
+            'lab_staff' => ['nullable', 'string', 'max:150'],
+            'lab_staff_name' => ['nullable', 'string', 'max:150'],
+            'assay_method' => ['nullable', 'string', 'max:120'],
+            'specimen_tube' => ['nullable', 'string', 'max:64'],
+            'specimen_tube_code' => ['nullable', 'string', 'max:64'],
+            'test_notes' => ['nullable', 'string', 'max:1000'],
+            'screening_record_id' => ['nullable'],
+        ]);
+
+        $donation = Donation::query()
+            ->where('donation_code', $validated['donation_id'])
+            ->when(is_numeric($validated['donation_id']), fn ($q) => $q->orWhere('id', (int) $validated['donation_id']))
+            ->firstOrFail();
+
+        $testTypeId = $validated['test_type_id'] ?? null;
+        if (! $testTypeId && ! empty($validated['test_type'])) {
+            $testTypeId = ScreeningTestType::query()
+                ->where('name', $validated['test_type'])
+                ->orWhere('code', $validated['test_type'])
+                ->value('id');
+        }
+
+        $attributes = [
+            'screening_record_id' => $validated['screening_record_id'] ?? null,
+            'test_type_id' => $testTypeId,
+            'test_type_code' => empty($testTypeId) ? ($validated['test_type'] ?? null) : null,
+            'screening_result' => $validated['screening_result'],
+            'is_confirmatory' => (bool) ($validated['is_confirmatory'] ?? false),
+            'test_date' => $validated['test_date'] ?? now()->toDateString(),
+            'lab_staff_name' => $validated['lab_staff_name'] ?? $validated['lab_staff'] ?? $actor->name,
+            'assay_method' => $validated['assay_method'] ?? 'Automated Chemiluminescent Assay',
+            'specimen_tube_code' => $validated['specimen_tube_code'] ?? $validated['specimen_tube'] ?? null,
+            'test_notes' => $validated['test_notes'] ?? null,
+        ];
+
+        $record = $this->screeningService->recordScreeningResult($donation, $actor, $attributes);
+
+        return redirect()
+            ->route('screening.show', $record)
+            ->with('success', "Screening result recorded as {$record->screening_result} for {$donation->donation_code}.");
+    }
+
+    /**
+     * Release a passed donation and its primary blood unit into available inventory.
+     */
+    public function releaseToInventory(Request $request, Donation $donation): RedirectResponse
+    {
+        $actor = $this->authorizeScreeningAccess($request);
+
+        $validated = $request->validate([
+            'screening_notes' => ['nullable', 'string', 'max:1000'],
+            'storage_location' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        try {
+            $released = $this->screeningService->releaseToInventory($donation, $actor, $validated);
+
+            return redirect()
+                ->route('donations.show', $released)
+                ->with('success', "Donation {$released->donation_code} and quarantined blood unit released into available inventory.");
+        } catch (ValidationException $e) {
+            return redirect()
+                ->back()
+                ->withErrors($e->errors())
+                ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Authorize that the acting user has laboratory officer or staff rights.
+     */
+    private function authorizeScreeningAccess(Request $request): User
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if (
+            ! $user
+            || ! $user->is_active
+            || (! $user->hasAnyRole(['admin', 'staff', 'lab_officer']) && ! $user->hasPermission('screening.record') && ! $user->hasPermission('screening.manage'))
+        ) {
+            abort(403, 'Unauthorized access to laboratory screening management.');
+        }
+
+        return $user;
     }
 
     /**
@@ -68,7 +360,7 @@ class ScreeningController extends Controller
      */
     private function findScreeningOrFail(string $screeningId): array
     {
-        foreach ($this->sampleScreenings() as $record) {
+        foreach (self::sampleScreeningList() as $record) {
             if (strcasecmp($record['id'], $screeningId) === 0) {
                 return $record;
             }
@@ -136,7 +428,25 @@ class ScreeningController extends Controller
      *     collectionStatus: string
      * }>
      */
-    private function sampleDonationsById(): array
+    /**
+     * Sample donations synchronized with DonationsController & DonorsController records.
+     *
+     * @return array<string, array{
+     *     id: string,
+     *     donorId: string,
+     *     donorName: string,
+     *     donorEmail: string,
+     *     donorPhone: string,
+     *     bloodGroup: string,
+     *     collectionDate: string,
+     *     collectionDateFormatted: string,
+     *     donationType: string,
+     *     quantityMl: int,
+     *     collectionLocation: string,
+     *     collectionStatus: string
+     * }>
+     */
+    public static function sampleDonationsById(): array
     {
         $records = [
             [
@@ -155,17 +465,17 @@ class ScreeningController extends Controller
             ],
             [
                 'id' => 'DON-4404',
-                'donorId' => 'DNR-1048',
-                'donorName' => 'Omar Al-Mansoor',
-                'donorEmail' => 'omar.mansoor@example.org',
-                'donorPhone' => '+1 (555) 673-8044',
-                'bloodGroup' => 'B-',
-                'collectionDate' => '2026-11-10',
-                'collectionDateFormatted' => 'Nov 10, 2026',
-                'donationType' => 'Plasma',
-                'quantityMl' => 600,
-                'collectionLocation' => 'Westgate Donor Suite',
-                'collectionStatus' => 'Scheduled',
+                'donorId' => 'DNR-1042',
+                'donorName' => 'Marcus Vance',
+                'donorEmail' => 'marcus.vance@example.org',
+                'donorPhone' => '+1 (555) 391-4420',
+                'bloodGroup' => 'A+',
+                'collectionDate' => '2026-10-28',
+                'collectionDateFormatted' => 'Oct 28, 2026',
+                'donationType' => 'Whole Blood',
+                'quantityMl' => 450,
+                'collectionLocation' => 'University Health Campus',
+                'collectionStatus' => 'Completed',
             ],
             [
                 'id' => 'DON-4403',
@@ -174,8 +484,8 @@ class ScreeningController extends Controller
                 'donorEmail' => 'david.kim@example.org',
                 'donorPhone' => '+1 (555) 784-1933',
                 'bloodGroup' => 'AB-',
-                'collectionDate' => '2026-11-08',
-                'collectionDateFormatted' => 'Nov 08, 2026',
+                'collectionDate' => '2026-11-04',
+                'collectionDateFormatted' => 'Nov 04, 2026',
                 'donationType' => 'Platelets',
                 'quantityMl' => 250,
                 'collectionLocation' => 'Central Medical Plaza',
@@ -183,31 +493,31 @@ class ScreeningController extends Controller
             ],
             [
                 'id' => 'DON-4402',
-                'donorId' => 'DNR-1043',
-                'donorName' => 'Priya Sharma',
-                'donorEmail' => 'priya.sharma@example.org',
-                'donorPhone' => '+1 (555) 612-7745',
-                'bloodGroup' => 'B+',
-                'collectionDate' => '2026-11-06',
-                'collectionDateFormatted' => 'Nov 06, 2026',
-                'donationType' => 'Whole Blood',
-                'quantityMl' => 450,
-                'collectionLocation' => 'University Health Campus',
-                'collectionStatus' => 'Scheduled',
-            ],
-            [
-                'id' => 'DON-4401',
                 'donorId' => 'DNR-1045',
                 'donorName' => 'Amina Hassan',
                 'donorEmail' => 'amina.hassan@example.org',
                 'donorPhone' => '+1 (555) 845-3091',
                 'bloodGroup' => 'O+',
-                'collectionDate' => '2026-11-03',
-                'collectionDateFormatted' => 'Nov 03, 2026',
-                'donationType' => 'Plasma',
-                'quantityMl' => 550,
+                'collectionDate' => '2026-11-18',
+                'collectionDateFormatted' => 'Nov 18, 2026',
+                'donationType' => 'Whole Blood',
+                'quantityMl' => 450,
                 'collectionLocation' => 'Southgate Clinic',
-                'collectionStatus' => 'Cancelled',
+                'collectionStatus' => 'Scheduled',
+            ],
+            [
+                'id' => 'DON-4401',
+                'donorId' => 'DNR-1047',
+                'donorName' => 'Sofia Alvarez',
+                'donorEmail' => 'sofia.alvarez@example.org',
+                'donorPhone' => '+1 (555) 923-5510',
+                'bloodGroup' => 'AB+',
+                'collectionDate' => '2026-09-02',
+                'collectionDateFormatted' => 'Sep 02, 2026',
+                'donationType' => 'Whole Blood',
+                'quantityMl' => 450,
+                'collectionLocation' => 'University Health Campus',
+                'collectionStatus' => 'Completed',
             ],
             [
                 'id' => 'DON-4310',
@@ -289,39 +599,14 @@ class ScreeningController extends Controller
         return $indexed;
     }
 
-    /**
-     * Build realistic sample laboratory screening records referencing valid donations and donors.
-     *
-     * @return array<int, array{
-     *     id: string,
-     *     donationId: string,
-     *     donorId: string,
-     *     donorName: string,
-     *     donorEmail: string,
-     *     donorPhone: string,
-     *     bloodGroup: string,
-     *     collectionDate: string,
-     *     collectionDateFormatted: string,
-     *     donationType: string,
-     *     quantityMl: int,
-     *     collectionLocation: string,
-     *     collectionStatus: string,
-     *     testDate: ?string,
-     *     testDateFormatted: string,
-     *     testType: string,
-     *     screeningResult: string,
-     *     labStaff: string,
-     *     assayMethod: string,
-     *     specimenTube: string,
-     *     testNotes: string,
-     *     collectedAt: string,
-     *     loggedAt: string,
-     *     resultRecordedAt: string
-     * }>
-     */
     public function sampleScreenings(): array
     {
-        $donations = $this->sampleDonationsById();
+        return self::sampleScreeningList();
+    }
+
+    public static function sampleScreeningList(): array
+    {
+        $donations = self::sampleDonationsById();
 
         $entries = [
             [

@@ -41,6 +41,33 @@ class DonorAppointment extends Model
     public const array STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled'];
 
     /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'appointment_code';
+    }
+
+    /**
+     * Retrieve the model for a bound value by appointment_code or numeric id.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        $record = $this->where($field, $value)->first();
+
+        if (! $record && is_numeric($value)) {
+            $record = $this->where('id', (int) $value)->first();
+        }
+
+        return $record;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

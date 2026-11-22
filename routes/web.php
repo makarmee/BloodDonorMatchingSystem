@@ -56,11 +56,18 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('/donations', [DonationsController::class, 'index'])->name('donations.index');
         Route::get('/donations/create', [DonationsController::class, 'create'])->name('donations.create');
+        Route::post('/donations', [DonationsController::class, 'store'])->name('donations.store');
         Route::get('/donations/{donation}', [DonationsController::class, 'show'])->name('donations.show');
         Route::get('/donations/{donation}/edit', [DonationsController::class, 'edit'])->name('donations.edit');
+        Route::match(['put', 'patch'], '/donations/{donation}', [DonationsController::class, 'update'])->name('donations.update');
+        Route::post('/donations/{donation}/complete', [DonationsController::class, 'complete'])->name('donations.complete');
+        Route::post('/donations/{donation}/cancel', [DonationsController::class, 'cancel'])->name('donations.cancel');
 
         Route::get('/screening', [ScreeningController::class, 'index'])->name('screening.index');
         Route::get('/screening/create', [ScreeningController::class, 'create'])->name('screening.create');
+        Route::post('/screening/records', [ScreeningController::class, 'storeRecord'])->name('screening.records.store');
+        Route::post('/screening', [ScreeningController::class, 'storeRecord'])->name('screening.store');
+        Route::post('/screening/donations/{donation}/release', [ScreeningController::class, 'releaseToInventory'])->name('screening.donations.release');
         Route::get('/screening/{screening}', [ScreeningController::class, 'show'])->name('screening.show');
 
         Route::get('/requests', [BloodRequestsController::class, 'index'])->name('requests.index');
@@ -86,6 +93,8 @@ Route::middleware('auth')->group(function (): void {
             Route::get('/donor-portal', [DonorPortalController::class, 'dashboard'])->name('donor-portal.dashboard');
             Route::get('/donor-portal/appointments', [DonorPortalController::class, 'appointments'])->name('donor-portal.appointments.index');
             Route::get('/donor-portal/appointments/create', [DonorPortalController::class, 'createAppointment'])->name('donor-portal.appointments.create');
+            Route::post('/donor-portal/appointments', [DonorPortalController::class, 'storeAppointment'])->name('donor-portal.appointments.store');
+            Route::post('/donor-portal/appointments/{appointment}/cancel', [DonorPortalController::class, 'cancelAppointment'])->name('donor-portal.appointments.cancel');
             Route::get('/donor-portal/history', [DonorPortalController::class, 'history'])->name('donor-portal.history');
             Route::get('/donor-portal/eligibility', [DonorPortalController::class, 'eligibility'])->name('donor-portal.eligibility');
         });
