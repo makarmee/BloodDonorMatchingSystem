@@ -36,16 +36,19 @@
                     <span class="flex size-8 items-center justify-center rounded-lg bg-crimson-600 text-white lg:hidden">
                         <x-icons.icon name="droplet" class="size-4" />
                     </span>
-                    <span>&larr; Back to Home</span>
+                    <span>&larr; {{ __('Back to Home') }}</span>
                 </a>
-                <x-ui.theme-toggle />
+                <div class="flex items-center gap-2">
+                    <x-ui.language-selector />
+                    <x-ui.theme-toggle />
+                </div>
             </div>
 
             <div class="mx-auto w-full max-w-md py-10">
                 <div class="mb-6">
-                    <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">Sign in to BDMS</h2>
+                    <h2 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">{{ __('Sign in to BDMS') }}</h2>
                     <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
-                        Access your Administrator, Blood Bank Staff, Lab Officer, Hospital Partner, or Donor account.
+                        {{ __('Access your Administrator, Blood Bank Staff, Lab Officer, Hospital Partner, or Donor account.') }}
                     </p>
                 </div>
 
@@ -58,7 +61,7 @@
                         @csrf
 
                         <x-ui.input
-                            label="Email address"
+                            :label="__('Email address')"
                             name="email"
                             type="email"
                             icon="envelope"
@@ -69,35 +72,35 @@
                         />
 
                         <x-ui.input
-                            label="Password"
+                            :label="__('Password')"
                             name="password"
                             type="password"
                             icon="lock-closed"
-                            placeholder="Enter your password"
+                            :placeholder="__('Enter your password')"
                             required
                         />
 
                         <div class="flex items-center justify-between text-xs">
                             <label class="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300 cursor-pointer">
                                 <input type="checkbox" name="remember" class="rounded border-slate-300 text-crimson-600 focus:ring-crimson-500 dark:border-slate-700 dark:bg-slate-900">
-                                <span>Remember me</span>
+                                <span>{{ __('Remember me') }}</span>
                             </label>
 
                             <a href="{{ route('password.request') }}" class="font-medium text-crimson-600 hover:text-crimson-700 dark:text-crimson-400">
-                                Forgot password?
+                                {{ __('Forgot password?') }}
                             </a>
                         </div>
 
                         <x-ui.button type="submit" variant="primary" class="w-full">
-                            Sign in
+                            {{ __('Sign in') }}
                         </x-ui.button>
                     </form>
                 </x-ui.card>
 
                 <p class="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
-                    New donor or partner hospital?
+                    {{ __('New donor or partner hospital?') }}
                     <a href="{{ route('register') }}" class="font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400">
-                        Create an account
+                        {{ __('Create an account') }}
                     </a>
                 </p>
             </div>

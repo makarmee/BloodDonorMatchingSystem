@@ -17,7 +17,7 @@
 @endif
 
 @if ($errors->any())
-    <x-ui.alert variant="danger" title="Please check the highlighted fields" class="mb-4">
+    <x-ui.alert variant="danger" :title="__('Please check the highlighted fields')" class="mb-4">
         <ul class="mt-1 list-disc list-inside space-y-0.5 text-xs">
             @foreach ($errors->all() as $error)
                 <li>{{ $error }}</li>

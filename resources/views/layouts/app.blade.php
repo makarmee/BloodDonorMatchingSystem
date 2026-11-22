@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'fa' ? 'rtl' : 'ltr' }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -20,6 +20,9 @@
         @fonts
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
+    @php
+        $isRtl = app()->getLocale() === 'fa';
+    @endphp
     <body
         x-data="{ sidebarOpen: false }"
         class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100"
@@ -39,18 +42,18 @@
                 x-show="sidebarOpen"
                 x-cloak
                 x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="-translate-x-full"
+                x-transition:enter-start="{{ $isRtl ? 'translate-x-full' : '-translate-x-full' }}"
                 x-transition:enter-end="translate-x-0"
                 x-transition:leave="transition ease-in duration-150"
                 x-transition:leave-start="translate-x-0"
-                x-transition:leave-end="-translate-x-full"
-                class="fixed inset-y-0 left-0 z-50 w-72 border-r border-slate-200 dark:border-slate-800 lg:hidden"
+                x-transition:leave-end="{{ $isRtl ? 'translate-x-full' : '-translate-x-full' }}"
+                class="fixed inset-y-0 {{ $isRtl ? 'right-0 border-l' : 'left-0 border-r' }} z-50 w-72 border-slate-200 dark:border-slate-800 lg:hidden"
             >
                 @include('partials.sidebar', ['activeRole' => $activeRole])
             </aside>
 
             {{-- Desktop fixed sidebar --}}
-            <aside class="hidden w-68 shrink-0 border-r border-slate-200/80 dark:border-slate-800 lg:block">
+            <aside class="hidden w-68 shrink-0 {{ $isRtl ? 'border-l' : 'border-r' }} border-slate-200/80 dark:border-slate-800 lg:block">
                 <div class="sticky top-0 h-screen">
                     @include('partials.sidebar', ['activeRole' => $activeRole])
                 </div>

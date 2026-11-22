@@ -12,70 +12,72 @@
                     {{ config('app.name', 'BDMS') }}
                 </span>
                 <span class="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    Blood Donation Network
+                    {{ __('Blood Donation Network') }}
                 </span>
             </div>
         </a>
 
-        <nav class="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300" aria-label="Main navigation">
+        <nav class="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300" aria-label="{{ __('Main navigation') }}">
             <a
                 href="{{ route('home') }}"
                 @class([
                     'transition hover:text-crimson-600 dark:hover:text-crimson-400',
                     'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('home'),
                 ])
-            >Home</a>
+            >{{ __('Home') }}</a>
             <a
                 href="{{ route('public.stock') }}"
                 @class([
                     'transition hover:text-crimson-600 dark:hover:text-crimson-400',
                     'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('public.stock'),
                 ])
-            >Blood Stock</a>
+            >{{ __('Blood Stock') }}</a>
             <a
                 href="{{ route('public.camps.index') }}"
                 @class([
                     'transition hover:text-crimson-600 dark:hover:text-crimson-400',
                     'text-crimson-600 font-semibold dark:text-crimson-400' => request()->routeIs('public.camps.*'),
                 ])
-            >Donation Camps</a>
-            <a href="{{ route('home') }}#faq-contact" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">FAQ &amp; Contact</a>
+            >{{ __('Donation Camps') }}</a>
+            <a href="{{ route('home') }}#faq-contact" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">{{ __('FAQ & Contact') }}</a>
             @if (auth()->user()?->hasRole('donor'))
-                <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">Donor Portal</a>
+                <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">{{ __('Donor Portal') }}</a>
             @endif
         </nav>
 
         <div class="hidden lg:flex items-center gap-2.5 shrink-0">
+            <x-ui.language-selector />
             <x-ui.theme-toggle />
 
             @auth
                 <x-ui.button :href="route(auth()->user()->dashboardRouteName())" variant="primary" size="sm">
-                    Dashboard
+                    {{ __('Dashboard') }}
                 </x-ui.button>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <x-ui.button type="submit" variant="ghost" size="sm">
-                        Sign out
+                        {{ __('Sign out') }}
                     </x-ui.button>
                 </form>
             @else
                 <x-ui.button :href="route('login')" variant="ghost" size="sm">
-                    Sign in
+                    {{ __('Sign in') }}
                 </x-ui.button>
                 <x-ui.button :href="route('register')" variant="primary" size="sm">
-                    Become a Donor
+                    {{ __('Become a Donor') }}
                 </x-ui.button>
             @endauth
         </div>
 
         <div class="flex items-center gap-2 lg:hidden">
+            <x-ui.language-selector />
             <x-ui.theme-toggle />
             <button
                 type="button"
                 @click="mobileOpen = !mobileOpen"
                 class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 cursor-pointer"
                 :aria-expanded="mobileOpen"
-                aria-label="Toggle navigation menu"
+                aria-label="{{ __('Toggle navigation menu') }}"
             >
                 <span x-show="!mobileOpen">
                     <x-icons.icon name="menu" class="size-5" />
@@ -93,26 +95,26 @@
         x-transition
         class="border-t border-slate-200 bg-white px-4 py-4 lg:hidden dark:border-slate-800 dark:bg-slate-950"
     >
-        <nav class="flex flex-col gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200" aria-label="Mobile navigation">
-            <a href="{{ route('home') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Home</a>
-            <a href="{{ route('public.stock') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Blood Stock</a>
-            <a href="{{ route('public.camps.index') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donation Camps</a>
-            <a href="{{ route('home') }}#faq-contact" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">FAQ &amp; Contact</a>
+        <nav class="flex flex-col gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200" aria-label="{{ __('Mobile navigation') }}">
+            <a href="{{ route('home') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">{{ __('Home') }}</a>
+            <a href="{{ route('public.stock') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">{{ __('Blood Stock') }}</a>
+            <a href="{{ route('public.camps.index') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">{{ __('Donation Camps') }}</a>
+            <a href="{{ route('home') }}#faq-contact" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">{{ __('FAQ & Contact') }}</a>
             @if (auth()->user()?->hasRole('donor'))
-                <a href="{{ route('donor-portal.dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">Donor Portal</a>
+                <a href="{{ route('donor-portal.dashboard') }}" @click="mobileOpen = false" class="rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-900">{{ __('Donor Portal') }}</a>
             @endif
         </nav>
 
         <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
             @auth
-                <x-ui.button :href="route(auth()->user()->dashboardRouteName())" variant="primary" class="w-full">Dashboard</x-ui.button>
+                <x-ui.button :href="route(auth()->user()->dashboardRouteName())" variant="primary" class="w-full">{{ __('Dashboard') }}</x-ui.button>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <x-ui.button type="submit" variant="outline" class="w-full">Sign out</x-ui.button>
+                    <x-ui.button type="submit" variant="outline" class="w-full">{{ __('Sign out') }}</x-ui.button>
                 </form>
             @else
-                <x-ui.button :href="route('login')" variant="outline" class="w-full">Sign in</x-ui.button>
-                <x-ui.button :href="route('register')" variant="primary" class="w-full">Become a Donor</x-ui.button>
+                <x-ui.button :href="route('login')" variant="outline" class="w-full">{{ __('Sign in') }}</x-ui.button>
+                <x-ui.button :href="route('register')" variant="primary" class="w-full">{{ __('Become a Donor') }}</x-ui.button>
             @endauth
         </div>
     </div>

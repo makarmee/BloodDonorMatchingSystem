@@ -8,7 +8,10 @@
                 <span>{{ config('app.name', 'BDMS') }}</span>
             </a>
 
-            <x-ui.theme-toggle />
+            <div class="flex items-center gap-2">
+                <x-ui.language-selector />
+                <x-ui.theme-toggle />
+            </div>
         </div>
 
         <div class="mx-auto w-full max-w-lg py-8">

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" dir="{{ app()->getLocale() === 'fa' ? 'rtl' : 'ltr' }}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -43,19 +43,19 @@
                             <x-icons.icon name="droplet" class="size-3.5" />
                         </span>
                         <span class="font-semibold text-slate-700 dark:text-slate-200">{{ config('app.name', 'BDMS') }}</span>
-                        <span>— Blood Donation Management System</span>
+                        <span>— {{ __('Blood Donation Management System') }}</span>
                     </div>
 
                     <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-                        <a href="{{ route('public.stock') }}" class="hover:text-slate-900 dark:hover:text-white">Blood Stock</a>
-                        <a href="{{ route('public.camps.index') }}" class="hover:text-slate-900 dark:hover:text-white">Donation Camps</a>
-                        <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">Donor Portal</a>
-                        <a href="{{ route('home') }}#faq-contact" class="hover:text-slate-900 dark:hover:text-white">FAQ &amp; Contact</a>
+                        <a href="{{ route('public.stock') }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Blood Stock') }}</a>
+                        <a href="{{ route('public.camps.index') }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Donation Camps') }}</a>
+                        <a href="{{ route('donor-portal.dashboard') }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Donor Portal') }}</a>
+                        <a href="{{ route('home') }}#faq-contact" class="hover:text-slate-900 dark:hover:text-white">{{ __('FAQ & Contact') }}</a>
                         @auth
-                            <a href="{{ route(auth()->user()->dashboardRouteName()) }}" class="hover:text-slate-900 dark:hover:text-white">Dashboard</a>
+                            <a href="{{ route(auth()->user()->dashboardRouteName()) }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Dashboard') }}</a>
                         @else
-                            <a href="{{ route('login') }}" class="hover:text-slate-900 dark:hover:text-white">Sign in</a>
-                            <a href="{{ route('register') }}" class="hover:text-slate-900 dark:hover:text-white">Register</a>
+                            <a href="{{ route('login') }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Sign in') }}</a>
+                            <a href="{{ route('register') }}" class="hover:text-slate-900 dark:hover:text-white">{{ __('Register') }}</a>
                         @endauth
                     </div>
                 </div>

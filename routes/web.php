@@ -12,6 +12,7 @@ use App\Http\Controllers\DonorsController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\HospitalVerificationController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ScreeningController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,9 @@ Route::get('/', HomeController::class)->name('home');
 Route::get('/blood-stock', [PublicPortalController::class, 'bloodStock'])->name('public.stock');
 Route::get('/blood-camps', [PublicPortalController::class, 'camps'])->name('public.camps.index');
 Route::get('/blood-camps/{camp}', [PublicPortalController::class, 'showCamp'])->name('public.camps.show');
+
+Route::post('/locale', [LocaleController::class, 'setLocale'])->name('locale.set');
+Route::get('/locale/{locale}', [LocaleController::class, 'switchLocale'])->name('locale.switch');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');

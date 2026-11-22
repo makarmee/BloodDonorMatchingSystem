@@ -100,7 +100,7 @@
                     {{ config('app.name', 'BDMS') }}
                 </span>
                 <span class="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    {{ $roleMeta['label'] }}
+                    {{ __($roleMeta['label']) }}
                 </span>
             </div>
         </a>
@@ -109,7 +109,7 @@
             type="button"
             @click="sidebarOpen = false"
             class="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden dark:text-slate-400 dark:hover:bg-slate-800 cursor-pointer"
-            aria-label="Close sidebar"
+            aria-label="{{ __('Close sidebar') }}"
         >
             <x-icons.icon name="x-mark" class="size-5" />
         </button>
@@ -118,18 +118,18 @@
     <div class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div class="px-2">
             <x-ui.badge :variant="$roleMeta['badge']" :dot="true" class="w-full justify-between py-1">
-                <span>Active Portal</span>
-                <span class="font-semibold">{{ $roleMeta['label'] }}</span>
+                <span>{{ __('Active Portal') }}</span>
+                <span class="font-semibold">{{ __($roleMeta['label']) }}</span>
             </x-ui.badge>
         </div>
 
         @foreach ($roleMeta['sections'] as $sectionTitle => $items)
             <div class="space-y-1">
                 <p class="px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                    {{ $sectionTitle }}
+                    {{ __($sectionTitle) }}
                 </p>
 
-                <nav class="space-y-1" aria-label="{{ $sectionTitle }}">
+                <nav class="space-y-1" aria-label="{{ __($sectionTitle) }}">
                     @foreach ($items as $item)
                         @php
                             $routeExists = Route::has($item['route']);
@@ -146,7 +146,7 @@
                         <a
                             href="{{ $href }}"
                             @if (! $routeExists)
-                                title="Module scheduled for next step"
+                                title="{{ __('Module scheduled for next step') }}"
                             @endif
                             @class([
                                 'group flex items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition',
@@ -157,12 +157,12 @@
                         >
                             <span class="flex items-center gap-2.5 truncate">
                                 <x-icons.icon :name="$item['icon']" class="size-4.5" />
-                                <span class="truncate">{{ $item['label'] }}</span>
+                                <span class="truncate">{{ __($item['label']) }}</span>
                             </span>
 
                             @if (! $routeExists)
                                 <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                    Soon
+                                    {{ __('Soon') }}
                                 </span>
                             @endif
                         </a>
@@ -178,7 +178,7 @@
             class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition"
         >
             <x-icons.icon name="droplet" class="size-4.5 text-crimson-600 dark:text-crimson-400" />
-            <span>Public Portal</span>
+            <span>{{ __('Public Portal') }}</span>
         </a>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
@@ -187,7 +187,7 @@
                 class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white transition cursor-pointer"
             >
                 <x-icons.icon name="arrow-right-on-rectangle" class="size-4.5" />
-                <span>Sign out</span>
+                <span>{{ __('Sign out') }}</span>
             </button>
         </form>
     </div>

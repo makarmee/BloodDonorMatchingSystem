@@ -77,4 +77,11 @@ document.addEventListener('alpine:init', () => {
 });
 
 window.Alpine = Alpine;
+window.__ = function (key, replace = {}) {
+    let translation = window.BDMS_I18N?.[key] || key;
+    for (const [placeholder, value] of Object.entries(replace)) {
+        translation = translation.replace(`:${placeholder}`, value);
+    }
+    return translation;
+};
 Alpine.start();
