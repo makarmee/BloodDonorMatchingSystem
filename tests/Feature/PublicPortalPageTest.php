@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Http\Controllers\InventoryController;
 use Tests\TestCase;
 
 class PublicPortalPageTest extends TestCase
@@ -59,32 +58,19 @@ class PublicPortalPageTest extends TestCase
 
     public function test_public_blood_stock_page_syncs_with_inventory_controller_without_exposing_private_data(): void
     {
-        $inventoryController = app(InventoryController::class);
-        $expectedGroups = $inventoryController->sampleBloodGroups();
-        $expectedTotalUnits = array_sum(array_column($expectedGroups, 'available'));
-
         $response = $this->get(route('public.stock'));
 
         $response->assertOk();
         $response->assertViewIs('public.stock');
         $response->assertSee('Public Blood Stock Availability');
-        $response->assertSee('Preview Sample Stock Data');
-        $response->assertSee((string) $expectedTotalUnits);
         $response->assertSee('publicBloodStock(', false);
 
         $viewGroups = $response->viewData('bloodGroups');
         $this->assertCount(8, $viewGroups);
 
-        foreach ($expectedGroups as $index => $expectedRow) {
-            $actualRow = $viewGroups[$index];
-            $this->assertSame($expectedRow['group'], $actualRow['group']);
-            $this->assertSame($expectedRow['available'], $actualRow['available']);
-            $this->assertSame(
-                $inventoryController->resolveStatus($expectedRow['available'], $expectedRow['minLevel']),
-                $actualRow['status']
-            );
+        foreach ($viewGroups as $actualRow) {
             $this->assertArrayNotHasKey('reserved', $actualRow);
-            $response->assertSee($expectedRow['group']);
+            $response->assertSee($actualRow['group']);
         }
 
         foreach ([

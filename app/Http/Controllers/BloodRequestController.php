@@ -52,7 +52,7 @@ class BloodRequestController extends Controller
             $request->merge(['contact_email_snapshot' => $request->input('email')]);
         }
         if (! $request->filled('department_or_ward') && $request->filled('hospital_address')) {
-            $request->merge(['department_or_ward' => \Illuminate\Support\Str::limit((string) $request->input('hospital_address'), 150, '')]);
+            $request->merge(['department_or_ward' => Str::limit((string) $request->input('hospital_address'), 150, '')]);
         }
 
         $validated = $request->validate([

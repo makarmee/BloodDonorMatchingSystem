@@ -373,4 +373,3 @@ class HospitalEndToEndWorkflowTest extends TestCase
         return $user;
     }
 }
-

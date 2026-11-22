@@ -56,6 +56,33 @@ class DonationCamp extends Model
     public const array PUBLIC_STATUSES = ['Upcoming', 'Ongoing'];
 
     /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'camp_code';
+    }
+
+    /**
+     * Retrieve the model for a bound value by camp_code or numeric id.
+     *
+     * @param  mixed  $value
+     * @param  string|null  $field
+     */
+    public function resolveRouteBinding($value, $field = null): ?Model
+    {
+        $field = $field ?? $this->getRouteKeyName();
+
+        $record = $this->where($field, $value)->first();
+
+        if (! $record && is_numeric($value)) {
+            $record = $this->where('id', (int) $value)->first();
+        }
+
+        return $record;
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

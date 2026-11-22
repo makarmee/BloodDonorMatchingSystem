@@ -2,7 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BloodComponent;
+use App\Models\BloodUnit;
+use App\Models\DonationCamp;
+use App\Models\InventoryStock;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class PublicPortalController extends Controller
 {
@@ -16,14 +22,26 @@ class PublicPortalController extends Controller
     /**
      * Display the public blood stock availability lookup page.
      */
-    public function bloodStock(): View
+    public function bloodStock(Request $request): View
     {
-        $bloodGroups = $this->publicBloodGroups();
+        $selectedComponentId = $request->filled('component_id') ? (int) $request->query('component_id') : null;
+        $components = collect();
+        try {
+            if (Schema::hasTable('blood_components')) {
+                $components = BloodComponent::query()->where('is_active', true)->orderBy('name')->get();
+            }
+        } catch (\Throwable) {
+            $components = collect();
+        }
+
+        $bloodGroups = $this->publicBloodGroups($selectedComponentId);
         $summary = $this->publicStockSummary($bloodGroups);
 
         return view('public.stock', [
             'bloodGroups' => $bloodGroups,
             'summary' => $summary,
+            'components' => $components,
+            'selectedComponentId' => $selectedComponentId,
             'todayIso' => self::TODAY_ISO,
         ]);
     }
@@ -78,7 +96,7 @@ class PublicPortalController extends Controller
     }
 
     /**
-     * Return public-safe blood inventory metrics derived directly from InventoryController.
+     * Return public-safe blood inventory metrics derived directly from real InventoryStock records.
      *
      * @return list<array{
      *     group: string,
@@ -87,30 +105,82 @@ class PublicPortalController extends Controller
      *     capacity: int,
      *     status: string,
      *     statusLabel: string,
-     *     lastUpdated: string
+     *     lastUpdated: string,
+     *     isSample: bool
      * }>
      */
-    public function publicBloodGroups(): array
+    public function publicBloodGroups(?int $componentId = null): array
     {
-        return array_map(function (array $row): array {
-            $available = (int) $row['available'];
-            $minLevel = (int) $row['minLevel'];
-            $status = $this->inventoryController->resolveStatus($available, $minLevel);
+        $hasTable = false;
+        try {
+            $hasTable = Schema::hasTable('inventory_stocks');
+        } catch (\Throwable) {
+            $hasTable = false;
+        }
 
+        if (! $hasTable) {
+            return array_map(function (array $row): array {
+                $available = (int) $row['available'];
+                $minLevel = (int) $row['minLevel'];
+                $status = $this->inventoryController->resolveStatus($available, $minLevel);
+
+                return [
+                    'group' => (string) $row['group'],
+                    'available' => $available,
+                    'minLevel' => $minLevel,
+                    'capacity' => (int) $row['capacity'],
+                    'status' => $status,
+                    'statusLabel' => match ($status) {
+                        'critical' => 'Critical',
+                        'low' => 'Low Stock',
+                        default => 'Normal',
+                    },
+                    'lastUpdated' => (string) $row['lastUpdated'],
+                    'isSample' => true,
+                ];
+            }, $this->inventoryController->sampleBloodGroups());
+        }
+
+        $hasDbStocks = InventoryStock::query()->exists();
+
+        if ($hasDbStocks) {
+            $rows = $this->inventoryController->getBloodGroupsData($componentId);
+
+            return array_map(function (array $row): array {
+                $available = (int) $row['available'];
+                $minLevel = (int) $row['minLevel'];
+                $status = $this->inventoryController->resolveStatus($available, $minLevel);
+
+                return [
+                    'group' => (string) $row['group'],
+                    'available' => $available,
+                    'minLevel' => $minLevel,
+                    'capacity' => (int) $row['capacity'],
+                    'status' => $status,
+                    'statusLabel' => match ($status) {
+                        'critical' => 'Critical',
+                        'low' => 'Low Stock',
+                        default => 'Normal',
+                    },
+                    'lastUpdated' => (string) $row['lastUpdated'],
+                    'isSample' => false,
+                ];
+            }, $rows);
+        }
+
+        // When inventory_stocks table exists but has 0 records: return honest 0 available units across all standard groups
+        return array_map(function (string $group): array {
             return [
-                'group' => (string) $row['group'],
-                'available' => $available,
-                'minLevel' => $minLevel,
-                'capacity' => (int) $row['capacity'],
-                'status' => $status,
-                'statusLabel' => match ($status) {
-                    'critical' => 'Critical',
-                    'low' => 'Low Stock',
-                    default => 'Normal',
-                },
-                'lastUpdated' => (string) $row['lastUpdated'],
+                'group' => $group,
+                'available' => 0,
+                'minLevel' => 20,
+                'capacity' => 100,
+                'status' => 'critical',
+                'statusLabel' => 'Critical',
+                'lastUpdated' => 'No inventory on hand',
+                'isSample' => false,
             ];
-        }, $this->inventoryController->sampleBloodGroups());
+        }, BloodUnit::BLOOD_GROUPS);
     }
 
     /**
@@ -123,7 +193,8 @@ class PublicPortalController extends Controller
      *     normalCount: int,
      *     lowCount: int,
      *     criticalCount: int,
-     *     urgentGroups: list<string>
+     *     urgentGroups: list<string>,
+     *     isSample: bool
      * }
      */
     public function publicStockSummary(array $bloodGroups): array
@@ -132,6 +203,7 @@ class PublicPortalController extends Controller
         $normalCount = count(array_filter($bloodGroups, fn (array $row): bool => $row['status'] === 'normal'));
         $lowCount = count(array_filter($bloodGroups, fn (array $row): bool => $row['status'] === 'low'));
         $criticalRows = array_values(array_filter($bloodGroups, fn (array $row): bool => $row['status'] === 'critical'));
+        $isSample = ! empty($bloodGroups) && ($bloodGroups[0]['isSample'] ?? false);
 
         return [
             'totalUnits' => $totalUnits,
@@ -140,6 +212,7 @@ class PublicPortalController extends Controller
             'lowCount' => $lowCount,
             'criticalCount' => count($criticalRows),
             'urgentGroups' => array_map(fn (array $row): string => (string) $row['group'], $criticalRows),
+            'isSample' => $isSample,
         ];
     }
 
@@ -150,12 +223,36 @@ class PublicPortalController extends Controller
      */
     public function publicCamps(): array
     {
-        $filtered = array_values(array_filter(
-            $this->campsController->sampleCamps(),
-            fn (array $camp): bool => in_array($camp['status'], ['Upcoming', 'Ongoing'], true)
-        ));
+        $hasTable = false;
+        try {
+            $hasTable = Schema::hasTable('donation_camps');
+        } catch (\Throwable) {
+            $hasTable = false;
+        }
 
-        return array_map(fn (array $camp): array => $this->sanitizePublicCamp($camp), $filtered);
+        if (! $hasTable) {
+            $filtered = array_values(array_filter(
+                $this->campsController->sampleCamps(),
+                fn (array $camp): bool => in_array($camp['status'], ['Upcoming', 'Ongoing'], true)
+            ));
+
+            return array_map(fn (array $camp): array => $this->sanitizePublicCamp($camp), $filtered);
+        }
+
+        $hasDbCamps = DonationCamp::query()->exists();
+
+        if ($hasDbCamps) {
+            $dbCamps = DonationCamp::query()
+                ->published()
+                ->with(['activeRegistrations'])
+                ->orderBy('start_date')
+                ->get();
+
+            return $dbCamps->map(fn (DonationCamp $c): array => $this->sanitizePublicCamp(DonationCampsController::formatCamp($c)))->values()->all();
+        }
+
+        // When donation_camps table exists but has 0 records: return empty array (honest empty state)
+        return [];
     }
 
     /**

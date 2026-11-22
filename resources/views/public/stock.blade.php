@@ -27,18 +27,24 @@
             </div>
         </div>
 
-        {{-- Explicit Preview / Sample Data Notice --}}
-        <x-ui.alert variant="info" title="Preview Sample Stock Data" :dismissible="false">
-            Availability counts and stock status thresholds are synchronized directly from BDMS sample inventory figures as of {{ $todayIso }}. Reserved hospital allocations, donor records, and internal audit logs are excluded from public view.
-        </x-ui.alert>
+        {{-- Stock Availability Notice --}}
+        @if ($summary['totalUnits'] === 0)
+            <x-ui.alert variant="warning" title="No Available Blood Stock" :dismissible="false">
+                Regional blood stock currently has zero available units on hand. Community blood donations are urgently requested across all blood groups.
+            </x-ui.alert>
+        @else
+            <x-ui.alert variant="info" title="Public Blood Stock Availability" :dismissible="false">
+                Availability counts reflect verified, screened blood units currently on hand in regional blood bank inventory as of {{ $todayIso }}. Reserved hospital allocations, donor personal records, and confidential testing logs are protected from public view.
+            </x-ui.alert>
+        @endif
 
         {{-- Summary Stat Cards --}}
         <section aria-label="Public stock summary" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <x-bdms.stat-card
-                label="Available Sample Units"
+                label="Available Stock Units"
                 :value="$summary['totalUnits']"
                 trend="Across all 8 ABO/Rh blood types"
-                trend-tone="up"
+                :trend-tone="$summary['totalUnits'] > 0 ? 'up' : 'down'"
                 icon="droplet"
                 accent="crimson"
             />
@@ -86,6 +92,25 @@
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2.5">
+                        @if (isset($components) && $components->isNotEmpty())
+                            <form method="GET" action="{{ route('public.stock') }}" class="inline-block">
+                                <label for="public-component-filter" class="sr-only">Filter by component</label>
+                                <select
+                                    id="public-component-filter"
+                                    name="component_id"
+                                    onchange="this.form.submit()"
+                                    class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
+                                >
+                                    <option value="">All Blood Components</option>
+                                    @foreach ($components as $comp)
+                                        <option value="{{ $comp->id }}" {{ (isset($selectedComponentId) && (int) $selectedComponentId === (int) $comp->id) ? 'selected' : '' }}>
+                                            {{ $comp->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </form>
+                        @endif
+
                         <select
                             x-model="groupFilter"
                             aria-label="Filter by blood group"

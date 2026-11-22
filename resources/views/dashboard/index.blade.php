@@ -100,7 +100,7 @@
                                 {{ $activeRole === 'donor' ? 'Recent Donations & Visits' : 'Recent Blood Requests' }}
                             </h3>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Sample records rendered through reusable Blade components
+                                Operational activity log and recent submissions
                             </p>
                         </div>
                         <x-ui.badge variant="neutral">{{ count($portalData['recentActivity']) }} items</x-ui.badge>
@@ -120,7 +120,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800/80">
-                            @foreach ($portalData['recentActivity'] as $row)
+                            @forelse ($portalData['recentActivity'] as $row)
                                 <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
                                     <td class="whitespace-nowrap px-5 py-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">
                                         {{ $row['reference'] }}
@@ -141,7 +141,13 @@
                                         {{ $row['time'] }}
                                     </td>
                                 </tr>
-                            @endforeach
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="px-5 py-8 text-center text-xs text-slate-500 dark:text-slate-400">
+                                        No recent operational activity recorded.
+                                    </td>
+                                </tr>
+                            @endforelse
                         </tbody>
                     </table>
                 </div>
@@ -161,13 +167,17 @@
                 </x-slot:header>
 
                 <div class="space-y-4">
-                    @foreach ($portalData['inventorySnapshot'] as $stock)
+                    @forelse ($portalData['inventorySnapshot'] as $stock)
                         <x-bdms.stock-level-bar
                             :group="$stock['group']"
                             :units="$stock['units']"
                             :capacity="$stock['capacity']"
                         />
-                    @endforeach
+                    @empty
+                        <p class="py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                            No inventory stock levels recorded.
+                        </p>
+                    @endforelse
                 </div>
 
                 <x-slot:footer>

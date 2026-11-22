@@ -44,6 +44,20 @@
     })"
     class="space-y-6"
 >
+    @if (session('success'))
+        <x-ui.alert variant="success" :title="session('success')" class="mb-4" />
+    @endif
+
+    @if ($errors->any())
+        <x-ui.alert variant="danger" title="Validation errors occurred" class="mb-4">
+            <ul class="list-disc pl-5 text-xs space-y-1">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </x-ui.alert>
+    @endif
+
     @if ($isEdit && in_array($campStatus, ['Completed', 'Cancelled'], true))
         <x-ui.alert variant="warning" :title="$campStatus . ' Camp Modification Notice'">
             This donation camp is currently marked <strong>{{ $campStatus }}</strong>. Editing schedule or capacity parameters in preview mode requires administrative verification, and all existing donor registration history ({{ count($campRecord['registrations'] ?? []) }} record(s)) remains preserved.
@@ -97,7 +111,17 @@
         </button>
     </div>
 
-    <form @submit.prevent="submitForm()" novalidate class="space-y-6">
+    <form
+        method="POST"
+        action="{{ $isEdit ? route('camps.update', $campRecord['id']) : route('camps.store') }}"
+        @submit="if (!validateAll()) { $event.preventDefault(); feedback = { type: 'danger', title: 'Validation errors found', message: 'Please correct the highlighted camp schedule, contact, or capacity fields before submitting.' }; window.scrollTo({ top: 0, behavior: 'smooth' }); }"
+        novalidate
+        class="space-y-6"
+    >
+        @csrf
+        @if ($isEdit)
+            @method('PUT')
+        @endif
         {{-- Section 1: Camp Information --}}
         <x-ui.card>
             <x-slot:header>
@@ -573,6 +597,23 @@
                         x-model="form.additionalNotes"
                     />
                 </div>
+
+                @if ($isEdit)
+                    <div>
+                        <label for="camp-status" class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                            Camp Status
+                        </label>
+                        <select
+                            id="camp-status"
+                            name="status"
+                            class="mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                        >
+                            @foreach ($statuses as $st)
+                                <option value="{{ $st }}" {{ $campStatus === $st ? 'selected' : '' }}>{{ $st }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
             </div>
 
             <x-slot:footer>

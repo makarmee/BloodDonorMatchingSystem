@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BloodComponent;
+use App\Models\CampRegistration;
 use App\Models\Donation;
 use App\Models\DonationCamp;
 use App\Models\DonationCenter;
@@ -16,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class DonorPortalController extends Controller
 {
@@ -198,6 +200,27 @@ class DonorPortalController extends Controller
                 $centerId = DonationCenter::first()?->id;
             }
 
+            if ($campId) {
+                $camp = DonationCamp::find($campId);
+                if (! $camp || ! in_array($camp->status, ['Upcoming', 'Ongoing'], true)) {
+                    return back()->withErrors(['location_id' => 'The selected donation camp is not open for registration.']);
+                }
+
+                $activeCount = $camp->activeRegistrations()->count();
+                if ($activeCount >= $camp->capacity) {
+                    return back()->withErrors(['location_id' => 'This donation camp has reached its maximum donor capacity.']);
+                }
+
+                $alreadyRegistered = CampRegistration::where('camp_id', $camp->id)
+                    ->where('donor_id', $donor->id)
+                    ->where('attendance_status', '<>', 'Cancelled')
+                    ->exists();
+
+                if ($alreadyRegistered) {
+                    return back()->withErrors(['location_id' => 'You are already registered for this donation camp.']);
+                }
+            }
+
             $code = app(ReferenceCodeGenerator::class)->generate(DonorAppointment::class, 'appointment_code', 'APT-');
 
             $appointment = DonorAppointment::create([
@@ -211,6 +234,21 @@ class DonorPortalController extends Controller
                 'status' => 'Pending',
                 'notes' => $validated['notes'] ?? null,
             ]);
+
+            if ($campId) {
+                $regCode = app(ReferenceCodeGenerator::class)->generate(CampRegistration::class, 'registration_code', 'REG-');
+                CampRegistration::create([
+                    'registration_code' => $regCode,
+                    'camp_id' => $campId,
+                    'donor_id' => $donor->id,
+                    'appointment_id' => $appointment->id,
+                    'registered_by_user_id' => $request->user()?->id,
+                    'registration_date' => $appointmentDate,
+                    'is_walk_in' => false,
+                    'attendance_status' => 'Registered',
+                    'registered_at' => now(),
+                ]);
+            }
 
             return redirect()
                 ->route('donor-portal.appointments.index')
@@ -242,6 +280,13 @@ class DonorPortalController extends Controller
         $appointment->cancelled_at = now();
         $appointment->cancellation_reason = $validated['cancellation_reason'] ?? $validated['reason'] ?? 'Cancelled by donor.';
         $appointment->save();
+
+        if ($appointment->campRegistration) {
+            $appointment->campRegistration->update([
+                'attendance_status' => 'Cancelled',
+                'cancelled_at' => now(),
+            ]);
+        }
 
         return redirect()
             ->route('donor-portal.appointments.index')
@@ -744,6 +789,60 @@ class DonorPortalController extends Controller
      */
     private function buildDonorCamps(string $donorId): array
     {
+        $hasTable = false;
+        try {
+            $hasTable = Schema::hasTable('donation_camps');
+        } catch (\Throwable) {
+            $hasTable = false;
+        }
+
+        if ($hasTable && DonationCamp::query()->exists()) {
+            $camps = DonationCamp::published()
+                ->with(['activeRegistrations.donor'])
+                ->orderBy('start_date')
+                ->get();
+
+            return $camps->map(function (DonationCamp $camp) use ($donorId): array {
+                $donorRegistered = false;
+                foreach ($camp->activeRegistrations as $reg) {
+                    if (
+                        strcasecmp((string) $reg->donor?->donor_code, $donorId) === 0
+                        || (string) $reg->donor_id === $donorId
+                    ) {
+                        $donorRegistered = true;
+                        break;
+                    }
+                }
+
+                $formatted = DonationCampsController::formatCamp($camp);
+
+                return [
+                    'id' => $formatted['id'],
+                    'name' => $formatted['name'],
+                    'description' => $formatted['description'],
+                    'venueName' => $formatted['venueName'],
+                    'fullAddress' => $formatted['fullAddress'],
+                    'city' => $formatted['city'],
+                    'locationNotes' => $formatted['locationNotes'],
+                    'startDate' => $formatted['startDate'],
+                    'startDateFormatted' => $formatted['startDateFormatted'],
+                    'endDate' => $formatted['endDate'],
+                    'endDateFormatted' => $formatted['endDateFormatted'],
+                    'startTime' => $formatted['startTime'],
+                    'endTime' => $formatted['endTime'],
+                    'capacity' => (int) $formatted['capacity'],
+                    'registeredDonors' => (int) $formatted['registeredDonors'],
+                    'availableSlots' => (int) $formatted['availableSlots'],
+                    'registrationDeadline' => $formatted['registrationDeadline'],
+                    'registrationDeadlineFormatted' => $formatted['registrationDeadlineFormatted'],
+                    'allowWalkIn' => (bool) $formatted['allowWalkIn'],
+                    'donorRequirements' => $formatted['donorRequirements'],
+                    'status' => $formatted['status'],
+                    'donorAlreadyRegistered' => $donorRegistered,
+                ];
+            })->all();
+        }
+
         return array_map(function (array $camp) use ($donorId): array {
             $donorRegistered = false;
             foreach (($camp['registrations'] ?? []) as $reg) {

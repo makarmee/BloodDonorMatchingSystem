@@ -16,7 +16,7 @@
         <div class="mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:py-20 lg:px-8">
             <div class="space-y-6 lg:col-span-7">
                 <x-ui.badge variant="crimson" :dot="true" class="py-1 text-xs">
-                    Public Portal &bull; Synchronized Sample Supply Preview
+                    {{ ($stockSummary['isSample'] ?? false) ? 'Public Portal • Synchronized Sample Supply Preview' : 'Public Portal • Live Blood Supply Coordination' }}
                 </x-ui.badge>
 
                 <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl dark:text-white">
@@ -70,7 +70,7 @@
                             {{ $stockSummary['totalUnits'] }}
                         </p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            Available Sample Units ({{ $stockSummary['totalGroups'] }} Groups)
+                            {{ ($stockSummary['isSample'] ?? false) ? 'Available Sample Units (' . $stockSummary['totalGroups'] . ' Groups)' : 'Available Units (' . $stockSummary['totalGroups'] . ' Groups)' }}
                         </p>
                     </div>
                     <div>

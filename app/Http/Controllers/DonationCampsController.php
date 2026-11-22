@@ -2,16 +2,54 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CampRegistration;
+use App\Models\CampStatusHistory;
+use App\Models\DonationCamp;
+use App\Models\Donor;
+use App\Models\User;
+use App\Services\ReferenceCodeGenerator;
+use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class DonationCampsController extends Controller
 {
     /**
+     * Authorize that the acting user is an active staff or administrator.
+     */
+    private function authorizeCampManagement(Request $request): User
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if (! $user || ! $user->is_active || ! $user->hasAnyRole(['admin', 'staff'])) {
+            abort(403, 'Unauthorized access to donation camps management.');
+        }
+
+        return $user;
+    }
+
+    /**
      * Display the donation camps overview cards and filterable camps listing.
      */
-    public function index(): View
+    public function index(Request $request): View
     {
-        $camps = $this->sampleCamps();
+        $this->authorizeCampManagement($request);
+
+        $dbCampsCount = DonationCamp::query()->count();
+
+        if ($dbCampsCount > 0) {
+            $campModels = DonationCamp::query()
+                ->with(['activeRegistrations.donor', 'registrations.donor', 'statusHistories'])
+                ->orderByDesc('start_date')
+                ->get();
+
+            $camps = $campModels->map(fn (DonationCamp $camp): array => self::formatCamp($camp))->all();
+        } else {
+            $camps = $this->sampleCamps();
+        }
 
         $locations = collect($camps)
             ->pluck('city')
@@ -49,23 +87,89 @@ class DonationCampsController extends Controller
     /**
      * Display the create donation camp form.
      */
-    public function create(): View
+    public function create(Request $request): View
     {
+        $this->authorizeCampManagement($request);
+
         return view('camps.create', [
             'statuses' => $this->statusOptions(),
         ]);
     }
 
     /**
+     * Store a newly created donation camp in the database.
+     */
+    public function store(Request $request): RedirectResponse
+    {
+        $actor = $this->authorizeCampManagement($request);
+
+        $validated = $this->validateCampData($request);
+
+        $code = app(ReferenceCodeGenerator::class)->generate(DonationCamp::class, 'camp_code', 'CMP-');
+
+        $allowWalkIn = filter_var($validated['allow_walk_in'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        $status = $validated['status'] ?? 'Draft';
+        if (! in_array($status, DonationCamp::STATUSES, true)) {
+            $status = 'Draft';
+        }
+
+        $camp = DonationCamp::create([
+            'camp_code' => $code,
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'organizer_name' => $validated['organizer_name'],
+            'organizer_contact' => $validated['organizer_contact'],
+            'organizer_email' => $validated['organizer_email'],
+            'created_by_user_id' => $actor->id,
+            'venue_name' => $validated['venue_name'],
+            'full_address' => $validated['full_address'],
+            'city' => $validated['city'],
+            'location_notes' => $validated['location_notes'] ?? null,
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'start_time' => $validated['start_time'],
+            'end_time' => $validated['end_time'],
+            'capacity' => (int) $validated['capacity'],
+            'registration_deadline' => $validated['registration_deadline'],
+            'allow_walk_in' => $allowWalkIn,
+            'donor_requirements' => $validated['donor_requirements'],
+            'additional_notes' => $validated['additional_notes'] ?? null,
+            'status' => $status,
+        ]);
+
+        CampStatusHistory::create([
+            'camp_id' => $camp->id,
+            'event_name' => 'Camp Created',
+            'previous_status' => null,
+            'new_status' => $camp->status,
+            'actor_user_id' => $actor->id,
+            'actor_name' => $actor->name,
+            'notes' => 'Camp created in system.',
+            'occurred_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('camps.show', $camp->camp_code)
+            ->with('success', "Donation camp {$camp->camp_code} created successfully.");
+    }
+
+    /**
      * Display detailed camp overview, capacity progress, registrations, registration manager, and history.
      */
-    public function show(string $camp): View
+    public function show(Request $request, string $camp): View
     {
-        $campRecord = $this->findCampOrFail($camp);
+        $this->authorizeCampManagement($request);
+
+        $campRecord = $this->resolveCampRecord($camp);
+
+        if (! $campRecord) {
+            abort(404);
+        }
 
         return view('camps.show', [
             'camp' => $campRecord,
-            'donors' => $this->sampleDonors(),
+            'donors' => $this->getAvailableDonorsForRegistration(),
             'attendanceStatuses' => $this->attendanceStatusOptions(),
             'campStatuses' => $this->statusOptions(),
         ]);
@@ -74,9 +178,15 @@ class DonationCampsController extends Controller
     /**
      * Display the edit camp form prefilled with sample data while preserving registrations.
      */
-    public function edit(string $camp): View
+    public function edit(Request $request, string $camp): View
     {
-        $campRecord = $this->findCampOrFail($camp);
+        $this->authorizeCampManagement($request);
+
+        $campRecord = $this->resolveCampRecord($camp);
+
+        if (! $campRecord) {
+            abort(404);
+        }
 
         return view('camps.edit', [
             'camp' => $campRecord,
@@ -85,19 +195,275 @@ class DonationCampsController extends Controller
     }
 
     /**
-     * Find a camp record by code or abort with HTTP 404.
+     * Update an existing donation camp record.
+     */
+    public function update(Request $request, string $camp): RedirectResponse
+    {
+        $actor = $this->authorizeCampManagement($request);
+
+        $campModel = $this->findCampModel($camp);
+        if (! $campModel) {
+            abort(404);
+        }
+
+        $activeRegCount = $campModel->activeRegistrations()->count();
+
+        $validated = $this->validateCampData($request, $activeRegCount);
+
+        $allowWalkIn = filter_var($validated['allow_walk_in'] ?? true, FILTER_VALIDATE_BOOLEAN);
+
+        $prevStatus = $campModel->status;
+        $newStatus = $validated['status'] ?? $prevStatus;
+
+        $campModel->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'organizer_name' => $validated['organizer_name'],
+            'organizer_contact' => $validated['organizer_contact'],
+            'organizer_email' => $validated['organizer_email'],
+            'venue_name' => $validated['venue_name'],
+            'full_address' => $validated['full_address'],
+            'city' => $validated['city'],
+            'location_notes' => $validated['location_notes'] ?? null,
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'start_time' => $validated['start_time'],
+            'end_time' => $validated['end_time'],
+            'capacity' => (int) $validated['capacity'],
+            'registration_deadline' => $validated['registration_deadline'],
+            'allow_walk_in' => $allowWalkIn,
+            'donor_requirements' => $validated['donor_requirements'],
+            'additional_notes' => $validated['additional_notes'] ?? null,
+            'status' => $newStatus,
+        ]);
+
+        if ($prevStatus !== $newStatus) {
+            CampStatusHistory::create([
+                'camp_id' => $campModel->id,
+                'event_name' => "Camp Marked {$newStatus}",
+                'previous_status' => $prevStatus,
+                'new_status' => $newStatus,
+                'actor_user_id' => $actor->id,
+                'actor_name' => $actor->name,
+                'notes' => "Status transitioned from {$prevStatus} to {$newStatus}.",
+                'occurred_at' => now(),
+            ]);
+        }
+
+        return redirect()
+            ->route('camps.show', $campModel->camp_code)
+            ->with('success', "Donation camp {$campModel->camp_code} updated successfully.");
+    }
+
+    /**
+     * Transition the status of an existing donation camp.
+     */
+    public function updateStatus(Request $request, string $camp): RedirectResponse
+    {
+        $actor = $this->authorizeCampManagement($request);
+
+        $campModel = $this->findCampModel($camp);
+        if (! $campModel) {
+            abort(404);
+        }
+
+        $validated = $request->validate([
+            'status' => ['required', 'string', Rule::in(DonationCamp::STATUSES)],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $prevStatus = $campModel->status;
+        $newStatus = $validated['status'];
+
+        if ($prevStatus !== $newStatus) {
+            $campModel->status = $newStatus;
+            $campModel->save();
+
+            CampStatusHistory::create([
+                'camp_id' => $campModel->id,
+                'event_name' => "Camp Marked {$newStatus}",
+                'previous_status' => $prevStatus,
+                'new_status' => $newStatus,
+                'actor_user_id' => $actor->id,
+                'actor_name' => $actor->name,
+                'notes' => $validated['notes'] ?? "Status updated from {$prevStatus} to {$newStatus}.",
+                'occurred_at' => now(),
+            ]);
+        }
+
+        return redirect()
+            ->route('camps.show', $campModel->camp_code)
+            ->with('success', "Camp status updated to {$newStatus}.");
+    }
+
+    /**
+     * Validate donation camp form inputs.
      *
      * @return array<string, mixed>
      */
-    private function findCampOrFail(string $campId): array
+    private function validateCampData(Request $request, int $minCapacity = 1): array
     {
-        foreach ($this->sampleCamps() as $record) {
-            if (strcasecmp($record['id'], $campId) === 0) {
-                return $record;
+        return $request->validate([
+            'name' => ['required', 'string', 'min:3', 'max:191'],
+            'description' => ['required', 'string', 'min:10'],
+            'organizer_name' => ['required', 'string', 'max:150'],
+            'organizer_contact' => ['required', 'string', 'min:7', 'max:32'],
+            'organizer_email' => ['required', 'string', 'email', 'max:191'],
+            'venue_name' => ['required', 'string', 'max:191'],
+            'full_address' => ['required', 'string', 'max:255'],
+            'city' => ['required', 'string', 'max:100'],
+            'location_notes' => ['nullable', 'string', 'max:1000'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'start_time' => ['required', 'string'],
+            'end_time' => [
+                'required',
+                'string',
+                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+                    $startDate = $request->input('start_date');
+                    $endDate = $request->input('end_date');
+                    $startTime = $request->input('start_time');
+
+                    if ($startDate && $endDate && $startDate === $endDate && $startTime && $value) {
+                        try {
+                            $start = Carbon::parse($startTime);
+                            $end = Carbon::parse($value);
+                            if ($end->lte($start)) {
+                                $fail('End time must be after start time on the same date.');
+                            }
+                        } catch (\Throwable) {
+                            // Let general format validation handle parsing issues
+                        }
+                    }
+                },
+            ],
+            'capacity' => ['required', 'integer', 'min:'.max(1, $minCapacity)],
+            'registration_deadline' => ['required', 'date', 'before_or_equal:start_date'],
+            'allow_walk_in' => ['nullable'],
+            'donor_requirements' => ['required', 'string'],
+            'additional_notes' => ['nullable', 'string', 'max:2000'],
+            'status' => ['nullable', 'string', Rule::in(DonationCamp::STATUSES)],
+        ]);
+    }
+
+    /**
+     * Find a donation camp model by camp_code or numeric ID.
+     */
+    public function findCampModel(string $campId): ?DonationCamp
+    {
+        return DonationCamp::where('camp_code', $campId)
+            ->orWhere('id', is_numeric($campId) ? (int) $campId : 0)
+            ->first();
+    }
+
+    /**
+     * Resolve camp record from database model or sample dataset fallback.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function resolveCampRecord(string $campId): ?array
+    {
+        $dbCamp = $this->findCampModel($campId);
+        if ($dbCamp) {
+            return self::formatCamp($dbCamp);
+        }
+
+        foreach ($this->sampleCamps() as $sample) {
+            if (strcasecmp($sample['id'], $campId) === 0) {
+                return $sample;
             }
         }
 
-        abort(404);
+        return null;
+    }
+
+    /**
+     * Format a DonationCamp model into the array shape expected by camp views.
+     *
+     * @return array<string, mixed>
+     */
+    public static function formatCamp(DonationCamp $camp): array
+    {
+        $camp->loadMissing(['activeRegistrations.donor', 'registrations.donor', 'statusHistories']);
+
+        $registeredCount = $camp->activeRegistrations->count();
+        $availableSlots = max(0, $camp->capacity - $registeredCount);
+
+        $registrations = $camp->registrations->map(function (CampRegistration $reg): array {
+            return [
+                'id' => $reg->registration_code,
+                'donorId' => $reg->donor?->donor_code ?? 'DNR-'.$reg->donor_id,
+                'donorName' => $reg->donor?->full_name ?? 'Anonymous Donor',
+                'bloodGroup' => $reg->donor?->blood_group ?? 'Unknown',
+                'registrationDate' => $reg->registration_date?->format('M d, Y') ?? $reg->created_at?->format('M d, Y') ?? '',
+                'attendanceStatus' => $reg->attendance_status,
+            ];
+        })->all();
+
+        $history = $camp->statusHistories->map(function (CampStatusHistory $h): array {
+            return [
+                'date' => $h->occurred_at?->format('M d, Y • H:i') ?? '',
+                'event' => $h->event_name,
+                'actor' => $h->actor_name,
+                'notes' => $h->notes ?? '',
+            ];
+        })->all();
+
+        return [
+            'id' => $camp->camp_code,
+            'name' => $camp->name,
+            'description' => $camp->description,
+            'organizerName' => $camp->organizer_name,
+            'organizerContact' => $camp->organizer_contact,
+            'organizerEmail' => $camp->organizer_email,
+            'venueName' => $camp->venue_name,
+            'fullAddress' => $camp->full_address,
+            'city' => $camp->city,
+            'locationNotes' => $camp->location_notes ?? '',
+            'startDate' => $camp->start_date?->format('Y-m-d') ?? '',
+            'startDateFormatted' => $camp->start_date?->format('M d, Y') ?? '',
+            'endDate' => $camp->end_date?->format('Y-m-d') ?? '',
+            'endDateFormatted' => $camp->end_date?->format('M d, Y') ?? '',
+            'startTime' => $camp->start_time ? Carbon::parse($camp->start_time)->format('h:i A') : '',
+            'endTime' => $camp->end_time ? Carbon::parse($camp->end_time)->format('h:i A') : '',
+            'capacity' => (int) $camp->capacity,
+            'registeredDonors' => $registeredCount,
+            'availableSlots' => $availableSlots,
+            'registrationDeadline' => $camp->registration_deadline?->format('Y-m-d') ?? '',
+            'registrationDeadlineFormatted' => $camp->registration_deadline?->format('M d, Y') ?? '',
+            'allowWalkIn' => (bool) $camp->allow_walk_in,
+            'donorRequirements' => $camp->donor_requirements,
+            'additionalNotes' => $camp->additional_notes ?? '',
+            'status' => $camp->status,
+            'registrations' => $registrations,
+            'history' => $history,
+        ];
+    }
+
+    /**
+     * Get real active donors for the registration dropdown or fallback to sample donors.
+     *
+     * @return array<int, array{id: string, name: string, bloodGroup: string, phone: string, email: string}>
+     */
+    private function getAvailableDonorsForRegistration(): array
+    {
+        if (Donor::query()->exists()) {
+            return Donor::query()
+                ->active()
+                ->orderBy('full_name')
+                ->limit(50)
+                ->get()
+                ->map(fn (Donor $d): array => [
+                    'id' => $d->donor_code,
+                    'name' => $d->full_name,
+                    'bloodGroup' => $d->blood_group,
+                    'phone' => $d->phone,
+                    'email' => $d->email,
+                ])
+                ->all();
+        }
+
+        return $this->sampleDonors();
     }
 
     /**

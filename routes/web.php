@@ -86,8 +86,11 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('/camps', [DonationCampsController::class, 'index'])->name('camps.index');
         Route::get('/camps/create', [DonationCampsController::class, 'create'])->name('camps.create');
+        Route::post('/camps', [DonationCampsController::class, 'store'])->name('camps.store');
         Route::get('/camps/{camp}', [DonationCampsController::class, 'show'])->name('camps.show');
         Route::get('/camps/{camp}/edit', [DonationCampsController::class, 'edit'])->name('camps.edit');
+        Route::match(['put', 'patch'], '/camps/{camp}', [DonationCampsController::class, 'update'])->name('camps.update');
+        Route::post('/camps/{camp}/status', [DonationCampsController::class, 'updateStatus'])->name('camps.status.update');
 
         Route::middleware('role:donor')->group(function (): void {
             Route::get('/donor-portal', [DonorPortalController::class, 'dashboard'])->name('donor-portal.dashboard');
