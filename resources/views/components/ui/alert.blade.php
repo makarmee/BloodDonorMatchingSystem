@@ -24,7 +24,7 @@
     x-show="open"
     x-transition.opacity.duration.200ms
     role="alert"
-    {{ $attributes->merge(['class' => "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm {$styles}"]) }}
+    {{ $attributes->merge(['class' => "flex items-start gap-3 rounded-xl border px-4 py-3 text-sm text-start {$styles}"]) }}
 >
     <x-icons.icon :name="$iconName" class="size-5 mt-0.5 shrink-0" />
 

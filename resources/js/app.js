@@ -74,14 +74,105 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('donorEligibility', donorEligibility);
     Alpine.data('publicBloodStock', publicBloodStock);
     Alpine.data('publicCampsDirectory', publicCampsDirectory);
+
+    Alpine.magic('num', () => (value) => window.toPersianDigits(value));
+    Alpine.directive('num', (el, { expression }, { evaluateLater, effect }) => {
+        const getValue = evaluateLater(expression);
+        effect(() => {
+            getValue((val) => {
+                el.textContent = window.toPersianDigits(val);
+            });
+        });
+    });
 });
+
+const PERSIAN_DIGITS = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+
+window.isNumberExempt = function (str) {
+    if (!str) return false;
+    const trimmed = String(str).trim();
+    if (/^(REQ|HSP|DON|USR|APT|MED|CAMP|SMP|UNT|BAG)-/i.test(trimmed)) return true;
+    if (/^(A|B|AB|O)[+-]$/i.test(trimmed) || /^(PRBC|FFP|PLT|CRYO|WHOLE_BLOOD)$/i.test(trimmed)) return true;
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return true;
+    if (/^\+?[0-9\s\-()]{7,25}$/.test(trimmed) && /[\s\-()+]/.test(trimmed)) return true;
+    if (/^https?:\/\//i.test(trimmed)) return true;
+    return false;
+};
+
+window.toPersianDigits = function (value) {
+    if (value === null || value === undefined) {
+        return '';
+    }
+    const str = String(value);
+    if (window.BDMS_LOCALE !== 'fa') {
+        return str;
+    }
+    if (window.isNumberExempt(str)) {
+        return str;
+    }
+    return str.replace(/[0-9]/g, (digit) => PERSIAN_DIGITS[Number(digit)]);
+};
+
+function localizeTabularNums(root = document) {
+    if (window.BDMS_LOCALE !== 'fa' || !root) return;
+    const elements = root.querySelectorAll('.tabular-nums:not([dir="ltr"]):not(.dir-ltr):not(.font-mono)');
+    elements.forEach((el) => {
+        if (el.closest('[dir="ltr"], .dir-ltr, .font-mono, code, pre, input, textarea, select')) return;
+        if (el.children.length === 0 && el.textContent) {
+            const text = el.textContent;
+            if (/[0-9]/.test(text) && !window.isNumberExempt(text)) {
+                el.textContent = window.toPersianDigits(text);
+            }
+        }
+    });
+}
 
 window.Alpine = Alpine;
 window.__ = function (key, replace = {}) {
     let translation = window.BDMS_I18N?.[key] || key;
     for (const [placeholder, value] of Object.entries(replace)) {
-        translation = translation.replace(`:${placeholder}`, value);
+        const displayValue = (window.BDMS_LOCALE === 'fa' && typeof value === 'number')
+            ? window.toPersianDigits(value)
+            : value;
+        translation = translation.replace(`:${placeholder}`, displayValue);
     }
     return translation;
 };
+
 Alpine.start();
+
+if (window.BDMS_LOCALE === 'fa') {
+    document.addEventListener('DOMContentLoaded', () => {
+        localizeTabularNums(document.body);
+
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                    const target = mutation.target.nodeType === Node.TEXT_NODE
+                        ? mutation.target.parentElement
+                        : mutation.target;
+
+                    if (!target || !(target instanceof HTMLElement)) continue;
+
+                    if (target.classList?.contains('tabular-nums') || target.hasAttribute('data-persian-num')) {
+                        if (target.closest('[dir="ltr"], .dir-ltr, .font-mono, code, pre, input, textarea, select')) continue;
+                        if (target.children.length === 0 && /[0-9]/.test(target.textContent)) {
+                            if (!window.isNumberExempt(target.textContent)) {
+                                const converted = window.toPersianDigits(target.textContent);
+                                if (converted !== target.textContent) {
+                                    target.textContent = converted;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+        });
+    });
+}

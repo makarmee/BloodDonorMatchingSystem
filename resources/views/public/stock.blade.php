@@ -5,7 +5,7 @@
             <div class="space-y-2">
                 <div class="flex flex-wrap items-center gap-2">
                     <x-ui.badge variant="crimson" :dot="true">{{ __('Public Inventory Lookup') }}</x-ui.badge>
-                    <x-ui.badge variant="neutral">{{ $summary['totalGroups'] }} {{ __('Standard ABO/Rh Groups') }}</x-ui.badge>
+                    <x-ui.badge variant="neutral">@num($summary['totalGroups']) {{ __('Standard ABO/Rh Groups') }}</x-ui.badge>
                 </div>
                 <h1 class="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                     {{ __('Public Blood Stock Availability') }}

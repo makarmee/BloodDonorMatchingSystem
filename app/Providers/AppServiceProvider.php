@@ -14,6 +14,7 @@ use App\Policies\HospitalPolicy;
 use App\Policies\ScreeningRecordPolicy;
 use Closure;
 use Illuminate\Database\Schema\Builder;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,7 +25,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        if (file_exists(__DIR__.'/../Support/helpers.php')) {
+            require_once __DIR__.'/../Support/helpers.php';
+        }
     }
 
     /**
@@ -32,6 +35,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Blade::directive('num', function (string $expression): string {
+            return "<?php echo \App\Support\NumberLocalizer::toPersianDigits({$expression}); ?>";
+        });
+
+        Blade::directive('persianDigits', function (string $expression): string {
+            return "<?php echo \App\Support\NumberLocalizer::toPersianDigits({$expression}); ?>";
+        });
+
         Gate::policy(BloodRequest::class, BloodRequestPolicy::class);
         Gate::policy(Donation::class, DonationPolicy::class);
         Gate::policy(Donor::class, DonorPolicy::class);

@@ -39,7 +39,7 @@
         <div class="flex items-center gap-2.5">
             <x-bdms.blood-group-badge :group="$group" size="sm" />
             <span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">
-                {{ $units }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ __('units') }}</span>
+                {{ \App\Support\NumberLocalizer::toPersianDigits($units) }} <span class="font-normal text-slate-500 dark:text-slate-400">{{ __('units') }}</span>
             </span>
         </div>
 

@@ -67,23 +67,23 @@
                 <div class="grid grid-cols-3 gap-4 border-t border-slate-200/80 pt-6 dark:border-slate-800">
                     <div>
                         <p class="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
-                            {{ $stockSummary['totalUnits'] }}
+                            @num($stockSummary['totalUnits'])
                         </p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ __('Available Units') }} ({{ $stockSummary['totalGroups'] }} {{ __('Groups') }})
+                            {{ __('Available Units') }} (@num($stockSummary['totalGroups']) {{ __('Groups') }})
                         </p>
                     </div>
                     <div>
                         <p class="text-2xl font-bold tabular-nums text-slate-900 dark:text-white">
-                            {{ $campSummary['totalCamps'] }}
+                            @num($campSummary['totalCamps'])
                         </p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                            {{ __('Public Drives') }} ({{ $campSummary['totalAvailableSlots'] }} {{ __('Open Slots') }})
+                            {{ __('Public Drives') }} (@num($campSummary['totalAvailableSlots']) {{ __('Open Slots') }})
                         </p>
                     </div>
                     <div>
                         <p class="text-2xl font-bold tabular-nums text-rose-600 dark:text-rose-400">
-                            {{ $stockSummary['criticalCount'] }}
+                            @num($stockSummary['criticalCount'])
                         </p>
                         <p class="text-xs text-slate-500 dark:text-slate-400">
                             {{ __('Critical Groups') }} ({{ implode(', ', $stockSummary['urgentGroups']) ?: __('None') }})
@@ -101,7 +101,7 @@
                                 <h2 class="text-sm font-semibold text-slate-900 dark:text-white">{{ __('Live Priority Stock Watch') }}</h2>
                             </div>
                             <x-ui.badge variant="danger" :dot="true">
-                                {{ $stockSummary['criticalCount'] }} {{ __('Critical') }} &bull; {{ $stockSummary['lowCount'] }} {{ __('Low') }}
+                                @num($stockSummary['criticalCount']) {{ __('Critical') }} &bull; @num($stockSummary['lowCount']) {{ __('Low') }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>

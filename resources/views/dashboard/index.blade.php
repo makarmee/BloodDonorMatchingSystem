@@ -103,7 +103,7 @@
                                 {{ __('Operational activity log and recent submissions') }}
                             </p>
                         </div>
-                        <x-ui.badge variant="neutral">{{ __(':count items', ['count' => count($portalData['recentActivity'])]) }}</x-ui.badge>
+                        <x-ui.badge variant="neutral">{{ __(':count items', ['count' => \App\Support\NumberLocalizer::toPersianDigits(count($portalData['recentActivity']))]) }}</x-ui.badge>
                     </div>
                 </x-slot:header>
 
@@ -132,7 +132,7 @@
                                         <x-bdms.blood-group-badge :group="$row['group']" size="sm" />
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-slate-600 dark:text-slate-300">
-                                        {{ $row['quantity'] }}
+                                        @num($row['quantity'])
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5">
                                         <x-bdms.urgency-badge :level="$row['status']" />

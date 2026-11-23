@@ -25,15 +25,15 @@
 
 <x-ui.card {{ $attributes }}>
     <div class="flex items-start justify-between gap-4">
-        <div class="space-y-1 min-w-0">
+        <div class="space-y-1 min-w-0 text-start">
             <p class="text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 {{ __($label) }}
             </p>
             <p
-                @if ($valueBind) x-text="{{ $valueBind }}" @endif
+                @if ($valueBind) x-text="window.toPersianDigits ? window.toPersianDigits({{ $valueBind }}) : ({{ $valueBind }})" @endif
                 class="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white"
             >
-                {{ is_numeric($value) ? $value : __($value) }}
+                {{ is_numeric($value) ? \App\Support\NumberLocalizer::toPersianDigits($value) : __($value) }}
             </p>
         </div>
 

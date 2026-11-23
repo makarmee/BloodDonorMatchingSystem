@@ -2,7 +2,7 @@
     'padding' => true,
 ])
 
-<div {{ $attributes->merge(['class' => 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl shadow-xs']) }}>
+<div {{ $attributes->merge(['class' => 'bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-800 rounded-xl shadow-xs text-start']) }}>
     @isset($header)
         <div class="px-5 py-4 border-b border-slate-200/80 dark:border-slate-800">
             {{ $header }}

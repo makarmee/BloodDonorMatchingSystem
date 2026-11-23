@@ -35,7 +35,7 @@
     <div
         x-show="open"
         x-transition.scale.95.opacity.duration.200ms
-        class="relative w-full {{ $widthClass }} rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        class="relative w-full {{ $widthClass }} rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900 text-start"
     >
         @if ($title)
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4 dark:border-slate-800">

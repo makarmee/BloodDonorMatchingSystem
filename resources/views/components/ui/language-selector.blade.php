@@ -18,7 +18,7 @@
 
 <div
     x-data="{ open: false }"
-    class="relative inline-block text-left"
+    class="relative inline-block text-start"
     {{ $attributes }}
 >
     <button
