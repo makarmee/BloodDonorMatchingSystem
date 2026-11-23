@@ -12,6 +12,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class BloodRequestController extends Controller
 {
@@ -57,11 +58,12 @@ class BloodRequestController extends Controller
 
         $validated = $request->validate([
             'hospital_id' => [
-                Rule::requiredIf(fn (): bool => ! $actor->hospitalUser()->where('is_active', true)->exists()),
+                Rule::requiredIf(fn (): bool => ! $actor->hospitalUser()->where('is_active', true)->exists() && ! $request->filled('hospital_name')),
                 'nullable',
                 'integer',
                 'exists:hospitals,id',
             ],
+            'hospital_name' => ['nullable', 'string', 'max:255'],
             'blood_group' => ['required', 'string', Rule::in(BloodRequest::BLOOD_GROUPS)],
             'blood_component_id' => ['nullable', 'integer', 'min:1'],
             'blood_component_code' => ['nullable', 'string', 'max:32'],
@@ -79,7 +81,8 @@ class BloodRequestController extends Controller
 
         $hospital = $this->resolveHospitalForStore(
             $actor,
-            isset($validated['hospital_id']) ? (int) $validated['hospital_id'] : null
+            isset($validated['hospital_id']) ? (int) $validated['hospital_id'] : null,
+            $request->input('hospital_name')
         );
 
         Gate::authorize('create', [BloodRequest::class, $hospital]);
@@ -306,31 +309,68 @@ class BloodRequestController extends Controller
     /**
      * Resolve the target Hospital for request creation using validated input or active coordinator affiliation.
      */
-    private function resolveHospitalForStore(User $actor, ?int $hospitalId): Hospital
+    private function resolveHospitalForStore(User $actor, ?int $hospitalId, ?string $hospitalName = null): Hospital
     {
         if ($actor->hasRole('hospital')) {
             $coordinatorLink = $actor->hospitalUser()
                 ->where('is_active', true)
                 ->with('hospital')
-                ->firstOrFail();
+                ->first();
+
+            if (! $coordinatorLink || ! $coordinatorLink->hospital) {
+                abort(403, __('You are not linked to an active hospital.'));
+            }
+
+            if (! $coordinatorLink->hospital->is_active || $coordinatorLink->hospital->verification_status !== 'Verified') {
+                abort(403, __('Your hospital is not verified to submit blood requests.'));
+            }
 
             if ($hospitalId !== null && (int) $hospitalId !== (int) $coordinatorLink->hospital_id) {
-                abort(403, 'You are not authorized to create blood requests for other hospitals.');
+                abort(403, __('You are not authorized to create blood requests for other hospitals.'));
             }
 
             return $coordinatorLink->hospital;
         }
 
         if ($hospitalId !== null) {
-            return Hospital::query()->findOrFail($hospitalId);
+            $hospital = Hospital::query()
+                ->where('is_active', true)
+                ->where('verification_status', 'Verified')
+                ->find($hospitalId);
+
+            if (! $hospital) {
+                throw ValidationException::withMessages([
+                    'hospital_id' => __('The selected hospital must be an active, verified hospital.'),
+                ]);
+            }
+
+            return $hospital;
+        }
+
+        if ($hospitalName !== null && trim($hospitalName) !== '') {
+            $hospital = Hospital::query()
+                ->where('is_active', true)
+                ->where('verification_status', 'Verified')
+                ->where('name', trim($hospitalName))
+                ->first();
+
+            if ($hospital) {
+                return $hospital;
+            }
         }
 
         $coordinatorLink = $actor->hospitalUser()
             ->where('is_active', true)
             ->with('hospital')
-            ->firstOrFail();
+            ->first();
 
-        return $coordinatorLink->hospital;
+        if ($coordinatorLink?->hospital && $coordinatorLink->hospital->is_active && $coordinatorLink->hospital->verification_status === 'Verified') {
+            return $coordinatorLink->hospital;
+        }
+
+        throw ValidationException::withMessages([
+            'hospital_id' => __('Please select a verified partner hospital for this blood request.'),
+        ]);
     }
 
     /**

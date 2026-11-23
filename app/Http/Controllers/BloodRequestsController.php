@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BloodRequest;
+use App\Models\Hospital;
 use App\Models\InventoryStock;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -123,6 +124,7 @@ class BloodRequestsController extends Controller
         $prefill = [];
         if ($hospital) {
             $prefill = [
+                'hospitalId' => $hospital->id,
                 'hospitalName' => $hospital->name,
                 'contactPerson' => $coordinatorLink->contact_name ?? $hospital->primary_contact_name ?? $user->name,
                 'contactNumber' => $coordinatorLink->work_phone ?? $hospital->primary_phone ?? $user->phone ?? '',
@@ -131,10 +133,18 @@ class BloodRequestsController extends Controller
             ];
         }
 
+        $hospitals = Hospital::query()
+            ->where('is_active', true)
+            ->where('verification_status', 'Verified')
+            ->orderBy('name')
+            ->get();
+
         return view('requests.create', [
             'bloodGroups' => $this->bloodGroupOptions(),
             'priorities' => $this->priorityOptions(),
             'prefill' => $prefill,
+            'hospital' => $hospital,
+            'hospitals' => $hospitals,
         ]);
     }
 
@@ -143,6 +153,10 @@ class BloodRequestsController extends Controller
      */
     public function show(Request $request, string $requestId): View
     {
+        if ($requestId === 'create') {
+            return $this->create($request);
+        }
+
         $bloodRequest = BloodRequest::query()
             ->with([
                 'hospital',
@@ -189,6 +203,10 @@ class BloodRequestsController extends Controller
      */
     public function edit(Request $request, string $requestId): View|RedirectResponse
     {
+        if ($requestId === 'create') {
+            return $this->create($request);
+        }
+
         $bloodRequest = BloodRequest::query()
             ->with(['hospital', 'requestedBy', 'bloodComponent'])
             ->where('id', $requestId)

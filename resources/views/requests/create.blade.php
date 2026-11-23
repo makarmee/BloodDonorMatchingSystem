@@ -32,6 +32,9 @@
             'mode' => 'create',
             'bloodGroups' => $bloodGroups,
             'priorities' => $priorities,
+            'prefill' => $prefill ?? [],
+            'hospital' => $hospital ?? null,
+            'hospitals' => $hospitals ?? collect(),
         ])
     </div>
 </x-app-layout>

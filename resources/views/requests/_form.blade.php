@@ -2,9 +2,12 @@
     $isEdit = ($mode ?? 'create') === 'edit';
     $requestRecord = $bloodRequest ?? [];
     $prefillData = $prefill ?? [];
+    $userHospital = $hospital ?? null;
+    $availableHospitals = $hospitals ?? collect();
 
     $initialForm = [
-        'hospitalName' => old('hospital_name', $requestRecord['hospitalName'] ?? $prefillData['hospitalName'] ?? ''),
+        'hospitalId' => old('hospital_id', $requestRecord['hospitalId'] ?? $prefillData['hospitalId'] ?? $userHospital?->id ?? ''),
+        'hospitalName' => old('hospital_name', $requestRecord['hospitalName'] ?? $prefillData['hospitalName'] ?? $userHospital?->name ?? ''),
         'contactPerson' => old('contact_person', $requestRecord['contactPerson'] ?? $prefillData['contactPerson'] ?? ''),
         'contactNumber' => old('contact_number', $requestRecord['contactNumber'] ?? $prefillData['contactNumber'] ?? ''),
         'hospitalAddress' => old('hospital_address', $requestRecord['hospitalAddress'] ?? $prefillData['hospitalAddress'] ?? ''),
@@ -119,6 +122,50 @@
             </x-slot:header>
 
             <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                @if (! $isEdit && ! $userHospital && $availableHospitals->isNotEmpty())
+                    <div class="md:col-span-2">
+                        <label for="select-target-hospital" class="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
+                            {{ __('Select Verified Hospital') }} <span class="text-crimson-500">*</span>
+                        </label>
+                        <select
+                            id="select-target-hospital"
+                            name="hospital_id"
+                            class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-xs focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            @change="
+                                const opt = $event.target.selectedOptions ? $event.target.selectedOptions[0] : null;
+                                if (opt && opt.value) {
+                                    form.hospitalName = opt.dataset.name || form.hospitalName;
+                                    if (opt.dataset.contact) form.contactPerson = opt.dataset.contact;
+                                    if (opt.dataset.phone) form.contactNumber = opt.dataset.phone;
+                                    if (opt.dataset.email) form.email = opt.dataset.email;
+                                    if (opt.dataset.address) form.hospitalAddress = opt.dataset.address;
+                                    errors.hospitalName = '';
+                                }
+                            "
+                        >
+                            <option value="">{{ __('Select a verified partner hospital...') }}</option>
+                            @foreach ($availableHospitals as $hospOption)
+                                <option
+                                    value="{{ $hospOption->id }}"
+                                    data-name="{{ $hospOption->name }}"
+                                    data-contact="{{ $hospOption->primary_contact_name }}"
+                                    data-phone="{{ $hospOption->primary_phone }}"
+                                    data-email="{{ $hospOption->primary_email }}"
+                                    data-address="{{ $hospOption->address }}"
+                                    {{ (string) old('hospital_id', $initialForm['hospitalId']) === (string) $hospOption->id ? 'selected' : '' }}
+                                >
+                                    {{ $hospOption->name }} ({{ $hospOption->hospital_code ?? 'HSP-'.$hospOption->id }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('hospital_id')
+                            <p class="mt-1.5 text-xs font-medium text-crimson-600 dark:text-crimson-400">{{ $message }}</p>
+                        @enderror
+                    </div>
+                @elseif ($userHospital)
+                    <input type="hidden" name="hospital_id" value="{{ $userHospital->id }}">
+                @endif
+
                 <div class="md:col-span-2">
                     <x-ui.input
                         id="request-hospital-name"

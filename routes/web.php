@@ -76,8 +76,8 @@ Route::middleware('auth')->group(function (): void {
 
         Route::get('/requests', [BloodRequestsController::class, 'index'])->name('requests.index');
         Route::get('/requests/create', [BloodRequestsController::class, 'create'])->name('requests.create');
-        Route::get('/requests/{request}', [BloodRequestsController::class, 'show'])->name('requests.show');
-        Route::get('/requests/{request}/edit', [BloodRequestsController::class, 'edit'])->name('requests.edit');
+        Route::get('/requests/{request}', [BloodRequestsController::class, 'show'])->where('request', '^(?!create$)[a-zA-Z0-9_-]+$')->name('requests.show');
+        Route::get('/requests/{request}/edit', [BloodRequestsController::class, 'edit'])->where('request', '^(?!create$)[a-zA-Z0-9_-]+$')->name('requests.edit');
 
         Route::post('/requests', [BloodRequestController::class, 'store'])->name('requests.store');
         Route::match(['put', 'patch'], '/requests/{bloodRequest}', [BloodRequestController::class, 'update'])->name('requests.update');

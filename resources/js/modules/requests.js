@@ -411,6 +411,19 @@ export function requestForm(initial = {}) {
         dismissFeedback() {
             this.feedback = null;
         },
+
+        onHospitalSelect(event) {
+            const select = event.target;
+            const option = select.selectedOptions ? select.selectedOptions[0] : null;
+            if (option && option.value) {
+                this.form.hospitalName = option.dataset.name || this.form.hospitalName;
+                if (option.dataset.contact) this.form.contactPerson = option.dataset.contact;
+                if (option.dataset.phone) this.form.contactNumber = option.dataset.phone;
+                if (option.dataset.email) this.form.email = option.dataset.email;
+                if (option.dataset.address) this.form.hospitalAddress = option.dataset.address;
+                this.errors.hospitalName = '';
+            }
+        },
     };
 }
 

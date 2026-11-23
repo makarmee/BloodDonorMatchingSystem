@@ -5,41 +5,47 @@ namespace App\Policies;
 use App\Models\BloodRequest;
 use App\Models\Hospital;
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class BloodRequestPolicy
 {
     /**
      * Determine whether the user can submit a new blood request for the given hospital.
      */
-    public function create(User $user, ?Hospital $hospital = null): bool
+    public function create(User $user, ?Hospital $hospital = null): Response|bool
     {
         if (! $user->is_active) {
-            return false;
+            return Response::deny(__('Your account is deactivated.'));
         }
 
         if ($user->hasPermission('requests.fulfill')) {
-            return true;
+            return Response::allow();
         }
 
         if (! $user->hasRole('hospital')) {
-            return false;
+            return Response::deny(__('Only verified hospital representatives and authorized staff may create blood requests.'));
         }
 
-        if (! $hospital instanceof Hospital) {
-            return $user->hospitalUser()
-                ->where('is_active', true)
-                ->whereHas('hospital', function ($query): void {
-                    $query->where('is_active', true)
-                        ->where('verification_status', 'Verified');
-                })
-                ->exists();
+        $coordinatorLink = $user->hospitalUser()->where('is_active', true)->with('hospital')->first();
+        if (! $coordinatorLink || ! $coordinatorLink->hospital) {
+            return Response::deny(__('Your user profile is not linked to any hospital.'));
         }
 
-        if (! $hospital->is_active || $hospital->verification_status !== 'Verified') {
-            return false;
+        $targetHospital = $hospital ?? $coordinatorLink->hospital;
+
+        if (! $targetHospital->is_active) {
+            return Response::deny(__('Your hospital account has been deactivated.'));
         }
 
-        return $this->isActiveHospitalCoordinatorFor($user, $hospital);
+        if ($targetHospital->verification_status !== 'Verified') {
+            return Response::deny(__('Your hospital account is currently pending administrative verification. Only verified partner hospitals may create blood requests.'));
+        }
+
+        if (! $this->isActiveHospitalCoordinatorFor($user, $targetHospital)) {
+            return Response::deny(__('You are not authorized as an active coordinator for this hospital.'));
+        }
+
+        return Response::allow();
     }
 
     /**
