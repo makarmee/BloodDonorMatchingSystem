@@ -18,7 +18,29 @@ class BloodRequestPolicy
             return Response::deny(__('Your account is deactivated.'));
         }
 
-        if ($user->hasPermission('requests.fulfill')) {
+        $isStaffOrAdmin = $user->hasRole('admin') || $user->hasRole('staff') || $user->hasPermission('requests.fulfill');
+
+        if ($hospital instanceof Hospital) {
+            if (! $hospital->is_active) {
+                return Response::deny(__('The target hospital account is inactive.'));
+            }
+
+            if ($hospital->verification_status !== 'Verified') {
+                return Response::deny(__('Blood requests may only be created for verified partner hospitals.'));
+            }
+
+            if ($isStaffOrAdmin) {
+                return Response::allow();
+            }
+
+            if (! $user->hasRole('hospital') || ! $this->isActiveHospitalCoordinatorFor($user, $hospital)) {
+                return Response::deny(__('You are not authorized as an active coordinator for this hospital.'));
+            }
+
+            return Response::allow();
+        }
+
+        if ($isStaffOrAdmin) {
             return Response::allow();
         }
 
@@ -31,7 +53,7 @@ class BloodRequestPolicy
             return Response::deny(__('Your user profile is not linked to any hospital.'));
         }
 
-        $targetHospital = $hospital ?? $coordinatorLink->hospital;
+        $targetHospital = $coordinatorLink->hospital;
 
         if (! $targetHospital->is_active) {
             return Response::deny(__('Your hospital account has been deactivated.'));

@@ -311,7 +311,9 @@ class BloodRequestController extends Controller
      */
     private function resolveHospitalForStore(User $actor, ?int $hospitalId, ?string $hospitalName = null): Hospital
     {
-        if ($actor->hasRole('hospital')) {
+        $isStaffOrAdmin = $actor->hasRole('admin') || $actor->hasRole('staff') || $actor->hasPermission('requests.fulfill');
+
+        if (! $isStaffOrAdmin && $actor->hasRole('hospital')) {
             $coordinatorLink = $actor->hospitalUser()
                 ->where('is_active', true)
                 ->with('hospital')

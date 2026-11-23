@@ -118,7 +118,11 @@ class BloodRequestsController extends Controller
 
         /** @var User|null $user */
         $user = $request->user();
-        $coordinatorLink = $user?->hospitalUser()->where('is_active', true)->with('hospital')->first();
+        $isStaffOrAdmin = $user && ($user->hasRole('admin') || $user->hasRole('staff') || $user->hasPermission('requests.fulfill'));
+
+        $coordinatorLink = ! $isStaffOrAdmin
+            ? $user?->hospitalUser()->where('is_active', true)->with('hospital')->first()
+            : null;
         $hospital = $coordinatorLink?->hospital;
 
         $prefill = [];

@@ -50,6 +50,79 @@ class BloodRequestCreateAccessTest extends TestCase
         $response->assertSee($verifiedHospital->name);
     }
 
+    public function test_admin_with_linked_pending_hospital_can_still_access_requests_create_and_see_hospital_selector(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->roles()->attach(Role::where('slug', 'admin')->firstOrFail());
+        $admin->roles()->attach(Role::where('slug', 'hospital')->firstOrFail());
+
+        $pendingHospital = Hospital::factory()->create([
+            'is_active' => true,
+            'verification_status' => 'Pending',
+            'name' => 'Pending Facility Under Audit',
+        ]);
+
+        HospitalUser::factory()->create([
+            'user_id' => $admin->id,
+            'hospital_id' => $pendingHospital->id,
+            'is_active' => true,
+        ]);
+
+        $verifiedHospital = Hospital::factory()->create([
+            'is_active' => true,
+            'verification_status' => 'Verified',
+            'name' => 'Fully Verified Regional Clinic',
+        ]);
+
+        $response = $this->actingAs($admin)->get(route('requests.create'));
+
+        $response->assertOk();
+        $response->assertSee('Select Verified Hospital');
+        $response->assertSee('Fully Verified Regional Clinic');
+    }
+
+    public function test_staff_can_access_requests_create_and_select_verified_hospital(): void
+    {
+        $staff = User::factory()->create(['is_active' => true]);
+        $staff->roles()->attach(Role::where('slug', 'staff')->firstOrFail());
+
+        $verifiedHospital = Hospital::factory()->create([
+            'is_active' => true,
+            'verification_status' => 'Verified',
+            'name' => 'General County Hospital',
+        ]);
+
+        $response = $this->actingAs($staff)->get(route('requests.create'));
+
+        $response->assertOk();
+        $response->assertSee('Select Verified Hospital');
+        $response->assertSee('General County Hospital');
+    }
+
+    public function test_admin_cannot_create_request_for_unverified_hospital(): void
+    {
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->roles()->attach(Role::where('slug', 'admin')->firstOrFail());
+
+        $pendingHospital = Hospital::factory()->create([
+            'is_active' => true,
+            'verification_status' => 'Pending',
+        ]);
+
+        $prbc = BloodComponent::query()->where('code', 'PRBC')->firstOrFail();
+
+        $response = $this->actingAs($admin)->post(route('requests.store'), [
+            'hospital_id' => $pendingHospital->id,
+            'blood_group' => 'A+',
+            'blood_component_id' => $prbc->id,
+            'requested_units' => 2,
+            'priority' => 'High',
+            'request_reason' => 'Emergency order attempt on unverified hospital.',
+        ]);
+
+        $response->assertSessionHasErrors(['hospital_id']);
+    }
+
     public function test_verified_hospital_representative_can_access_blood_request_create_page_and_see_form(): void
     {
         $hospital = Hospital::factory()->create([
