@@ -76,7 +76,12 @@ class AccountRegistrationService
                     ]);
                 }
 
-                $donorRole = Role::query()->bySlug('donor')->firstOrFail();
+                $donorRole = Role::query()->bySlug('donor')->first()
+                    ?? Role::query()->create([
+                        'name' => 'Donor',
+                        'slug' => 'donor',
+                        'description' => 'Registered donor portal user managing personal profile completion, eligibility status, appointments, and camp registrations.',
+                    ]);
 
                 $user = User::query()->create([
                     'name' => $name,
@@ -207,7 +212,12 @@ class AccountRegistrationService
                     ]);
                 }
 
-                $hospitalRole = Role::query()->bySlug('hospital')->firstOrFail();
+                $hospitalRole = Role::query()->bySlug('hospital')->first()
+                    ?? Role::query()->create([
+                        'name' => 'Hospital Partner',
+                        'slug' => 'hospital',
+                        'description' => 'Partner hospital portal user authorized to submit and track requests scoped to verified partner hospitals.',
+                    ]);
 
                 $user = User::query()->create([
                     'name' => $coordinatorName,
