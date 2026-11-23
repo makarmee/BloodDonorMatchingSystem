@@ -30,7 +30,7 @@
                     </h1>
                     <x-bdms.blood-group-badge :group="$sample['bloodGroup']" size="md" />
                     <x-ui.badge variant="neutral">
-                        {{ $sample['testType'] }}
+                        {{ __($sample['testType']) }}
                     </x-ui.badge>
                     <x-ui.badge :variant="$resultVariant" :dot="true">
                         {{ __('Result') }}: {{ __($sample['screeningResult']) }}
@@ -121,10 +121,10 @@
                     {{ __('Test Panel') }}
                 </p>
                 <p class="mt-3 text-lg font-bold text-slate-900 dark:text-white">
-                    {{ $sample['testType'] }}
+                    {{ __($sample['testType']) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ __('Specimen') }}: {{ $sample['specimenTube'] }}
+                    {{ __('Specimen') }}: <span class="dir-ltr">{{ $sample['specimenTube'] }}</span>
                 </p>
             </x-ui.card>
 
@@ -148,7 +148,7 @@
                     {{ __('Test Date') }}
                 </p>
                 <p class="mt-3 text-lg font-bold text-slate-900 dark:text-white">
-                    {{ $sample['testDateFormatted'] }}
+                    {{ __($sample['testDateFormatted']) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {{ __('Collected') }}: {{ $sample['collectionDateFormatted'] }}
@@ -187,7 +187,7 @@
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
                             <dt class="text-slate-500 dark:text-slate-400">{{ __('Donor Name') }}</dt>
-                            <dd class="font-semibold text-slate-900 dark:text-white">{{ $sample['donorName'] }}</dd>
+                            <dd class="font-semibold text-slate-900 dark:text-white">{{ __($sample['donorName']) }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
@@ -251,7 +251,7 @@
 
                         <div class="flex items-center justify-between gap-4 py-2.5 last:pb-0">
                             <dt class="text-slate-500 dark:text-slate-400">{{ __('Location') }}</dt>
-                            <dd class="text-end text-slate-700 dark:text-slate-200">{{ $sample['collectionLocation'] }}</dd>
+                            <dd class="text-end text-slate-700 dark:text-slate-200">{{ __($sample['collectionLocation']) }}</dd>
                         </div>
                     </dl>
 
@@ -288,12 +288,12 @@
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Assay Method') }}</p>
-                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ $sample['assayMethod'] }}</p>
+                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($sample['assayMethod']) }}</p>
                             </div>
 
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Laboratory Staff') }}</p>
-                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ $sample['labStaff'] }}</p>
+                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($sample['labStaff']) }}</p>
                             </div>
                         </div>
 
@@ -302,7 +302,7 @@
                                 {{ __('Test Notes') }}
                             </p>
                             <p class="mt-1.5 leading-relaxed text-slate-800 dark:text-slate-200">
-                                {{ $sample['testNotes'] ?: __('No laboratory remarks recorded.') }}
+                                {{ $sample['testNotes'] ? __($sample['testNotes']) : __('No laboratory remarks recorded.') }}
                             </p>
                         </div>
                     </div>

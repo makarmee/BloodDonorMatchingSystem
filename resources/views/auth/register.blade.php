@@ -1,4 +1,4 @@
-<x-guest-layout title="Register" :minimal="true">
+<x-guest-layout :title="__('Register')" :minimal="true">
     <div class="min-h-screen flex flex-col justify-between bg-slate-50 px-4 py-8 sm:px-6 lg:px-8 dark:bg-slate-950">
         <div class="mx-auto flex w-full max-w-lg items-center justify-between">
             <a href="{{ route('home') }}" class="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white">

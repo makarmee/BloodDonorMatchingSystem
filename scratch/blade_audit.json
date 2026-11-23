@@ -1,0 +1,232 @@
+{
+    "scratch/../resources/views\\auth\\forgot-password.blade.php": [
+        "Attribute title: \"Reset Password\"",
+        "Attribute placeholder: \"name@hospital.org\""
+    ],
+    "scratch/../resources/views\\auth\\login.blade.php": [
+        "Attribute title: \"Sign in\"",
+        "Attribute placeholder: \"name@hospital.org\""
+    ],
+    "scratch/../resources/views\\auth\\register.blade.php": [
+        "Attribute title: \"Register\"",
+        "Attribute placeholder: \"Dr. Sarah Jenkins\"",
+        "Attribute placeholder: \"name@example.com\"",
+        "Attribute placeholder: \"City General Hospital\"",
+        "Attribute placeholder: \"Metropolis\"",
+        "Attribute placeholder: \"100 Hospital Boulevard, Suite 400\""
+    ],
+    "scratch/../resources/views\\camps\\index.blade.php": [
+        "Attribute aria-label: \"Donation camps overview statistics\"",
+        "Attribute aria-label: \"Donation camps pagination\"",
+        "Literal text: \"statuses as\"",
+        "Literal text: \"locations as\"",
+        "Literal text: \"camps as\""
+    ],
+    "scratch/../resources/views\\camps\\show.blade.php": [
+        "Literal text: \"campStatuses as\"",
+        "Literal text: \"attendanceStatuses as\"",
+        "Literal text: \"attendanceStatuses as\""
+    ],
+    "scratch/../resources/views\\camps\\_form.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute placeholder: \"coordinator@organization.org\"",
+        "Literal text: \"statuses as\""
+    ],
+    "scratch/../resources/views\\components\\bdms\\blood-group-badge.blade.php": [
+        "Literal text: \"flex items-center justify-center rounded-lg font-bold tracking-tight tabular-nums ring-1 ring-inset\""
+    ],
+    "scratch/../resources/views\\components\\ui\\alert.blade.php": [
+        "Literal text: \"flex items-start gap-3 rounded-xl border px-4 py-3 text-sm\""
+    ],
+    "scratch/../resources/views\\components\\ui\\badge.blade.php": [
+        "Literal text: \"flex items-center gap-1\"",
+        "Literal text: \"full px-2\"",
+        "Literal text: \"xs font-medium ring-1 ring-inset\""
+    ],
+    "scratch/../resources/views\\components\\ui\\card.blade.php": [
+        "Literal text: \"white dark\"",
+        "Literal text: \"border border-slate-200\"",
+        "Literal text: \"xl shadow-xs\""
+    ],
+    "scratch/../resources/views\\components\\ui\\input.blade.php": [
+        "Attribute aria-label: \"showPassword ? \"",
+        "Literal text: \"block w-full rounded-lg border bg-white px-3\"",
+        "Literal text: \"sm text-slate-900 placeholder\"",
+        "Literal text: \"transition focus\"",
+        "Literal text: \"none focus\""
+    ],
+    "scratch/../resources/views\\components\\ui\\language-selector.blade.php": [
+        "Literal text: \"languages as\""
+    ],
+    "scratch/../resources/views\\components\\ui\\select.blade.php": [
+        "Literal text: \"block w-full rounded-lg border bg-white px-3\"",
+        "Literal text: \"sm text-slate-900 shadow-2xs transition focus\"",
+        "Literal text: \"none focus\"",
+        "Literal text: \"options as\""
+    ],
+    "scratch/../resources/views\\components\\ui\\textarea.blade.php": [
+        "Literal text: \"block w-full rounded-lg border bg-white px-3\"",
+        "Literal text: \"sm text-slate-900 placeholder\"",
+        "Literal text: \"transition focus\"",
+        "Literal text: \"none focus\""
+    ],
+    "scratch/../resources/views\\components\\ui\\theme-toggle.blade.php": [
+        "Attribute aria-label: \"$store.theme.dark ? \"",
+        "Attribute title: \"$store.theme.dark ? \"",
+        "Literal text: \"flex items-center justify-center rounded-lg border border-slate-200 bg-white p-2 text-slate-600 shadow-2xs transition hover\"",
+        "Literal text: \"white cursor-pointer\"",
+        "Literal text: \"Switch to light mode\"",
+        "Literal text: \"Switch to dark mode\"",
+        "Literal text: \"Switch to light mode\"",
+        "Literal text: \"Switch to dark mode\""
+    ],
+    "scratch/../resources/views\\dashboard\\index.blade.php": [
+        "Attribute title: \"__($portalData[\"",
+        "Attribute label: \"$kpi[\""
+    ],
+    "scratch/../resources/views\\donations\\index.blade.php": [
+        "Attribute aria-label: \"Donations overview statistics\"",
+        "Attribute aria-label: \"Donations pagination\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"donations as\""
+    ],
+    "scratch/../resources/views\\donations\\show.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute title: \"session(\"",
+        "Attribute aria-label: \"Donation summary metrics\""
+    ],
+    "scratch/../resources/views\\donations\\_form.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute placeholder: \"e.g. Central Medical Plaza\"",
+        "Attribute placeholder: \"e.g. Nurse Hannah Reed\"",
+        "Literal text: \"locations as\"",
+        "Literal text: \"staffMembers as\""
+    ],
+    "scratch/../resources/views\\donor-portal\\appointments\\create.blade.php": [
+        "Literal text: \"donationTypes as\"",
+        "Literal text: \"centers as\"",
+        "Literal text: \"camps as\""
+    ],
+    "scratch/../resources/views\\donor-portal\\appointments\\index.blade.php": [
+        "Literal text: \"statuses as\"",
+        "Literal text: \"appointments as\""
+    ],
+    "scratch/../resources/views\\donor-portal\\dashboard.blade.php": [
+        "Literal text: \"recentDonations as\"",
+        "Literal text: \"upcomingCamps as\""
+    ],
+    "scratch/../resources/views\\donor-portal\\history.blade.php": [
+        "Literal text: \"donationStatuses as\"",
+        "Literal text: \"donations as\""
+    ],
+    "scratch/../resources/views\\donor-portal\\_portal-header.blade.php": [
+        "Literal text: \"portalTabs as\""
+    ],
+    "scratch/../resources/views\\donors\\index.blade.php": [
+        "Attribute aria-label: \"Donor overview statistics\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"donors as\""
+    ],
+    "scratch/../resources/views\\donors\\show.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute aria-label: \"Donor summary metrics\""
+    ],
+    "scratch/../resources/views\\donors\\_form.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute placeholder: \"e.g. Elena Rostova\"",
+        "Attribute placeholder: \"donor@example.org\"",
+        "Attribute placeholder: \"e.g. Viktor Rostov (Spouse) - +1 (555) 234-8999\""
+    ],
+    "scratch/../resources/views\\hospitals\\index.blade.php": [
+        "Attribute aria-label: \"Hospital verification overview\"",
+        "Literal text: \"hospitals as\""
+    ],
+    "scratch/../resources/views\\hospitals\\show.blade.php": [
+        "Attribute title: \"$hospital->name . \"",
+        "Literal text: \"hospitalUsers as\""
+    ],
+    "scratch/../resources/views\\inventory\\index.blade.php": [
+        "Attribute aria-label: \"Inventory summary statistics\"",
+        "Literal text: \"components as\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"of 8\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"units as\"",
+        "Literal text: \"stockBuckets as\"",
+        "Literal text: \"stockBuckets as\""
+    ],
+    "scratch/../resources/views\\inventory\\reconcile.blade.php": [
+        "Literal text: \"reports as\""
+    ],
+    "scratch/../resources/views\\inventory\\unit-show.blade.php": [
+        "Literal text: \"allocations as\"",
+        "Literal text: \"transactions as\""
+    ],
+    "scratch/../resources/views\\pages\\home.blade.php": [
+        "Attribute title: \"Home\"",
+        "Literal text: \"bloodStock as\"",
+        "Literal text: \"donationSteps as\"",
+        "Literal text: \"upcomingCamps as\"",
+        "Literal text: \"of  slots left\"",
+        "Literal text: \"faqs as\""
+    ],
+    "scratch/../resources/views\\partials\\sidebar.blade.php": [
+        "Literal text: \"items as\"",
+        "Literal text: \"allowed opacity-80\""
+    ],
+    "scratch/../resources/views\\public\\camps\\index.blade.php": [
+        "Literal text: \"cities as\"",
+        "Literal text: \"statuses as\"",
+        "Literal text: \"camps as\""
+    ],
+    "scratch/../resources/views\\public\\camps\\show.blade.php": [
+        "Attribute title: \"$camp[\"",
+        "Attribute aria-label: \"Breadcrumb\"",
+        "Attribute title: \"__($camp[\"",
+        "Literal text: \"Demo Placeholder\"",
+        "Literal text: \"otherCamps as\""
+    ],
+    "scratch/../resources/views\\public\\stock.blade.php": [
+        "Literal text: \"components as\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"bloodGroups as\""
+    ],
+    "scratch/../resources/views\\requests\\index.blade.php": [
+        "Attribute aria-label: \"Blood requests overview statistics\"",
+        "Attribute aria-label: \"Blood requests pagination\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"priorities as\"",
+        "Literal text: \"statuses as\"",
+        "Literal text: \"requests as\""
+    ],
+    "scratch/../resources/views\\requests\\show.blade.php": [
+        "Attribute aria-label: \"Request fulfillment summary\"",
+        "Literal text: \"bloodGroups as\""
+    ],
+    "scratch/../resources/views\\requests\\_form.blade.php": [
+        "Attribute placeholder: \"transfusion@hospital.org\""
+    ],
+    "scratch/../resources/views\\screening\\create.blade.php": [
+        "Literal text: \"labStaffSuggestions as\""
+    ],
+    "scratch/../resources/views\\screening\\index.blade.php": [
+        "Attribute aria-label: \"Lab screening overview statistics\"",
+        "Attribute aria-label: \"Screening pagination\"",
+        "Literal text: \"bloodGroups as\"",
+        "Literal text: \"testTypes as\"",
+        "Literal text: \"samples as\""
+    ],
+    "scratch/../resources/views\\screening\\show.blade.php": [
+        "Attribute title: \"session(\"",
+        "Attribute title: \"session(\"",
+        "Attribute aria-label: \"Screening summary metrics\""
+    ],
+    "scratch/../resources/views\\welcome.blade.php": [
+        "Literal text: \"Dashboard\n                        \n                    \n                        \n                            Log in\"",
+        "Literal text: \"Register\n                            \n                        \n                    \n                \n            \n        \n        \n            \n                \n                    Let\"",
+        "Literal text: \"get started\n                    With so many options available to you\"",
+        "Literal text: \"we suggest you start with the following\"",
+        "Literal text: \"Read the\n                                \n                                    Documentation\n                                    \n                                        \n                                    \n                                \n                            \n                        \n                        \n                            \n                                \n                                    \n                                \n                            \n                            \n                                Watch video tutorials at\n                                \n                                    Laracasts\n                                    \n                                        \n                                    \n                                \n                            \n                        \n                    \n                    \n                        \n                            \n                                Deploy now\n                            \n                        \n                    \n\n                    \n                        v\n                        \n                            View changelog\""
+    ]
+}

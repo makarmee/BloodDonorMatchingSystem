@@ -1,4 +1,4 @@
-<x-app-layout :title="__('Edit Donor') . ' · ' . $donor['name']" :page-title="__('Edit Donor')" active-role="staff">
+<x-app-layout :title="__('Edit Donor') . ' · ' . __($donor['name'])" :page-title="__('Edit Donor')" active-role="staff">
     <x-slot:header>
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -16,7 +16,7 @@
 
                 <div class="mt-2 flex flex-wrap items-center gap-3">
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {{ __('Edit Donor') }} · {{ $donor['name'] }}
+                        {{ __('Edit Donor') }} · {{ __($donor['name']) }}
                     </h1>
                     <x-bdms.blood-group-badge :group="$donor['bloodGroup']" size="sm" />
                 </div>

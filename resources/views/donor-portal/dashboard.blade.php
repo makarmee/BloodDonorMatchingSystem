@@ -381,11 +381,11 @@
                                 </div>
 
                                 <p class="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                                    {{ $camp['name'] }}
+                                    {{ __($camp['name']) }}
                                 </p>
 
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    {{ $camp['venueName'] }}, {{ $camp['city'] }} &middot; <span class="dir-ltr">{{ $camp['startDateFormatted'] }}</span> &middot;
+                                    {{ __($camp['venueName']) }}, {{ __($camp['city']) }} &middot; <span class="dir-ltr">{{ $camp['startDateFormatted'] }}</span> &middot;
                                     <strong class="text-slate-700 dark:text-slate-200">{{ __(':available / :capacity slots available', ['available' => $camp['availableSlots'], 'capacity' => $camp['capacity']]) }}</strong>
                                 </p>
                             </div>

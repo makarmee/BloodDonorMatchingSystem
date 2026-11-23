@@ -240,7 +240,7 @@
                                             href="{{ route('donors.show', $donation['donorId']) }}"
                                             class="font-semibold text-slate-900 transition hover:text-crimson-600 dark:text-white dark:hover:text-crimson-400"
                                         >
-                                            {{ $donation['donorName'] }}
+                                            {{ __($donation['donorName']) }}
                                         </a>
                                         <p class="font-mono text-xs text-slate-500 dark:text-slate-400 dir-ltr text-start">
                                             {{ $donation['donorId'] }}
@@ -253,7 +253,7 @@
                                 </td>
 
                                 <td class="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-200">
-                                    {{ $donation['donationDateFormatted'] }}
+                                    {{ __($donation['donationDateFormatted']) }}
                                 </td>
 
                                 <td class="px-6 py-4 whitespace-nowrap font-medium text-slate-800 dark:text-slate-200">

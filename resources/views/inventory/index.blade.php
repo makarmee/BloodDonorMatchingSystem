@@ -11,7 +11,7 @@
                         $activeComp = $components->firstWhere('id', $selectedComponentId);
                     @endphp
                     @if ($activeComp)
-                        <x-ui.badge variant="neutral">{{ $activeComp->name }}</x-ui.badge>
+                        <x-ui.badge variant="neutral">{{ __($activeComp->name) }}</x-ui.badge>
                     @endif
                 @endif
             </div>
@@ -163,7 +163,7 @@
                             href="{{ route('inventory.index', array_merge(request()->query(), ['component_id' => $comp->id])) }}"
                             class="rounded-lg px-2.5 py-1 font-medium transition {{ $selectedComponentId === $comp->id ? 'bg-crimson-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}"
                         >
-                            {{ $comp->name }} ({{ $comp->code }})
+                            {{ __($comp->name) }} ({{ $comp->code }})
                         </a>
                     @endforeach
                 </div>
@@ -396,8 +396,8 @@
                                             </span>
                                         </span>
                                     </td>
-                                    <td class="whitespace-nowrap px-5 py-3.5 text-xs text-slate-500 dark:text-slate-400" x-text="groups[{{ $index }}].lastUpdated">
-                                        {{ $item['lastUpdated'] }}
+                                    <td class="whitespace-nowrap px-5 py-3.5 text-xs text-slate-500 dark:text-slate-400" x-text="window.__ ? window.__(groups[{{ $index }}].lastUpdated) : groups[{{ $index }}].lastUpdated">
+                                        {{ __($item['lastUpdated']) }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-end">
                                         @if (auth()->user()?->hasPermission('inventory.adjust'))
@@ -586,7 +586,7 @@
                                             <x-bdms.blood-group-badge :group="$unit->blood_group" size="sm" />
                                         </td>
                                         <td class="whitespace-nowrap px-5 py-3 text-slate-700 dark:text-slate-300">
-                                            {{ $unit->bloodComponent?->name }} ({{ $unit->volume_ml }} mL)
+                                            {{ __($unit->bloodComponent?->name) }} ({{ $unit->volume_ml }} mL)
                                         </td>
                                         <td class="whitespace-nowrap px-5 py-3">
                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 font-medium ring-1 ring-inset {{ $unitBadge }}">
@@ -793,7 +793,7 @@
                             >
                                 @foreach ($stockBuckets as $bucket)
                                     <option value="{{ $bucket->id }}">
-                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} ({{ __('Available') }}: {{ $bucket->available_units }}, {{ __('Reserved') }}: {{ $bucket->reserved_units }})
+                                        {{ $bucket->blood_group }} &middot; {{ __($bucket->bloodComponent?->name) }} ({{ __('Available') }}: {{ $bucket->available_units }}, {{ __('Reserved') }}: {{ $bucket->reserved_units }})
                                     </option>
                                 @endforeach
                             </select>
@@ -859,7 +859,7 @@
                             >
                                 @foreach ($stockBuckets as $bucket)
                                     <option value="{{ $bucket->id }}">
-                                        {{ $bucket->blood_group }} &middot; {{ $bucket->bloodComponent?->name }} ({{ __('Available') }}: {{ $bucket->available_units }})
+                                        {{ $bucket->blood_group }} &middot; {{ __($bucket->bloodComponent?->name) }} ({{ __('Available') }}: {{ $bucket->available_units }})
                                     </option>
                                 @endforeach
                             </select>

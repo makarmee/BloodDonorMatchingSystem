@@ -153,7 +153,7 @@
                             >
                                 <option value="all">{{ __('All Locations') }}</option>
                                 @foreach ($locations as $location)
-                                    <option value="{{ $location }}">{{ $location }}</option>
+                                    <option value="{{ $location }}">{{ __($location) }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -233,24 +233,24 @@
                                             href="{{ route('camps.show', $camp['id']) }}"
                                             class="font-semibold text-slate-900 transition hover:text-crimson-600 dark:text-white dark:hover:text-crimson-400"
                                         >
-                                            {{ $camp['name'] }}
+                                            {{ __($camp['name']) }}
                                         </a>
                                         <p class="text-xs text-slate-500 dark:text-slate-400">
-                                            {{ $camp['venueName'] }}
+                                            {{ __($camp['venueName']) }}
                                         </p>
                                     </div>
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                                    {{ $camp['city'] }}
+                                    {{ __($camp['city']) }}
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                                    {{ $camp['startDateFormatted'] }}
+                                    {{ __($camp['startDateFormatted']) }}
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                                    {{ $camp['endDateFormatted'] }}
+                                    {{ __($camp['endDateFormatted']) }}
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap font-mono text-xs text-slate-700 dark:text-slate-200 dir-ltr text-start">
@@ -258,7 +258,7 @@
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                                    {{ $camp['organizerName'] }}
+                                    {{ __($camp['organizerName']) }}
                                 </td>
 
                                 <td class="px-5 py-4 whitespace-nowrap font-semibold text-slate-800 dark:text-slate-200">

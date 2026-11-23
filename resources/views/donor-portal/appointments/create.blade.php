@@ -154,7 +154,7 @@
                                     <optgroup :label="__('Permanent Donation Centers')">
                                         @foreach ($centers as $center)
                                             <option value="center:{{ $center['id'] }}">
-                                                {{ $center['name'] }} ({{ $center['city'] }})
+                                                {{ __($center['name']) }} ({{ __($center['city']) }})
                                             </option>
                                         @endforeach
                                     </optgroup>
@@ -162,7 +162,7 @@
                                     <optgroup :label="__('Donation Camps (Sample Schedule)')">
                                         @foreach ($camps as $camp)
                                             <option value="camp:{{ $camp['id'] }}">
-                                                {{ $camp['name'] }} &mdash; {{ $camp['startDateFormatted'] }} [{{ __($camp['status']) }}, {{ $camp['availableSlots'] }} {{ __('slots left') }}]
+                                                {{ __($camp['name']) }} &mdash; {{ $camp['startDateFormatted'] }} [{{ __($camp['status']) }}, {{ $camp['availableSlots'] }} {{ __('slots left') }}]
                                             </option>
                                         @endforeach
                                     </optgroup>

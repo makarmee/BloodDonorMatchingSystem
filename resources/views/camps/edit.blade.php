@@ -34,7 +34,7 @@
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ __('Update schedule, location, capacity limits, or requirements for :name.', ['name' => $camp['name']]) }}
+                    {{ __('Update schedule, location, capacity limits, or requirements for :name.', ['name' => __($camp['name'])]) }}
                 </p>
             </div>
 

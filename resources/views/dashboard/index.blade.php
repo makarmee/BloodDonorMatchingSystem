@@ -126,7 +126,7 @@
                                         {{ $row['reference'] }}
                                     </td>
                                     <td class="px-5 py-3.5 font-medium text-slate-900 dark:text-white">
-                                        {{ $row['subject'] }}
+                                        {{ __($row['subject']) }}
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5">
                                         <x-bdms.blood-group-badge :group="$row['group']" size="sm" />
@@ -138,7 +138,7 @@
                                         <x-bdms.urgency-badge :level="$row['status']" />
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3.5 text-end text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $row['time'] }}
+                                        {{ __($row['time']) }}
                                     </td>
                                 </tr>
                             @empty

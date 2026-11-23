@@ -188,7 +188,7 @@
 
                         <div class="flex items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs dark:border-slate-800">
                             <span class="text-slate-500 dark:text-slate-400">
-                                {{ __('Updated') }} {{ $item['lastUpdated'] }}
+                                {{ __('Updated') }} {{ __($item['lastUpdated']) }}
                             </span>
                             <a
                                 href="{{ route('public.camps.index') }}"

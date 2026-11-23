@@ -401,7 +401,7 @@ class PublicPortalController extends Controller
         } elseif ($status === 'Upcoming' && $deadlinePassed) {
             $availabilityState = 'deadline_passed';
             $availabilityLabel = 'Registration Closed';
-            $availabilityNote = 'Advance booking closed on '.$camp['registrationDeadlineFormatted'].'.';
+            $availabilityNote = __('Advance booking closed on :date.', ['date' => $camp['registrationDeadlineFormatted']]);
             $isBookingOpen = false;
         } elseif ($status === 'Ongoing' && ! $allowWalkIn) {
             $availabilityState = 'walk_in_closed';
@@ -416,7 +416,7 @@ class PublicPortalController extends Controller
         } else {
             $availabilityState = 'open';
             $availabilityLabel = 'Open for Registration';
-            $availabilityNote = 'Booking open through '.$camp['registrationDeadlineFormatted'].'.';
+            $availabilityNote = __('Booking open through :date.', ['date' => $camp['registrationDeadlineFormatted']]);
             $isBookingOpen = true;
         }
 

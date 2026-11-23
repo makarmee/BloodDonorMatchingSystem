@@ -279,7 +279,7 @@
 
                 <div class="rounded-xl border border-slate-200 p-3.5 text-xs dark:border-slate-800">
                     <p class="font-semibold text-slate-800 dark:text-slate-200">{{ __('Additional Notes') }}</p>
-                    <p class="mt-1 text-slate-600 dark:text-slate-300" x-text="selectedDonation?.donorNote"></p>
+                    <p class="mt-1 text-slate-600 dark:text-slate-300" x-text="window.__ ? window.__(selectedDonation?.donorNote) : selectedDonation?.donorNote"></p>
                     <p class="mt-2 text-[11px] text-slate-400">
                         {{ __('Historical donation and laboratory screening records are read-only and managed by authorized blood bank personnel.') }}
                     </p>

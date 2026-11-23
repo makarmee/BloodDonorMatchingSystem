@@ -33,7 +33,7 @@
                 @if ($valueBind) x-text="{{ $valueBind }}" @endif
                 class="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-white"
             >
-                {{ $value }}
+                {{ is_numeric($value) ? $value : __($value) }}
             </p>
         </div>
 

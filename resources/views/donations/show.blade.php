@@ -173,7 +173,7 @@
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
                             <dt class="text-slate-500 dark:text-slate-400">{{ __('Full Name') }}</dt>
-                            <dd class="font-semibold text-slate-900 dark:text-white">{{ $donation['donorName'] }}</dd>
+                            <dd class="font-semibold text-slate-900 dark:text-white">{{ __($donation['donorName']) }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">

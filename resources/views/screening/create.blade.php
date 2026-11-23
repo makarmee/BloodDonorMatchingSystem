@@ -1,12 +1,12 @@
 @php
     $donationOptions = collect($donations)
         ->mapWithKeys(fn (array $item): array => [
-            $item['id'] => "{$item['id']} — {$item['donorName']} ({$item['bloodGroup']} · {$item['donationType']})",
+            $item['id'] => "{$item['id']} — " . __($item['donorName']) . " ({$item['bloodGroup']} · " . __($item['donationType']) . ")",
         ])
         ->all();
 
     $testTypeOptions = collect($testTypes)
-        ->mapWithKeys(fn (string $type): array => [$type => $type])
+        ->mapWithKeys(fn (string $type): array => [$type => __($type)])
         ->all();
 
     $screeningResultOptions = [
@@ -92,7 +92,7 @@
             <button
                 type="button"
                 @click="dismissFeedback()"
-                :aria-label="__('Dismiss message')"
+                aria-label="{{ __('Dismiss message') }}"
                 class="rounded-lg p-1 opacity-70 transition hover:opacity-100 cursor-pointer"
             >
                 <x-icons.icon name="x-mark" class="size-4" />
@@ -142,7 +142,7 @@
                                         <div>
                                             <span class="font-mono text-xs font-bold text-slate-900 dark:text-white dir-ltr text-start" x-text="item.id"></span>
                                             <span class="mx-1.5 text-slate-400">&middot;</span>
-                                            <span class="font-medium text-slate-800 dark:text-slate-200" x-text="item.donorName"></span>
+                                            <span class="font-medium text-slate-800 dark:text-slate-200" x-text="window.__ ? window.__(item.donorName) : item.donorName"></span>
                                         </div>
                                         <span
                                             class="inline-flex items-center rounded-md bg-crimson-50 px-2 py-0.5 text-xs font-bold text-crimson-700 ring-1 ring-crimson-200 dark:bg-crimson-950/60 dark:text-crimson-300 dark:ring-crimson-800"
@@ -193,7 +193,7 @@
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Donor Name') }}</p>
                                     <p
                                         class="mt-0.5 text-sm font-bold text-slate-900 dark:text-white"
-                                        x-text="selectedDonation ? selectedDonation.donorName : '{{ __('Not selected') }}'"
+                                        x-text="selectedDonation ? (window.__ ? window.__(selectedDonation.donorName) : selectedDonation.donorName) : '{{ __('Not selected') }}'"
                                     ></p>
                                 </div>
 
@@ -216,7 +216,7 @@
                                 </p>
                                 <p class="text-slate-500 dark:text-slate-400">
                                     {{ __('Collected') }}:
-                                    <span class="font-medium text-slate-800 dark:text-slate-200" x-text="`${selectedDonation?.collectionDateFormatted} · ${selectedDonation?.donationType} (${selectedDonation?.quantityMl} ml)`"></span>
+                                    <span class="font-medium text-slate-800 dark:text-slate-200" x-text="`${selectedDonation?.collectionDateFormatted} · ${window.__ ? window.__(selectedDonation?.donationType) : selectedDonation?.donationType} (${selectedDonation?.quantityMl} {{ __('ml') }})`"></span>
                                 </p>
                             </div>
                         </div>

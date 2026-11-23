@@ -154,9 +154,9 @@
                             aria-label="{{ __('Drives per page') }}"
                             class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 focus:border-crimson-500 focus:outline-none focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200"
                         >
-                            <option value="4">4 / {{ __('page') }}</option>
-                            <option value="6">6 / {{ __('page') }}</option>
-                            <option value="12">12 / {{ __('page') }}</option>
+                            <option value="4">{{ __(':count / page', ['count' => 4]) }}</option>
+                            <option value="6">{{ __(':count / page', ['count' => 6]) }}</option>
+                            <option value="12">{{ __(':count / page', ['count' => 12]) }}</option>
                         </select>
                     </div>
                 </div>
@@ -193,11 +193,11 @@
                             <div>
                                 <h3 class="text-lg font-semibold text-slate-900 dark:text-white">
                                     <a href="{{ route('public.camps.show', $camp['id']) }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">
-                                        {{ $camp['name'] }}
+                                        {{ __($camp['name']) }}
                                     </a>
                                 </h3>
                                 <p class="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                                    {{ $camp['description'] }}
+                                    {{ __($camp['description']) }}
                                 </p>
                             </div>
 
@@ -215,8 +215,8 @@
                                     <x-icons.icon name="map-pin" class="size-4 text-slate-400 shrink-0 mt-0.5" />
                                     <div>
                                         <dt class="sr-only">{{ __('Venue') }}</dt>
-                                        <dd class="font-medium text-slate-900 dark:text-white">{{ $camp['venueName'] }}</dd>
-                                        <dd class="text-slate-500 dark:text-slate-400">{{ $camp['fullAddress'] }}, {{ $camp['city'] }}</dd>
+                                        <dd class="font-medium text-slate-900 dark:text-white">{{ __($camp['venueName']) }}</dd>
+                                        <dd class="text-slate-500 dark:text-slate-400">{{ __($camp['fullAddress']) }}, {{ __($camp['city']) }}</dd>
                                     </div>
                                 </div>
                             </dl>

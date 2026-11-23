@@ -39,7 +39,7 @@
 
                     <div class="mt-1.5 flex flex-wrap items-center gap-2.5">
                         <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                            {{ $donor['name'] }}
+                            {{ __($donor['name']) }}
                         </h1>
                         <x-bdms.blood-group-badge :group="$donor['bloodGroup']" size="md" />
                         <x-ui.badge :variant="$eligibilityVariant" :dot="true">
@@ -166,7 +166,7 @@
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
                             <dt class="text-slate-500 dark:text-slate-400">{{ __('Full Name') }}</dt>
-                            <dd class="font-medium text-slate-900 dark:text-white">{{ $donor['name'] }}</dd>
+                            <dd class="font-medium text-slate-900 dark:text-white">{{ __($donor['name']) }}</dd>
                         </div>
 
                         <div class="flex items-center justify-between gap-4 py-2.5">
@@ -289,7 +289,7 @@
                                     {{ __('Donation History') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    {{ __('Recorded blood collections and screening outcomes for :name.', ['name' => $donor['name']]) }}
+                                    {{ __('Recorded blood collections and screening outcomes for :name.', ['name' => __($donor['name'])]) }}
                                 </p>
                             </div>
 

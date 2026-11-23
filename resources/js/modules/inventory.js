@@ -310,7 +310,7 @@ export function inventoryManager(initial) {
             }
 
             target.status = resolveStockStatus(target.available, target.minLevel);
-            target.lastUpdated = 'Just now';
+            target.lastUpdated = window.__ ? window.__('Just now') : 'Just now';
 
             const now = new Date();
             const formattedDate = now.toLocaleDateString('en-US', {

@@ -31,11 +31,11 @@
                     </div>
 
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
-                        {{ $camp['name'] }}
+                        {{ __($camp['name']) }}
                     </h1>
 
                     <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                        {{ $camp['description'] }}
+                        {{ __($camp['description']) }}
                     </p>
                 </div>
 
@@ -66,7 +66,7 @@
                     </x-ui.alert>
                 @else
                     <x-ui.alert variant="warning" :title="__($camp['availabilityLabel'])" :dismissible="false">
-                        {{ $camp['availabilityNote'] }} {{ __('You can return to the public directory to select another active camp.') }}
+                        {{ __($camp['availabilityNote']) }} {{ __('You can return to the public directory to select another active camp.') }}
                     </x-ui.alert>
                 @endif
             </div>
@@ -88,17 +88,17 @@
                     <dl class="space-y-4 text-sm">
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Venue Name') }}</dt>
-                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">{{ $camp['venueName'] }}</dd>
+                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($camp['venueName']) }}</dd>
                         </div>
 
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Street Address & District') }}</dt>
-                            <dd class="mt-1 text-slate-700 dark:text-slate-300">{{ $camp['fullAddress'] }}, {{ $camp['city'] }}</dd>
+                            <dd class="mt-1 text-slate-700 dark:text-slate-300">{{ __($camp['fullAddress']) }}, {{ __($camp['city']) }}</dd>
                         </div>
 
                         <div>
                             <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Arrival & Parking Guidance') }}</dt>
-                            <dd class="mt-1 text-slate-600 dark:text-slate-400">{{ $camp['locationNotes'] }}</dd>
+                            <dd class="mt-1 text-slate-600 dark:text-slate-400">{{ __($camp['locationNotes']) }}</dd>
                         </div>
                     </dl>
                 </x-ui.card>
@@ -116,12 +116,12 @@
                     <div class="space-y-4 text-sm text-slate-600 dark:text-slate-300">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Intake Requirements') }}</p>
-                            <p class="mt-1 leading-relaxed">{{ $camp['donorRequirements'] }}</p>
+                            <p class="mt-1 leading-relaxed">{{ __($camp['donorRequirements']) }}</p>
                         </div>
 
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Drive Notice') }}</p>
-                            <p class="mt-1 leading-relaxed">{{ $camp['additionalNotes'] }}</p>
+                            <p class="mt-1 leading-relaxed">{{ __($camp['additionalNotes']) }}</p>
                         </div>
                     </div>
                 </x-ui.card>

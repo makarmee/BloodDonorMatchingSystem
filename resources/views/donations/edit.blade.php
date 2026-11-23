@@ -22,7 +22,7 @@
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ __('Update collection parameters, attending staff, screening findings, or collection status for :donor.', ['donor' => $donation['donorName']]) }}
+                    {{ __('Update collection parameters, attending staff, screening findings, or collection status for :donor.', ['donor' => __($donation['donorName'])]) }}
                 </p>
             </div>
 

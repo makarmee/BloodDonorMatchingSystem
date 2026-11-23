@@ -34,7 +34,7 @@
 
                 <div class="mt-2 flex flex-wrap items-center gap-2.5">
                     <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                        {{ $camp['name'] }}
+                        {{ __($camp['name']) }}
                     </h1>
                     <span class="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200 dir-ltr">
                         {{ $camp['id'] }}
@@ -45,7 +45,7 @@
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ $camp['venueName'] }}, {{ $camp['city'] }} &middot; {{ $camp['startDateFormatted'] }} {{ __('to') }} {{ $camp['endDateFormatted'] }} &middot; <span class="dir-ltr">{{ $camp['startTime'] }}&ndash;{{ $camp['endTime'] }}</span>
+                    {{ __($camp['venueName']) }}, {{ __($camp['city']) }} &middot; {{ __($camp['startDateFormatted']) }} {{ __('to') }} {{ __($camp['endDateFormatted']) }} &middot; <span class="dir-ltr">{{ $camp['startTime'] }}&ndash;{{ $camp['endTime'] }}</span>
                 </p>
             </div>
 
@@ -140,17 +140,17 @@
                                     {{ __('Location & Venue') }}
                                 </p>
                                 <p class="mt-1.5 text-sm font-semibold text-slate-900 dark:text-white">
-                                    {{ $camp['venueName'] }}
+                                    {{ __($camp['venueName']) }}
                                 </p>
                                 <p class="mt-0.5 text-sm text-slate-600 dark:text-slate-300">
-                                    {{ $camp['fullAddress'] }}
+                                    {{ __($camp['fullAddress']) }}
                                 </p>
                                 <p class="mt-0.5 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                    {{ __('City') }}: {{ $camp['city'] }}
+                                    {{ __('City') }}: {{ __($camp['city']) }}
                                 </p>
                                 @if (! empty($camp['locationNotes']))
                                     <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                        {{ $camp['locationNotes'] }}
+                                        {{ __($camp['locationNotes']) }}
                                     </p>
                                 @endif
                             </div>
@@ -163,7 +163,7 @@
                                     <div class="flex items-center justify-between gap-2">
                                         <dt class="text-slate-500 dark:text-slate-400">{{ __('Dates') }}</dt>
                                         <dd class="font-medium text-slate-900 dark:text-white">
-                                            {{ $camp['startDateFormatted'] }} &ndash; {{ $camp['endDateFormatted'] }}
+                                            {{ __($camp['startDateFormatted']) }} &ndash; {{ __($camp['endDateFormatted']) }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">
@@ -175,7 +175,7 @@
                                     <div class="flex items-center justify-between gap-2">
                                         <dt class="text-slate-500 dark:text-slate-400">{{ __('Organizer') }}</dt>
                                         <dd class="font-medium text-slate-900 dark:text-white">
-                                            {{ $camp['organizerName'] }}
+                                            {{ __($camp['organizerName']) }}
                                         </dd>
                                     </div>
                                     <div class="flex items-center justify-between gap-2">

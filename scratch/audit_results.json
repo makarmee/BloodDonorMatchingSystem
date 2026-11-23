@@ -1,0 +1,95 @@
+{
+    "home": [],
+    "public.stock": [
+        "AB-\n                                                            O"
+    ],
+    "public.camps.index": [
+        "Upcoming\n                                                            Ongoing\n                                                    \n\n                        \n\n                        \n                            4"
+    ],
+    "public.camps.show": [
+        "Not Found\n\n        \n\n        \n    \n    \n        \n            \n                \n                    \n                        404                    \n\n                    \n                        Not Found"
+    ],
+    "login": [],
+    "register": [
+        "AB-\n            \n                    \n                O"
+    ],
+    "password.request": [
+        "Reset Password"
+    ],
+    "dashboard": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "hospitals.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "inventory.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "inventory.reconcile": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donors.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donors.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donations.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donations.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "screening.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "screening.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "requests.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "requests.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "camps.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "camps.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donor-portal.dashboard": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donor-portal.appointments.index": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donor-portal.appointments.create": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donor-portal.eligibility": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ],
+    "donor-portal.history": [
+        "Redirecting to http",
+        "login\n    \n    \n        Redirecting to http"
+    ]
+}

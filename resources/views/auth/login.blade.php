@@ -1,4 +1,4 @@
-<x-guest-layout title="Sign in" :minimal="true">
+<x-guest-layout :title="__('Sign in')" :minimal="true">
     <div class="min-h-screen grid lg:grid-cols-2">
         {{-- Left branding panel --}}
         <div class="hidden lg:flex flex-col justify-between bg-slate-900 p-10 text-white relative overflow-hidden">

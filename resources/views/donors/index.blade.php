@@ -217,7 +217,7 @@
                                                 href="{{ route('donors.show', $donor['id']) }}"
                                                 class="font-semibold text-slate-900 transition hover:text-crimson-600 dark:text-white dark:hover:text-crimson-400"
                                             >
-                                                {{ $donor['name'] }}
+                                                {{ __($donor['name']) }}
                                             </a>
                                             <p class="text-xs text-slate-500 dark:text-slate-400 dir-ltr text-start">
                                                 {{ $donor['email'] }}

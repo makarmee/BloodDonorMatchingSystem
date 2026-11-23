@@ -108,7 +108,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Total Available Units',
                 'value' => number_format($totalUnits),
-                'trend' => $unitsAddedToday > 0 ? "+{$unitsAddedToday} screened units added today" : 'Screened units in inventory',
+                'trend' => $unitsAddedToday > 0 ? __(':count screened units added today', ['count' => "+{$unitsAddedToday}"]) : __('Screened units in inventory'),
                 'trendTone' => $unitsAddedToday > 0 ? 'up' : 'neutral',
                 'icon' => 'droplet',
                 'accent' => 'crimson',
@@ -116,7 +116,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Registered Donors',
                 'value' => number_format($totalDonors),
-                'trend' => "{$activeDonors} active registered donors",
+                'trend' => __(':count active registered donors', ['count' => $activeDonors]),
                 'trendTone' => 'up',
                 'icon' => 'users',
                 'accent' => 'sky',
@@ -124,7 +124,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Pending Requests',
                 'value' => number_format($pendingRequests),
-                'trend' => "{$criticalRequests} critical priority requests",
+                'trend' => __(':count critical priority requests', ['count' => $criticalRequests]),
                 'trendTone' => $criticalRequests > 0 ? 'down' : 'neutral',
                 'icon' => 'clipboard-list',
                 'accent' => 'amber',
@@ -152,7 +152,7 @@ class DashboardController extends Controller
                     'reference' => $req->request_code,
                     'subject' => $req->hospital?->name ?? 'Hospital Request',
                     'group' => $req->blood_group,
-                    'quantity' => "{$req->requested_units} Units",
+                    'quantity' => __(':count Units', ['count' => $req->requested_units]),
                     'status' => strtolower($req->priority ?? 'routine'),
                     'time' => $req->created_at?->diffForHumans() ?? 'Recently',
                 ];
@@ -169,7 +169,7 @@ class DashboardController extends Controller
                     'reference' => $don->donation_code,
                     'subject' => $don->donor?->full_name ?? ($don->collection_location_name ?? 'Donation Intake'),
                     'group' => $don->blood_group,
-                    'quantity' => "{$don->quantity_ml} ml",
+                    'quantity' => __(':count ml', ['count' => $don->quantity_ml]),
                     'status' => strtolower($don->collection_status === 'Completed' ? 'fulfilled' : 'routine'),
                     'time' => $don->created_at?->diffForHumans() ?? 'Recently',
                 ];
@@ -212,7 +212,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Active Blood Requests',
                 'value' => number_format($activeCount),
-                'trend' => $activeCount > 0 ? "{$activeCount} requests in fulfillment queue" : 'No active requests',
+                'trend' => $activeCount > 0 ? __(':count requests in fulfillment queue', ['count' => $activeCount]) : __('No active requests'),
                 'trendTone' => $activeCount > 0 ? 'down' : 'neutral',
                 'icon' => 'clipboard-list',
                 'accent' => 'crimson',
@@ -220,7 +220,7 @@ class DashboardController extends Controller
             [
                 'label' => 'Units Fulfilled (30d)',
                 'value' => number_format($fulfilledUnits30d),
-                'trend' => "{$fulfilledCount} requests successfully fulfilled",
+                'trend' => __(':count requests successfully fulfilled', ['count' => $fulfilledCount]),
                 'trendTone' => 'up',
                 'icon' => 'check-circle',
                 'accent' => 'emerald',
@@ -258,7 +258,7 @@ class DashboardController extends Controller
                 'reference' => $req->request_code,
                 'subject' => $req->hospital?->name ?? 'Hospital Request',
                 'group' => $req->blood_group,
-                'quantity' => "{$req->requested_units} Units",
+                'quantity' => __(':count Units', ['count' => $req->requested_units]),
                 'status' => strtolower($req->priority ?? 'routine'),
                 'time' => $req->created_at?->diffForHumans() ?? 'Recently',
             ];
@@ -342,7 +342,7 @@ class DashboardController extends Controller
                 'reference' => $scr->screening_code,
                 'subject' => $scr->testType?->name ?? 'Screening Assay',
                 'group' => $scr->donation?->blood_group ?? 'N/A',
-                'quantity' => '1 Specimen',
+                'quantity' => __('1 Specimen'),
                 'status' => $status,
                 'time' => $scr->created_at?->diffForHumans() ?? 'Recently',
             ];
@@ -433,7 +433,7 @@ class DashboardController extends Controller
                     'reference' => $don->donation_code,
                     'subject' => $don->collection_location_name ?? 'Donation Center',
                     'group' => $don->blood_group,
-                    'quantity' => "{$don->quantity_ml} ml",
+                    'quantity' => __(':count ml', ['count' => $don->quantity_ml]),
                     'status' => strtolower($don->collection_status === 'Completed' ? 'completed' : 'pending'),
                     'time' => $don->donation_date?->format('M d, Y') ?? 'Recorded',
                 ];

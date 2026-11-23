@@ -1,4 +1,4 @@
-<x-guest-layout title="Home">
+<x-guest-layout :title="__('Home')">
     @php
         $priorityGroups = $bloodStock;
         usort($priorityGroups, static function (array $a, array $b): int {
@@ -162,7 +162,7 @@
                     />
                     <div class="flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
                         <span>{{ __('Min target') }}: {{ $item['minLevel'] }} {{ __('units') }}</span>
-                        <span>{{ $item['lastUpdated'] }}</span>
+                        <span>{{ __($item['lastUpdated']) }}</span>
                     </div>
                 </x-ui.card>
             @endforeach
@@ -249,18 +249,18 @@
                 <x-ui.card class="flex flex-col justify-between gap-5">
                     <div>
                         <div class="flex flex-wrap items-center justify-between gap-2">
-                            <x-ui.badge :variant="$statusVariant" :dot="true">{{ $camp['status'] }}</x-ui.badge>
-                            <x-ui.badge :variant="$availabilityVariant">{{ $camp['availabilityLabel'] }}</x-ui.badge>
+                            <x-ui.badge :variant="$statusVariant" :dot="true">{{ __($camp['status']) }}</x-ui.badge>
+                            <x-ui.badge :variant="$availabilityVariant">{{ __($camp['availabilityLabel']) }}</x-ui.badge>
                         </div>
 
                         <h3 class="mt-3 text-base font-semibold text-slate-900 dark:text-white">
                             <a href="{{ route('public.camps.show', $camp['id']) }}" class="hover:text-crimson-600 dark:hover:text-crimson-400 transition">
-                                {{ $camp['name'] }}
+                                {{ __($camp['name']) }}
                             </a>
                         </h3>
 
                         <p class="mt-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                            {{ $camp['description'] }}
+                            {{ __($camp['description']) }}
                         </p>
 
                         <dl class="mt-4 space-y-2 text-xs text-slate-600 dark:text-slate-400">
@@ -270,11 +270,11 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <x-icons.icon name="clock" class="size-4 text-slate-400 shrink-0" />
-                                <dd>{{ $camp['startTime'] }} &ndash; {{ $camp['endTime'] }} &bull; {{ $camp['availableSlots'] }} of {{ $camp['capacity'] }} slots left</dd>
+                                <dd><span class="dir-ltr">{{ $camp['startTime'] }} &ndash; {{ $camp['endTime'] }}</span> &bull; {{ __(':available of :capacity slots left', ['available' => $camp['availableSlots'], 'capacity' => $camp['capacity']]) }}</dd>
                             </div>
                             <div class="flex items-center gap-2">
                                 <x-icons.icon name="map-pin" class="size-4 text-slate-400 shrink-0" />
-                                <dd>{{ $camp['venueName'] }}, {{ $camp['city'] }}</dd>
+                                <dd>{{ __($camp['venueName']) }}, {{ __($camp['city']) }}</dd>
                             </div>
                         </dl>
                     </div>
@@ -431,7 +431,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Support Phone') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white dir-ltr">{{ $contactInfo['phone'] }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white dir-ltr">{{ __($contactInfo['phone']) }}</dd>
                             </div>
                         </div>
 
@@ -441,7 +441,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Support Email') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white dir-ltr">{{ $contactInfo['email'] }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white dir-ltr">{{ __($contactInfo['email']) }}</dd>
                             </div>
                         </div>
 
@@ -451,7 +451,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Regional Hub') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $contactInfo['address'] }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ __($contactInfo['address']) }}</dd>
                             </div>
                         </div>
 
@@ -461,7 +461,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Service Window') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $contactInfo['hours'] }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ __($contactInfo['hours']) }}</dd>
                             </div>
                         </div>
                     </dl>

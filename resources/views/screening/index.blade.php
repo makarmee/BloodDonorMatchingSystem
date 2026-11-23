@@ -158,7 +158,7 @@
                             >
                                 <option value="all">{{ __('All Test Types') }}</option>
                                 @foreach ($testTypes as $testType)
-                                    <option value="{{ $testType }}">{{ $testType }}</option>
+                                    <option value="{{ $testType }}">{{ __($testType) }}</option>
                                 @endforeach
                             </select>
                         </div>
@@ -243,7 +243,7 @@
                                             href="{{ route('donors.show', $sample['donorId']) }}"
                                             class="font-semibold text-slate-900 transition hover:text-crimson-600 dark:text-white dark:hover:text-crimson-400"
                                         >
-                                            {{ $sample['donorName'] }}
+                                            {{ __($sample['donorName']) }}
                                         </a>
                                         <p class="font-mono text-xs text-slate-500 dark:text-slate-400 dir-ltr text-start">
                                             {{ $sample['donorId'] }}
@@ -261,14 +261,14 @@
 
                                 <td class="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-200">
                                     @if ($sample['testDate'])
-                                        <span>{{ $sample['testDateFormatted'] }}</span>
+                                        <span>{{ __($sample['testDateFormatted']) }}</span>
                                     @else
-                                        <span class="text-xs text-slate-400 italic dark:text-slate-500">{{ $sample['testDateFormatted'] }}</span>
+                                        <span class="text-xs text-slate-400 italic dark:text-slate-500">{{ __($sample['testDateFormatted']) }}</span>
                                     @endif
                                 </td>
 
                                 <td class="px-6 py-4 whitespace-nowrap font-medium text-slate-700 dark:text-slate-200">
-                                    {{ $sample['testType'] }}
+                                    {{ __($sample['testType']) }}
                                 </td>
 
                                 <td class="px-6 py-4 whitespace-nowrap">
