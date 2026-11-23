@@ -6,7 +6,6 @@ use App\Models\Donor;
 use App\Models\Hospital;
 use App\Models\Role;
 use App\Models\User;
-use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -212,4 +211,3 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
     }
 }
-
