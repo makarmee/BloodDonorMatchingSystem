@@ -173,7 +173,7 @@ return [
         'component_type' => 'نوع فرآورده خونی',
         'units_requested' => 'تعداد واحد درخواستی',
         'urgency' => 'درجه فوریت',
-        'hospital_name' => 'نام بیمارستان',
+        'hospital_name' => 'نام شفاخانه',
         'license_number' => 'شماره مجوز',
         'city' => 'شهر',
         'address' => 'نشانی',

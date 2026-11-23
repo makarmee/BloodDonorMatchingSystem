@@ -47,7 +47,7 @@ class VisualPersianTranslationAuditTest extends TestCase
 
         // Create Hospital & Hospital Coordinator
         $hospitalRole = Role::where('slug', 'hospital')->firstOrFail();
-        $this->hospitalUser = User::factory()->create(['name' => 'مسئول هماهنگی بیمارستان', 'is_active' => true]);
+        $this->hospitalUser = User::factory()->create(['name' => 'مسئول هماهنگی شفاخانه', 'is_active' => true]);
         $this->hospitalUser->roles()->attach($hospitalRole);
         $hospital = Hospital::create([
             'hospital_code' => 'HSP-TEST-01',
@@ -56,7 +56,7 @@ class VisualPersianTranslationAuditTest extends TestCase
             'facility_type' => 'General Hospital',
             'contact_phone' => '+1 (555) 019-2834',
             'contact_email' => 'transfusion@citygeneral.invalid',
-            'address' => 'بلوار بیمارستان ۱۰۰، بال سی',
+            'address' => 'بلوار شفاخانه ۱۰۰، بال سی',
             'verification_status' => 'Verified',
             'verified_at' => now(),
             'verified_by_user_id' => $this->admin->id,
