@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BloodComponent;
 use App\Models\BloodRequest;
 use App\Models\BloodUnit;
 use App\Models\Donation;
+use App\Models\DonationCamp;
 use App\Models\DonationCenter;
 use App\Models\Donor;
 use App\Models\DonorAppointment;
@@ -13,6 +15,7 @@ use App\Models\InventoryStock;
 use App\Models\ScreeningRecord;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -36,10 +39,16 @@ class DashboardController extends Controller
 
         $portalData = $this->portalPayload($activeRole, $user, $hospital);
 
+        $donationFormData = [];
+        if (in_array($activeRole, ['admin', 'staff'], true)) {
+            $donationFormData = $this->buildDonationFormData();
+        }
+
         return view('dashboard.index', [
             'activeRole' => $activeRole,
             'portalData' => $portalData,
             'hospital' => $hospital,
+            'donationFormData' => $donationFormData,
         ]);
     }
 
@@ -475,5 +484,83 @@ class DashboardController extends Controller
         usort($snapshot, fn (array $a, array $b): int => $a['units'] <=> $b['units']);
 
         return array_slice($snapshot, 0, 4);
+    }
+
+    /**
+     * Build reference options for the donation registration modal form on the dashboard.
+     *
+     * @return array{
+     *     donors: array<int, array{id: string, name: string, bloodGroup: string, isEligible: bool, eligibilityStatus: string, email: string, phone: string}>,
+     *     centers: Collection<int, DonationCenter>,
+     *     camps: Collection<int, DonationCamp>,
+     *     components: Collection<int, BloodComponent>,
+     * }
+     */
+    private function buildDonationFormData(): array
+    {
+        if (DonationCenter::query()->count() === 0) {
+            DonationCenter::query()->create([
+                'center_code' => 'CTR-001',
+                'name' => 'Main Blood Donation Center',
+                'address' => 'Central Plaza, Suite 100',
+                'city' => 'Central City',
+                'operating_hours' => '08:00 - 18:00',
+                'default_slot_capacity' => 5,
+                'is_active' => true,
+            ]);
+            DonationCenter::query()->create([
+                'center_code' => 'CTR-002',
+                'name' => 'Westgate Transfusion Suite',
+                'address' => '450 Westgate Blvd',
+                'city' => 'Westgate',
+                'operating_hours' => '09:00 - 17:00',
+                'default_slot_capacity' => 4,
+                'is_active' => true,
+            ]);
+        }
+
+        $donors = Donor::query()
+            ->active()
+            ->with(['currentEligibilityRecord'])
+            ->orderBy('full_name')
+            ->get()
+            ->map(function (Donor $d): array {
+                $isEligible = $d->account_status === 'Active'
+                    && $d->profile_completed
+                    && ($d->currentEligibilityRecord?->eligibility_status === 'Eligible' || $d->eligibility_status === 'Eligible');
+
+                return [
+                    'id' => $d->donor_code,
+                    'name' => $d->full_name,
+                    'bloodGroup' => $d->blood_group,
+                    'isEligible' => (bool) $isEligible,
+                    'eligibilityStatus' => $d->currentEligibilityRecord?->eligibility_status ?? $d->eligibility_status ?? 'Unknown',
+                    'email' => $d->email,
+                    'phone' => $d->phone ?? '',
+                ];
+            })
+            ->all();
+
+        $centers = DonationCenter::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'center_code', 'name', 'city']);
+
+        $camps = DonationCamp::query()
+            ->whereIn('status', ['Upcoming', 'Ongoing'])
+            ->orderBy('name')
+            ->get(['id', 'camp_code', 'name', 'city', 'venue_name']);
+
+        $components = BloodComponent::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'code', 'name', 'standard_volume_ml']);
+
+        return [
+            'donors' => $donors,
+            'centers' => $centers,
+            'camps' => $camps,
+            'components' => $components,
+        ];
     }
 }

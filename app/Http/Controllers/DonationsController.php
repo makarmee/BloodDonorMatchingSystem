@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\BloodComponent;
 use App\Models\Donation;
+use App\Models\DonationCamp;
+use App\Models\DonationCenter;
 use App\Models\Donor;
 use App\Models\User;
 use App\Services\DonationService;
@@ -180,14 +182,24 @@ class DonationsController extends Controller
 
         $validated = $request->validate([
             'donor_id' => ['required', 'string'],
-            'donation_date' => ['required', 'date', 'before_or_equal:today'],
+            'donation_date' => [
+                'required',
+                'date',
+                Rule::when($request->input('collection_status') === 'Completed', ['before_or_equal:today']),
+            ],
+            'donation_time' => ['nullable', 'string'],
+            'collected_at' => ['nullable', 'date'],
             'donation_type' => ['nullable', 'string'],
+            'blood_component_id' => ['nullable', 'integer', 'exists:blood_components,id'],
+            'center_id' => ['nullable', 'integer', 'exists:donation_centers,id'],
+            'camp_id' => ['nullable', 'integer', 'exists:donation_camps,id'],
             'quantity_ml' => ['required', 'integer', 'min:100', 'max:1000'],
             'collection_location' => ['nullable', 'string', 'max:150'],
             'staff_member' => ['nullable', 'string', 'max:150'],
             'collection_status' => ['required', 'string', Rule::in(['Scheduled', 'Completed'])],
             'collection_notes' => ['nullable', 'string', 'max:1000'],
             'storage_location' => ['nullable', 'string', 'max:120'],
+            'redirect_to' => ['nullable', 'string'],
         ]);
 
         $donor = Donor::where('donor_code', $validated['donor_id'])
@@ -201,19 +213,49 @@ class DonationsController extends Controller
         }
 
         $component = null;
-        if (! empty($validated['donation_type'])) {
-            $component = BloodComponent::where('name', $validated['donation_type'])->first();
+        if (! empty($validated['blood_component_id'])) {
+            $component = BloodComponent::find($validated['blood_component_id']);
+        }
+        if (! $component && ! empty($validated['donation_type'])) {
+            $component = BloodComponent::where('name', $validated['donation_type'])
+                ->orWhere('code', $validated['donation_type'])
+                ->first();
         }
         if (! $component) {
             $component = BloodComponent::where('code', 'WB-450')->orWhere('name', 'Whole Blood')->first();
+        }
+
+        $centerId = ! empty($validated['center_id']) ? (int) $validated['center_id'] : null;
+        $campId = ! empty($validated['camp_id']) ? (int) $validated['camp_id'] : null;
+
+        $locationName = $validated['collection_location'] ?? null;
+        if (! $locationName && $centerId) {
+            $locationName = DonationCenter::find($centerId)?->name;
+        } elseif (! $locationName && $campId) {
+            $camp = DonationCamp::find($campId);
+            $locationName = $camp?->venue_name ?? $camp?->name;
+        }
+
+        $collectedAt = null;
+        if ($validated['collection_status'] === 'Completed') {
+            if (! empty($validated['collected_at'])) {
+                $collectedAt = CarbonImmutable::parse($validated['collected_at']);
+            } elseif (! empty($validated['donation_time'])) {
+                $collectedAt = CarbonImmutable::parse($validated['donation_date'].' '.$validated['donation_time']);
+            } else {
+                $collectedAt = CarbonImmutable::now();
+            }
         }
 
         $donation = $this->donationService->registerDonation($donor, $actor, [
             'blood_component_id' => $component?->id,
             'quantity_ml' => $validated['quantity_ml'],
             'donation_date' => $validated['donation_date'],
+            'collected_at' => $collectedAt,
             'collection_status' => $validated['collection_status'],
-            'collection_location_name' => $validated['collection_location'] ?? 'Main Center',
+            'center_id' => $centerId,
+            'camp_id' => $campId,
+            'collection_location_name' => $locationName ?? 'Main Center',
             'staff_member_name' => $validated['staff_member'] ?? $actor->name,
             'collection_notes' => $validated['collection_notes'] ?? null,
             'storage_location' => $validated['storage_location'] ?? null,
@@ -227,6 +269,12 @@ class DonationsController extends Controller
             } catch (\Throwable $e) {
                 report($e);
             }
+        }
+
+        if (($validated['redirect_to'] ?? null) === 'dashboard') {
+            return redirect()
+                ->route('dashboard')
+                ->with('success', "Donation {$donation->donation_code} registered successfully.");
         }
 
         return redirect()
