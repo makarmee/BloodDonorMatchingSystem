@@ -487,6 +487,65 @@ class DonorsManagementIntegrationTest extends TestCase
         $this->actingAs($hospitalUser)->put(route('donors.update', $donorModel), [])->assertForbidden();
     }
 
+    public function test_donors_directory_authorization_boundaries_across_all_roles_and_multirole_accounts(): void
+    {
+        $hospitalRole = Role::query()->where('slug', 'hospital')->firstOrFail();
+        $donorRole = Role::query()->where('slug', 'donor')->firstOrFail();
+
+        // 1. Admin standalone has access (200 OK)
+        $admin = $this->createUserWithRole('admin');
+        $this->actingAs($admin)->get(route('donors.index'))->assertOk();
+
+        // 2. Multi-role Admin (admin + hospital) has access (200 OK)
+        $adminWithHospital = $this->createUserWithRole('admin');
+        $adminWithHospital->roles()->attach($hospitalRole->id, ['assigned_at' => now()]);
+        $this->actingAs($adminWithHospital->fresh())->get(route('donors.index'))->assertOk();
+
+        // 3. Multi-role Admin (admin + donor) has access (200 OK)
+        $adminWithDonor = $this->createUserWithRole('admin');
+        $adminWithDonor->roles()->attach($donorRole->id, ['assigned_at' => now()]);
+        $this->actingAs($adminWithDonor->fresh())->get(route('donors.index'))->assertOk();
+
+        // 4. Staff standalone has access (200 OK)
+        $staff = $this->createUserWithRole('staff');
+        $this->actingAs($staff)->get(route('donors.index'))->assertOk();
+
+        // 5. Multi-role Staff (staff + hospital) has access (200 OK)
+        $staffWithHospital = $this->createUserWithRole('staff');
+        $staffWithHospital->roles()->attach($hospitalRole->id, ['assigned_at' => now()]);
+        $this->actingAs($staffWithHospital->fresh())->get(route('donors.index'))->assertOk();
+
+        // 6. Lab Officer standalone has access (200 OK)
+        $labOfficer = $this->createUserWithRole('lab_officer');
+        $this->actingAs($labOfficer)->get(route('donors.index'))->assertOk();
+
+        // 7. Multi-role Lab Officer (lab_officer + donor) has access (200 OK)
+        $labOfficerWithDonor = $this->createUserWithRole('lab_officer');
+        $labOfficerWithDonor->roles()->attach($donorRole->id, ['assigned_at' => now()]);
+        $this->actingAs($labOfficerWithDonor->fresh())->get(route('donors.index'))->assertOk();
+
+        // 8. Donor standalone account is forbidden (403 Forbidden)
+        $donor = $this->createUserWithRole('donor');
+        $this->actingAs($donor)->get(route('donors.index'))->assertForbidden();
+
+        // 9. Hospital standalone account is forbidden (403 Forbidden)
+        $hospital = $this->createUserWithRole('hospital');
+        $this->actingAs($hospital)->get(route('donors.index'))->assertForbidden();
+
+        // 10. Multi-role non-operational user (donor + hospital) is forbidden (403 Forbidden)
+        $donorAndHospital = $this->createUserWithRole('donor');
+        $donorAndHospital->roles()->attach($hospitalRole->id, ['assigned_at' => now()]);
+        $this->actingAs($donorAndHospital->fresh())->get(route('donors.index'))->assertForbidden();
+
+        // 11. Inactive admin is forbidden (403 Forbidden)
+        $inactiveAdmin = $this->createUserWithRole('admin', false);
+        $this->actingAs($inactiveAdmin)->get(route('donors.index'))->assertForbidden();
+
+        // 12. Unauthenticated guest is redirected to login (302 Redirect)
+        auth()->logout();
+        $this->get(route('donors.index'))->assertRedirect(route('login'));
+    }
+
     private function createUserWithRole(string $roleSlug, bool $isActive = true): User
     {
         $user = User::factory()->create(['is_active' => $isActive]);

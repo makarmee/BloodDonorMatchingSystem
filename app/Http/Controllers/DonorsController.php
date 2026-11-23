@@ -394,14 +394,25 @@ class DonorsController extends Controller
 
     /**
      * Authorize that the acting user has access to view the donors directory overview.
-     * Partner hospitals and registered blood donors are strictly forbidden.
+     * Accessible to administrators, blood bank staff, and lab officers.
+     * Pure partner hospital and blood donor accounts are strictly forbidden.
      */
     private function authorizeDonorDirectory(Request $request): User
     {
         /** @var User|null $user */
         $user = $request->user();
 
-        if (! $user || ! $user->is_active || $user->hasAnyRole(['donor', 'hospital'])) {
+        if (! $user || ! $user->is_active) {
+            abort(403);
+        }
+
+        // Administrators, blood bank staff, and lab officers always have authorized access (including multi-role accounts).
+        if ($user->hasAnyRole(['admin', 'staff', 'lab_officer'])) {
+            return $user;
+        }
+
+        // Partner hospital and donor accounts without operations privileges are strictly forbidden.
+        if ($user->hasAnyRole(['donor', 'hospital'])) {
             abort(403, 'Unauthorized access to donors directory.');
         }
 
