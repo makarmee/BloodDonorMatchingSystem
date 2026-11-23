@@ -468,12 +468,23 @@ class DonorsManagementIntegrationTest extends TestCase
         $this->get(route('donors.show', $donorModel))->assertRedirect(route('login'));
         $this->post(route('donors.store'), [])->assertRedirect(route('login'));
 
-        // Donor portal user is forbidden from staff mutation routes
+        // Donor portal user is forbidden from staff directory and mutation routes
         $donorUser = $this->createUserWithRole('donor');
+        $this->actingAs($donorUser)->get(route('donors.index'))->assertForbidden();
+        $this->actingAs($donorUser)->get(route('donors.show', $donorModel))->assertForbidden();
         $this->actingAs($donorUser)->get(route('donors.create'))->assertForbidden();
         $this->actingAs($donorUser)->post(route('donors.store'), [])->assertForbidden();
         $this->actingAs($donorUser)->get(route('donors.edit', $donorModel))->assertForbidden();
         $this->actingAs($donorUser)->put(route('donors.update', $donorModel), [])->assertForbidden();
+
+        // Hospital portal user is also forbidden from administrative donor management
+        $hospitalUser = $this->createUserWithRole('hospital');
+        $this->actingAs($hospitalUser)->get(route('donors.index'))->assertForbidden();
+        $this->actingAs($hospitalUser)->get(route('donors.show', $donorModel))->assertForbidden();
+        $this->actingAs($hospitalUser)->get(route('donors.create'))->assertForbidden();
+        $this->actingAs($hospitalUser)->post(route('donors.store'), [])->assertForbidden();
+        $this->actingAs($hospitalUser)->get(route('donors.edit', $donorModel))->assertForbidden();
+        $this->actingAs($hospitalUser)->put(route('donors.update', $donorModel), [])->assertForbidden();
     }
 
     private function createUserWithRole(string $roleSlug, bool $isActive = true): User

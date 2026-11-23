@@ -29,12 +29,7 @@ class DonorsController extends Controller
      */
     public function index(Request $request): View
     {
-        /** @var User|null $user */
-        $user = $request->user();
-
-        if (! $user || ! $user->is_active) {
-            abort(403);
-        }
+        $this->authorizeDonorDirectory($request);
 
         $summary = [
             'totalDonors' => Donor::query()->count(),
@@ -193,8 +188,8 @@ class DonorsController extends Controller
         /** @var User|null $user */
         $user = $request->user();
 
-        if (! $user || ! $user->is_active) {
-            abort(403);
+        if (! $user || ! $user->is_active || ! $user->hasAnyRole(['admin', 'staff', 'lab_officer'])) {
+            abort(403, 'Unauthorized access to donor details.');
         }
 
         $donor->load([
@@ -395,6 +390,22 @@ class DonorsController extends Controller
         return redirect()
             ->route('donors.show', $donor)
             ->with('success', 'Donor eligibility assessment recorded successfully.');
+    }
+
+    /**
+     * Authorize that the acting user has access to view the donors directory overview.
+     * Partner hospitals and registered blood donors are strictly forbidden.
+     */
+    private function authorizeDonorDirectory(Request $request): User
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if (! $user || ! $user->is_active || $user->hasAnyRole(['donor', 'hospital'])) {
+            abort(403, 'Unauthorized access to donors directory.');
+        }
+
+        return $user;
     }
 
     /**
