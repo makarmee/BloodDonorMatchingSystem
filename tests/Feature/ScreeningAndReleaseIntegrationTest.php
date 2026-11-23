@@ -101,7 +101,7 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
             'donation_id' => $donation->donation_code,
             'screening_record_id' => $pendingRecord->id,
             'screening_result' => 'Passed',
-            'assay_method' => 'Chemiluminescent Immunoassay (CLIA)',
+            'assay_method' => 'CLIA — Chemiluminescent Immunoassay',
             'test_notes' => 'Negative / Non-reactive verified.',
         ]);
 
@@ -110,7 +110,7 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
 
         $this->assertSame('Passed', $pendingRecord->screening_result);
         $this->assertNotNull($pendingRecord->result_recorded_at);
-        $this->assertSame('Chemiluminescent Immunoassay (CLIA)', $pendingRecord->assay_method);
+        $this->assertSame('CLIA — Chemiluminescent Immunoassay', $pendingRecord->assay_method);
     }
 
     public function test_failed_screening_result_triggers_quarantined_unit_discard_and_donor_deferral(): void
@@ -257,5 +257,114 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
         $this->actingAs($this->regularUser)
             ->post(route('screening.donations.release', $donation))
             ->assertForbidden();
+    }
+
+    public function test_assay_method_accepts_all_six_canonical_options_and_saves_correctly(): void
+    {
+        $donor = Donor::factory()->eligible()->create();
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $expectedMethods = [
+            'CLIA — Chemiluminescent Immunoassay',
+            'ECLIA — Electrochemiluminescence Immunoassay',
+            'CMIA — Chemiluminescent Microparticle Immunoassay',
+            'ELISA / EIA — Enzyme-Linked Immunosorbent Assay',
+            'NAT — Nucleic Acid Testing',
+            'Rapid Test — Rapid Diagnostic Test',
+        ];
+
+        $this->assertSame($expectedMethods, ScreeningRecord::ASSAY_METHODS);
+
+        foreach ($expectedMethods as $method) {
+            $donation = $this->donationService->registerDonation($donor, $this->staff, [
+                'blood_component_id' => $component->id,
+                'quantity_ml' => 450,
+                'collection_status' => 'Completed',
+                'collection_location_name' => 'Main Center',
+            ]);
+
+            $this->screeningService->initializePendingPanel($donation, $this->staff);
+            $pendingRecord = ScreeningRecord::where('donation_id', $donation->id)->firstOrFail();
+
+            $response = $this->actingAs($this->labOfficer)->post(route('screening.records.store'), [
+                'donation_id' => $donation->donation_code,
+                'screening_record_id' => $pendingRecord->id,
+                'screening_result' => 'Passed',
+                'assay_method' => $method,
+                'test_notes' => "Tested with {$method}.",
+            ]);
+
+            $response->assertRedirect(route('screening.show', $pendingRecord));
+            $this->assertSame($method, $pendingRecord->fresh()->assay_method);
+
+            // Verify it displays correctly on show page
+            $showResponse = $this->actingAs($this->labOfficer)->get(route('screening.show', $pendingRecord));
+            $showResponse->assertOk();
+            $showResponse->assertSee($method);
+        }
+    }
+
+    public function test_assay_method_rejects_unlisted_and_other_values(): void
+    {
+        $donor = Donor::factory()->eligible()->create();
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+        $pendingRecord = ScreeningRecord::where('donation_id', $donation->id)->firstOrFail();
+
+        foreach (['Other', 'Manual', 'Random String', 'CLIA', 'ELISA'] as $invalidMethod) {
+            $response = $this->actingAs($this->labOfficer)->post(route('screening.records.store'), [
+                'donation_id' => $donation->donation_code,
+                'screening_record_id' => $pendingRecord->id,
+                'screening_result' => 'Passed',
+                'assay_method' => $invalidMethod,
+            ]);
+
+            $response->assertSessionHasErrors('assay_method');
+            $this->assertNotSame($invalidMethod, $pendingRecord->fresh()->assay_method);
+        }
+    }
+
+    public function test_screening_details_view_renders_assay_method_dropdown_with_exact_options(): void
+    {
+        $donor = Donor::factory()->eligible()->create();
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+        $pendingRecord = ScreeningRecord::where('donation_id', $donation->id)->firstOrFail();
+
+        $response = $this->actingAs($this->labOfficer)->get(route('screening.show', $pendingRecord));
+        $response->assertOk();
+
+        // Must render a select element for assay_method
+        $response->assertSee('<select', false);
+        $response->assertSee('name="assay_method"', false);
+        $response->assertSee('id="modal-assay-method"', false);
+
+        // All 6 options must exist in dropdown
+        foreach (ScreeningRecord::ASSAY_METHODS as $method) {
+            $response->assertSee('<option value="'.$method.'"', false);
+        }
+
+        // Must NOT include an "Other" option
+        $response->assertDontSee('<option value="Other"', false);
+        $response->assertDontSee('>Other<', false);
     }
 }

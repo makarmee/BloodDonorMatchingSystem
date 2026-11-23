@@ -121,7 +121,7 @@ class ScreeningController extends Controller
                     'testType' => $record->testType?->name ?? 'HIV',
                     'screeningResult' => $record->screening_result,
                     'labStaff' => $record->lab_staff_name ?? $record->performedBy?->name ?? 'Laboratory Staff',
-                    'assayMethod' => $record->assay_method ?? 'Automated Chemiluminescent Assay',
+                    'assayMethod' => $record->assay_method ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
                     'specimenTube' => $record->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
                     'testNotes' => $record->test_notes ?? '',
                     'collectedAt' => $record->collected_at?->format('M d, Y • H:i') ?? '—',
@@ -221,7 +221,7 @@ class ScreeningController extends Controller
                 'testType' => $screening->testType?->name ?? 'HIV',
                 'screeningResult' => $screening->screening_result,
                 'labStaff' => $screening->lab_staff_name ?? $screening->performedBy?->name ?? 'Laboratory Staff',
-                'assayMethod' => $screening->assay_method ?? 'Automated Chemiluminescent Assay',
+                'assayMethod' => $screening->assay_method ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
                 'specimenTube' => $screening->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
                 'testNotes' => $screening->test_notes ?? '',
                 'collectedAt' => $screening->collected_at?->format('M d, Y • H:i') ?? '—',
@@ -238,6 +238,7 @@ class ScreeningController extends Controller
                 'donationModel' => $donation,
                 'readiness' => $readiness,
                 'sisterRecords' => $sisterRecords,
+                'assayMethods' => ScreeningRecord::ASSAY_METHODS,
             ]);
         }
 
@@ -249,6 +250,7 @@ class ScreeningController extends Controller
             'donationModel' => null,
             'readiness' => null,
             'sisterRecords' => collect(),
+            'assayMethods' => ScreeningRecord::ASSAY_METHODS,
         ]);
     }
 
@@ -268,7 +270,7 @@ class ScreeningController extends Controller
             'test_date' => ['nullable', 'date'],
             'lab_staff' => ['nullable', 'string', 'max:150'],
             'lab_staff_name' => ['nullable', 'string', 'max:150'],
-            'assay_method' => ['nullable', 'string', 'max:120'],
+            'assay_method' => ['nullable', 'string', Rule::in(ScreeningRecord::ASSAY_METHODS)],
             'specimen_tube' => ['nullable', 'string', 'max:64'],
             'specimen_tube_code' => ['nullable', 'string', 'max:64'],
             'test_notes' => ['nullable', 'string', 'max:1000'],
@@ -296,7 +298,7 @@ class ScreeningController extends Controller
             'is_confirmatory' => (bool) ($validated['is_confirmatory'] ?? false),
             'test_date' => $validated['test_date'] ?? now()->toDateString(),
             'lab_staff_name' => $validated['lab_staff_name'] ?? $validated['lab_staff'] ?? $actor->name,
-            'assay_method' => $validated['assay_method'] ?? 'Automated Chemiluminescent Assay',
+            'assay_method' => $validated['assay_method'] ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
             'specimen_tube_code' => $validated['specimen_tube_code'] ?? $validated['specimen_tube'] ?? null,
             'test_notes' => $validated['test_notes'] ?? null,
         ];

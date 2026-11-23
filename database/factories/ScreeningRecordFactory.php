@@ -29,7 +29,7 @@ class ScreeningRecordFactory extends Factory
             'is_confirmatory' => false,
             'performed_by_user_id' => null,
             'lab_staff_name' => fake()->name(),
-            'assay_method' => 'ELISA / Serology',
+            'assay_method' => ScreeningRecord::DEFAULT_ASSAY_METHOD,
             'specimen_tube_code' => 'TUBE-'.fake()->unique()->numerify('######'),
             'test_notes' => null,
             'collected_at' => now()->subHours(2),

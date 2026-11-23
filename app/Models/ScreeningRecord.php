@@ -42,6 +42,25 @@ class ScreeningRecord extends Model
     public const array SCREENING_RESULTS = ['Pending', 'Passed', 'Failed'];
 
     /**
+     * Canonical lab screening assay methodology options.
+     *
+     * @var list<string>
+     */
+    public const array ASSAY_METHODS = [
+        'CLIA — Chemiluminescent Immunoassay',
+        'ECLIA — Electrochemiluminescence Immunoassay',
+        'CMIA — Chemiluminescent Microparticle Immunoassay',
+        'ELISA / EIA — Enzyme-Linked Immunosorbent Assay',
+        'NAT — Nucleic Acid Testing',
+        'Rapid Test — Rapid Diagnostic Test',
+    ];
+
+    /**
+     * Sensible default assay method for screening records.
+     */
+    public const string DEFAULT_ASSAY_METHOD = 'CLIA — Chemiluminescent Immunoassay';
+
+    /**
      * Get the route key for the model.
      */
     public function getRouteKeyName(): string

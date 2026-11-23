@@ -425,13 +425,22 @@
                             <label for="modal-assay-method" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                 {{ __('Assay Method') }}
                             </label>
-                            <input
-                                type="text"
+                            @php
+                                $availableMethods = $assayMethods ?? \App\Models\ScreeningRecord::ASSAY_METHODS;
+                                $selectedMethod = old('assay_method', in_array($sample['assayMethod'] ?? '', $availableMethods, true) ? $sample['assayMethod'] : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD);
+                            @endphp
+                            <select
                                 id="modal-assay-method"
                                 name="assay_method"
-                                value="{{ $sample['assayMethod'] }}"
+                                required
                                 class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            />
+                            >
+                                @foreach ($availableMethods as $method)
+                                    <option value="{{ $method }}" @selected($selectedMethod === $method)>
+                                        {{ __($method) }}
+                                    </option>
+                                @endforeach
+                            </select>
                         </div>
 
                         <div>
