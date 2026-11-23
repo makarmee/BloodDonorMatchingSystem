@@ -324,7 +324,9 @@ export function requestForm(initial = {}) {
                 }
             } else if (field === 'priority') {
                 if (!VALID_PRIORITIES.includes(value)) {
-                    error = 'Select Low, Normal, High, or Critical priority.';
+                    error = typeof window !== 'undefined' && window.__
+                        ? window.__('Select Low, Normal, High, or Critical priority.')
+                        : 'Select Low, Normal, High, or Critical priority.';
                 }
             } else if (field === 'requestReason') {
                 if (value === '') {

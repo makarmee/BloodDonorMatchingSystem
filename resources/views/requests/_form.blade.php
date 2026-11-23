@@ -372,7 +372,7 @@
                     <p
                         x-show="errors.priority"
                         x-cloak
-                        x-text="errors.priority"
+                        x-text="window.__ ? window.__(errors.priority) : errors.priority"
                         class="mt-1.5 text-xs font-medium text-crimson-600 dark:text-crimson-400"
                     ></p>
                 </div>
