@@ -97,7 +97,7 @@ class VisualPersianTranslationAuditTest extends TestCase
 
         // Create Lab Officer
         $labRole = Role::where('slug', 'lab_officer')->firstOrFail();
-        $this->labUser = User::factory()->create(['name' => 'کارشناس آزمایشگاه', 'is_active' => true]);
+        $this->labUser = User::factory()->create(['name' => 'کارشناس لابراتوار', 'is_active' => true]);
         $this->labUser->roles()->attach($labRole);
     }
 
