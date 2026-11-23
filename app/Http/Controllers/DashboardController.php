@@ -554,7 +554,7 @@ class DashboardController extends Controller
         $components = BloodComponent::query()
             ->where('is_active', true)
             ->orderBy('name')
-            ->get(['id', 'code', 'name', 'standard_volume_ml']);
+            ->get(['id', 'code', 'name', 'default_volume_ml']);
 
         return [
             'donors' => $donors,
