@@ -119,26 +119,18 @@ class PublicPortalController extends Controller
         }
 
         if (! $hasTable) {
-            return array_map(function (array $row): array {
-                $available = (int) $row['available'];
-                $minLevel = (int) $row['minLevel'];
-                $status = $this->inventoryController->resolveStatus($available, $minLevel);
-
+            return array_map(function (string $group): array {
                 return [
-                    'group' => (string) $row['group'],
-                    'available' => $available,
-                    'minLevel' => $minLevel,
-                    'capacity' => (int) $row['capacity'],
-                    'status' => $status,
-                    'statusLabel' => match ($status) {
-                        'critical' => 'Critical',
-                        'low' => 'Low Stock',
-                        default => 'Normal',
-                    },
-                    'lastUpdated' => (string) $row['lastUpdated'],
-                    'isSample' => true,
+                    'group' => $group,
+                    'available' => 0,
+                    'minLevel' => 20,
+                    'capacity' => 100,
+                    'status' => 'critical',
+                    'statusLabel' => 'Critical',
+                    'lastUpdated' => 'No inventory on hand',
+                    'isSample' => false,
                 ];
-            }, $this->inventoryController->sampleBloodGroups());
+            }, BloodUnit::BLOOD_GROUPS);
         }
 
         $hasDbStocks = InventoryStock::query()->exists();

@@ -286,6 +286,100 @@
                     </div>
                 </x-ui.card>
 
+                {{-- Serialized Blood Unit & Warehouse Lifecycle Card --}}
+                <x-ui.card>
+                    <x-slot:header>
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 class="text-base font-semibold text-slate-900 dark:text-white">
+                                    {{ __('Serialized Blood Unit & Inventory Lifecycle') }}
+                                </h2>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">
+                                    {{ __('Direct warehouse link, quarantine verification, and inventory status.') }}
+                                </p>
+                            </div>
+
+                            @if ($donationModel && $donationModel->primaryBloodUnit)
+                                @php
+                                    $unitStatus = $donationModel->primaryBloodUnit->unit_status;
+                                    $unitBadgeVariant = match ($unitStatus) {
+                                        'Available' => 'success',
+                                        'Reserved' => 'info',
+                                        'Dispatched', 'Transfused' => 'primary',
+                                        'Expired', 'Discarded' => 'danger',
+                                        default => 'warning',
+                                    };
+                                @endphp
+                                <x-ui.badge :variant="$unitBadgeVariant" :dot="true">
+                                    {{ __($unitStatus) }}
+                                </x-ui.badge>
+                            @endif
+                        </div>
+                    </x-slot:header>
+
+                    <div class="space-y-4 text-sm">
+                        @if ($donationModel && $donationModel->primaryBloodUnit)
+                            @php $pUnit = $donationModel->primaryBloodUnit; @endphp
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div class="rounded-xl border border-slate-200/80 p-3 dark:border-slate-800">
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Unit Code') }}</p>
+                                    <p class="mt-1 font-semibold text-slate-900 dark:text-white dir-ltr">
+                                        <a href="{{ route('inventory.units.show', $pUnit->id) }}" class="text-crimson-600 hover:text-crimson-700 hover:underline dark:text-crimson-400">
+                                            {{ $pUnit->unit_code }}
+                                        </a>
+                                    </p>
+                                </div>
+
+                                <div class="rounded-xl border border-slate-200/80 p-3 dark:border-slate-800">
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Warehouse Status') }}</p>
+                                    <p class="mt-1 font-semibold text-slate-900 dark:text-white">
+                                        {{ __($pUnit->unit_status) }}
+                                    </p>
+                                </div>
+
+                                <div class="rounded-xl border border-slate-200/80 p-3 dark:border-slate-800">
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Expiry Date') }}</p>
+                                    <p class="mt-1 font-semibold text-slate-900 dark:text-white">
+                                        {{ $pUnit->expires_at?->format('M d, Y') ?? __('Not set') }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                <a
+                                    href="{{ route('inventory.units.show', $pUnit->id) }}"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-crimson-600 hover:text-crimson-700 dark:text-crimson-400"
+                                >
+                                    <span>{{ __('View Unit in Inventory Directory') }}</span>
+                                    <x-icons.icon name="arrow-right" class="size-3.5 rtl-flip" />
+                                </a>
+
+                                @if ($pUnit->unit_status === 'Quarantined' && $donationModel->screening_status === 'Passed')
+                                    <a
+                                        href="{{ route('screening.show', $donationModel->donation_code) }}"
+                                        class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700 transition"
+                                    >
+                                        <x-icons.icon name="check-circle" class="size-3.5" />
+                                        <span>{{ __('Ready for Inventory Release') }}</span>
+                                    </a>
+                                @elseif ($pUnit->unit_status === 'Quarantined')
+                                    <a
+                                        href="{{ route('screening.show', $donationModel->donation_code) }}"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    >
+                                        <x-icons.icon name="shield-check" class="size-3.5" />
+                                        <span>{{ __('Complete Screening Panel') }}</span>
+                                    </a>
+                                @endif
+                            </div>
+                        @else
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                {{ __('No serialized blood unit has been generated yet. Units are created automatically upon completion of the phlebotomy collection.') }}
+                            </p>
+                        @endif
+                    </div>
+                </x-ui.card>
+
                 <x-ui.card>
                     <x-slot:header>
                         <div class="flex flex-wrap items-center justify-between gap-2">

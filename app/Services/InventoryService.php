@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BloodComponent;
 use App\Models\BloodUnit;
 use App\Models\Donation;
 use App\Models\InventoryAllocation;
@@ -36,6 +37,7 @@ class InventoryService
         'Discarded' => ['Manual Adjustment', 'Discarded'],
         'Expired' => ['Manual Adjustment', 'Expired'],
         'Dispatched' => ['Manual Adjustment', 'Removed'],
+        'Transfused' => ['Manual Adjustment', 'Removed'],
     ];
 
     /**
@@ -556,6 +558,156 @@ class InventoryService
     }
 
     /**
+     * Admit a single screened Quarantined blood unit into Available inventory.
+     *
+     * @param  array{
+     *     description?: string|null,
+     *     reason?: string|null,
+     *     storage_location?: string|null,
+     *     reference_type?: string|null,
+     *     reference_id?: int|string|null
+     * }  $attributes
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function admitScreenedUnit(BloodUnit $unit, ?User $actor, array $attributes = []): BloodUnit
+    {
+        $this->authorizeAction($actor, 'adjust', InventoryStock::class);
+
+        $context = $this->validateMovementContext(
+            $attributes,
+            "Admitted screened blood unit {$unit->unit_code} into available inventory."
+        );
+        $storageLocation = $this->inputNormalizer->normalizeOptionalText(
+            $attributes['storage_location'] ?? null,
+            120,
+            'storage_location'
+        );
+
+        $now = CarbonImmutable::now();
+
+        $admittedUnit = DB::transaction(function () use ($unit, $actor, $context, $storageLocation, $now): BloodUnit {
+            $lockedUnit = BloodUnit::query()
+                ->whereKey($unit->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedUnit->unit_status !== 'Quarantined') {
+                throw ValidationException::withMessages([
+                    'unit_status' => "Only Quarantined blood units may be admitted into inventory; unit is currently '{$lockedUnit->unit_status}'.",
+                ]);
+            }
+
+            $donation = Donation::query()
+                ->whereKey($lockedUnit->donation_id)
+                ->first();
+
+            if ($donation instanceof Donation && $donation->screening_status !== 'Passed') {
+                throw ValidationException::withMessages([
+                    'screening_status' => "Cannot admit blood unit: associated donation screening status is '{$donation->screening_status}' (must be 'Passed').",
+                ]);
+            }
+
+            $lockedStock = $this->ensureAndLockInventoryStock(
+                $lockedUnit->blood_group,
+                $lockedUnit->blood_component_id
+            );
+
+            $this->admitLockedBucketUnits(
+                lockedStock: $lockedStock,
+                lockedUnits: new EloquentCollection([$lockedUnit]),
+                actor: $actor,
+                description: $context['description'],
+                referenceType: $context['reference_type'] ?? 'donation',
+                referenceId: $context['reference_id'] ?? (int) $lockedUnit->donation_id,
+                occurredAt: $now,
+                storageLocation: $storageLocation
+            );
+
+            return $lockedUnit;
+        }, 3);
+
+        return $admittedUnit->fresh(['bloodComponent', 'donation']) ?? $admittedUnit;
+    }
+
+    /**
+     * Mark an eligible blood unit as Transfused.
+     *
+     * Supports two valid clinical scenarios:
+     * 1. A previously Dispatched unit administered to a patient (status transition from Dispatched to Transfused;
+     *    stock counters remain unchanged as physical units were already decremented upon dispatch).
+     * 2. An Available unit administered directly on-site (atomic decrement of available_units, unit_status to Transfused,
+     *    and append-only ledger transaction with operation_type 'Removed' and units_delta -1).
+     *
+     * @param  array{
+     *     description?: string|null,
+     *     reason?: string|null,
+     *     reference_type?: string|null,
+     *     reference_id?: int|string|null
+     * }  $attributes
+     *
+     * @throws AuthorizationException
+     * @throws ValidationException
+     */
+    public function markUnitTransfused(BloodUnit $unit, ?User $actor, array $attributes = []): BloodUnit
+    {
+        $this->authorizeAction($actor, 'adjust', InventoryStock::class);
+
+        $context = $this->validateMovementContext(
+            $attributes,
+            "Blood unit {$unit->unit_code} marked as Transfused."
+        );
+        $now = CarbonImmutable::now();
+
+        $transfusedUnit = DB::transaction(function () use ($unit, $actor, $context, $now): BloodUnit {
+            $lockedUnit = BloodUnit::query()
+                ->whereKey($unit->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedUnit->unit_status === 'Dispatched') {
+                $lockedUnit->unit_status = 'Transfused';
+                $lockedUnit->save();
+
+                return $lockedUnit;
+            }
+
+            if ($lockedUnit->unit_status === 'Available') {
+                $this->ensureNoActiveAllocation($lockedUnit, 'allocation_status');
+
+                $lockedStock = $this->lockExistingStockForUnit($lockedUnit);
+
+                if ($lockedStock->available_units < 1) {
+                    throw ValidationException::withMessages([
+                        'available_units' => 'Cannot mark unit Transfused because stock available_units is already zero.',
+                    ]);
+                }
+
+                $this->decrementAvailableUnits(
+                    lockedStock: $lockedStock,
+                    lockedUnits: new EloquentCollection([$lockedUnit]),
+                    actor: $actor,
+                    targetUnitStatus: 'Transfused',
+                    operationType: 'Removed',
+                    description: $context['description'],
+                    referenceType: $context['reference_type'] ?? 'transfusion',
+                    referenceId: $context['reference_id'],
+                    occurredAt: $now
+                );
+
+                return $lockedUnit;
+            }
+
+            throw ValidationException::withMessages([
+                'unit_status' => "Cannot mark blood unit with status '{$lockedUnit->unit_status}' as Transfused (must be 'Dispatched' or 'Available').",
+            ]);
+        }, 3);
+
+        return $transfusedUnit->fresh(['bloodComponent', 'donation']) ?? $transfusedUnit;
+    }
+
+    /**
      * Evaluate stock level status (`critical`, `low`, or `normal`) dynamically from `inventory_stocks`.
      */
     public function evaluateStockStatus(InventoryStock $stock): string
@@ -948,6 +1100,109 @@ class InventoryService
     }
 
     /**
+     * Admit pre-locked screened Quarantined blood unit(s) into Available inventory within a caller-managed transaction.
+     *
+     * Validates that each unit is in Quarantined status, belongs to the locked stock bucket,
+     * has not already been admitted (idempotency guard against duplicate Stock In),
+     * transitions unit_status to 'Available', updates released_at and released_by_user_id,
+     * sets expires_at based on component shelf-life, increments stock available_units atomically,
+     * and appends an immutable 'Stock In' ledger record (+1 units_delta).
+     *
+     * @internal Intended for coordinated domain workflows (e.g., ScreeningService::releaseToInventory).
+     *
+     * @param  EloquentCollection<int, BloodUnit>  $lockedUnits
+     *
+     * @throws LogicException
+     * @throws ValidationException
+     */
+    public function admitLockedBucketUnits(
+        InventoryStock $lockedStock,
+        EloquentCollection $lockedUnits,
+        User $actor,
+        string $description,
+        string $referenceType,
+        int $referenceId,
+        CarbonImmutable $occurredAt,
+        ?string $storageLocation = null
+    ): void {
+        $this->assertLockedStockAndTransaction($lockedStock);
+        $normalizedDescription = $this->normalizeRequiredJustification(['description' => $description]);
+
+        if ($referenceId < 1) {
+            throw ValidationException::withMessages([
+                'reference_id' => 'A valid positive reference ID is required for stock admission.',
+            ]);
+        }
+
+        if ($lockedUnits->isEmpty()) {
+            throw ValidationException::withMessages([
+                'blood_unit_ids' => 'At least one screened Quarantined blood unit is required for admission.',
+            ]);
+        }
+
+        $this->validateLockedUnitsForTransition($lockedStock, $lockedUnits, 'Quarantined', 'blood_unit_ids');
+
+        foreach ($lockedUnits as $unit) {
+            $alreadyAdmitted = InventoryTransaction::query()
+                ->where('blood_unit_id', $unit->id)
+                ->where('operation_type', 'Stock In')
+                ->exists();
+
+            if ($alreadyAdmitted) {
+                throw ValidationException::withMessages([
+                    'blood_unit_ids' => "Blood unit {$unit->unit_code} has already been admitted to inventory.",
+                ]);
+            }
+
+            $this->ensureNoActiveAllocation($unit, 'blood_unit_ids');
+        }
+
+        $component = $lockedStock->bloodComponent
+            ?? BloodComponent::query()->whereKey($lockedStock->blood_component_id)->firstOrFail();
+
+        $runningAvailable = $lockedStock->available_units;
+        $reservedUnits = $lockedStock->reserved_units;
+
+        foreach ($lockedUnits as $unit) {
+            $collectedAt = $unit->collected_at?->toImmutable() ?? $occurredAt;
+
+            $unit->unit_status = 'Available';
+            $unit->released_at = $occurredAt;
+            $unit->released_by_user_id = $actor->getKey();
+            $unit->expires_at = $collectedAt->addDays($component->shelf_life_days);
+
+            if ($storageLocation !== null) {
+                $unit->storage_location = $storageLocation;
+            }
+
+            $unit->save();
+
+            $availableBefore = $runningAvailable;
+            $runningAvailable++;
+
+            $this->recordTransaction(
+                lockedStock: $lockedStock,
+                bloodUnit: $unit,
+                operationType: 'Stock In',
+                unitsDelta: 1,
+                availableBefore: $availableBefore,
+                availableAfter: $runningAvailable,
+                reservedBefore: $reservedUnits,
+                reservedAfter: $reservedUnits,
+                actor: $actor,
+                description: $normalizedDescription,
+                referenceType: $referenceType,
+                referenceId: $referenceId,
+                occurredAt: $occurredAt
+            );
+        }
+
+        $lockedStock->available_units = $runningAvailable;
+        $lockedStock->last_adjusted_at = $occurredAt;
+        $lockedStock->save();
+    }
+
+    /**
      * Validate a single ledger transaction's operation semantics, unit dimension parity, and uniqueness.
      *
      * @param  array<int, string>  $stockInUnitIds
@@ -1117,7 +1372,7 @@ class InventoryService
     /**
      * Ensure an `inventory_stocks` bucket exists for a pre-release unit and lock it `FOR UPDATE`.
      */
-    private function ensureAndLockInventoryStock(string $bloodGroup, int $bloodComponentId): InventoryStock
+    public function ensureAndLockInventoryStock(string $bloodGroup, int $bloodComponentId): InventoryStock
     {
         $now = CarbonImmutable::now();
 

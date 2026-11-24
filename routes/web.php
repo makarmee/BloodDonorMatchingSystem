@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/inventory/stocks/{inventoryStock}/adjust', [InventoryController::class, 'adjustStock'])->name('inventory.stocks.adjust');
         Route::post('/inventory/units/{bloodUnit}/discard', [InventoryController::class, 'discardUnit'])->name('inventory.units.discard');
         Route::post('/inventory/units/{bloodUnit}/expire', [InventoryController::class, 'markExpired'])->name('inventory.units.expire');
+        Route::post('/inventory/units/{bloodUnit}/transfuse', [InventoryController::class, 'markTransfused'])->name('inventory.units.transfuse');
         Route::get('/inventory/reconcile', [InventoryController::class, 'reconcile'])->name('inventory.reconcile');
 
         Route::get('/hospitals', [HospitalVerificationController::class, 'index'])->name('hospitals.index');

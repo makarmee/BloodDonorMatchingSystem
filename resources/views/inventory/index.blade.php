@@ -895,6 +895,7 @@
                                     <option value="Discarded">{{ __('Discarded (Compromised Bag)') }}</option>
                                     <option value="Expired">{{ __('Expired (Shelf Life)') }}</option>
                                     <option value="Dispatched">{{ __('Dispatched (Manual Transfer)') }}</option>
+                                    <option value="Transfused">{{ __('Transfused (Clinical Administration)') }}</option>
                                 </select>
                             </div>
                         </div>

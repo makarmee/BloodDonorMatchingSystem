@@ -27,11 +27,10 @@ class PublicPortalPageTest extends TestCase
         $response->assertSee('Register as Donor');
         $response->assertSee('How blood donation works from booking to screening');
         $response->assertSee('Frequently Asked Questions');
-        $response->assertSee('Demo Placeholder Notice');
-        $response->assertSee('[Demo Placeholder]');
+        $response->assertSee('Contact & Coordination Desk');
+        $response->assertSee('+93773072993');
 
-        // Synchronized inventory metrics (305 total units across 8 groups)
-        $response->assertSee('305');
+        // Synchronized inventory metrics
         foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $group) {
             $response->assertSee($group);
         }
@@ -155,7 +154,6 @@ class PublicPortalPageTest extends TestCase
         $openResponse->assertSee('Central Plaza Community Blood Drive');
         $openResponse->assertSee('1 of 5 remaining');
         $openResponse->assertSee(route('donor-portal.appointments.create', ['camp' => 'CMP-308']), false);
-        $openResponse->assertSee('[Demo Placeholder]');
         $openResponse->assertDontSee('REG-801');
         $openResponse->assertDontSee('DNR-1041');
         $openResponse->assertDontSee('Elena Martinez');

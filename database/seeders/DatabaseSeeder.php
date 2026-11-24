@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             ScreeningTestTypeSeeder::class,
             ComponentScreeningRequirementSeeder::class,
             BloodCompatibilityRuleSeeder::class,
+            InventoryStockSeeder::class,
         ]);
     }
 }

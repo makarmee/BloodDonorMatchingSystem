@@ -25,6 +25,7 @@ class ScreeningService
 {
     public function __construct(
         private DonorEligibilityService $eligibilityService,
+        private InventoryService $inventoryService,
         private ReferenceCodeGenerator $codeGenerator,
         private ServiceInputNormalizer $inputNormalizer
     ) {}
@@ -329,50 +330,16 @@ class ScreeningService
 
             $lockedDonation->save();
 
-            $runningAvailable = $lockedStock->available_units;
-            $reservedUnits = $lockedStock->reserved_units;
-
-            foreach ($primaryUnits as $unit) {
-                $collectedAt = $unit->collected_at?->toImmutable()
-                    ?? $lockedDonation->collected_at?->toImmutable()
-                    ?? $releaseTimestamp;
-
-                $unit->unit_status = 'Available';
-                $unit->released_at = $releaseTimestamp;
-                $unit->released_by_user_id = $actor->getKey();
-                $unit->expires_at = $collectedAt->addDays($component->shelf_life_days);
-
-                if ($storageLocation !== null) {
-                    $unit->storage_location = $storageLocation;
-                }
-
-                $unit->save();
-
-                $availableBefore = $runningAvailable;
-                $runningAvailable++;
-
-                InventoryTransaction::query()->create([
-                    'transaction_code' => $this->codeGenerator->generate(InventoryTransaction::class, 'transaction_code', 'TXN-', 7),
-                    'inventory_stock_id' => $lockedStock->id,
-                    'blood_unit_id' => $unit->id,
-                    'operation_type' => 'Stock In',
-                    'units_delta' => 1,
-                    'available_before' => $availableBefore,
-                    'available_after' => $runningAvailable,
-                    'reserved_before' => $reservedUnits,
-                    'reserved_after' => $reservedUnits,
-                    'reference_type' => 'donation',
-                    'reference_id' => $lockedDonation->id,
-                    'performed_by_user_id' => $actor->getKey(),
-                    'actor_name' => $actor->name,
-                    'description' => "Screened unit {$unit->unit_code} ({$lockedDonation->donation_code}) approved and released to available inventory.",
-                    'occurred_at' => $releaseTimestamp,
-                ]);
-            }
-
-            $lockedStock->available_units = $runningAvailable;
-            $lockedStock->last_adjusted_at = $releaseTimestamp;
-            $lockedStock->save();
+            $this->inventoryService->admitLockedBucketUnits(
+                lockedStock: $lockedStock,
+                lockedUnits: $primaryUnits,
+                actor: $actor,
+                description: "Screened unit(s) for donation {$lockedDonation->donation_code} approved and released to available inventory.",
+                referenceType: 'donation',
+                referenceId: (int) $lockedDonation->id,
+                occurredAt: $releaseTimestamp,
+                storageLocation: $storageLocation
+            );
 
             return $lockedDonation;
         }, 3);
@@ -735,25 +702,7 @@ class ScreeningService
      */
     private function ensureAndLockInventoryStock(string $bloodGroup, int $bloodComponentId): InventoryStock
     {
-        $now = CarbonImmutable::now();
-
-        DB::table('inventory_stocks')->insertOrIgnore([
-            'blood_group' => $bloodGroup,
-            'blood_component_id' => $bloodComponentId,
-            'available_units' => 0,
-            'reserved_units' => 0,
-            'minimum_level' => 20,
-            'target_capacity' => 100,
-            'last_adjusted_at' => null,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        return InventoryStock::query()
-            ->where('blood_group', $bloodGroup)
-            ->where('blood_component_id', $bloodComponentId)
-            ->lockForUpdate()
-            ->firstOrFail();
+        return $this->inventoryService->ensureAndLockInventoryStock($bloodGroup, $bloodComponentId);
     }
 
     /**

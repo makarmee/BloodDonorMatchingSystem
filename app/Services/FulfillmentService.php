@@ -1343,25 +1343,11 @@ class FulfillmentService
     }
 
     /**
-     * Lock an existing InventoryStock bucket `(blood_group, component_id)` or fail validation cleanly.
-     *
-     * @throws ValidationException
+     * Lock an InventoryStock bucket `(blood_group, component_id)` for update, ensuring it exists.
      */
     private function lockExistingStockBucket(string $bloodGroup, int $componentId): InventoryStock
     {
-        $lockedStock = InventoryStock::query()
-            ->forBloodGroup($bloodGroup)
-            ->forComponent($componentId)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $lockedStock instanceof InventoryStock) {
-            throw ValidationException::withMessages([
-                'available_units' => "No inventory stock bucket exists for {$bloodGroup} on component #{$componentId}.",
-            ]);
-        }
-
-        return $lockedStock;
+        return $this->inventoryService->ensureAndLockInventoryStock($bloodGroup, $componentId);
     }
 
     /**

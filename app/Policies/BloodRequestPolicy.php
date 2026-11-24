@@ -20,6 +20,10 @@ class BloodRequestPolicy
 
         $isStaffOrAdmin = $user->hasRole('admin') || $user->hasRole('staff') || $user->hasPermission('requests.fulfill');
 
+        if ($isStaffOrAdmin) {
+            return Response::allow();
+        }
+
         if ($hospital instanceof Hospital) {
             if (! $hospital->is_active) {
                 return Response::deny(__('The target hospital account is inactive.'));
@@ -29,18 +33,10 @@ class BloodRequestPolicy
                 return Response::deny(__('Blood requests may only be created for verified partner hospitals.'));
             }
 
-            if ($isStaffOrAdmin) {
-                return Response::allow();
-            }
-
             if (! $user->hasRole('hospital') || ! $this->isActiveHospitalCoordinatorFor($user, $hospital)) {
                 return Response::deny(__('You are not authorized as an active coordinator for this hospital.'));
             }
 
-            return Response::allow();
-        }
-
-        if ($isStaffOrAdmin) {
             return Response::allow();
         }
 

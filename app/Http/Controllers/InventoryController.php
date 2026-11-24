@@ -225,7 +225,7 @@ class InventoryController extends Controller
             'target_capacity' => ['nullable', 'integer', 'min:1'],
             'units_delta' => ['nullable', 'integer'],
             'description' => ['nullable', 'string', 'min:3', 'max:2000'],
-            'target_unit_status' => ['nullable', 'string', 'in:Discarded,Expired,Dispatched'],
+            'target_unit_status' => ['nullable', 'string', 'in:Discarded,Expired,Dispatched,Transfused'],
             'blood_unit_ids' => ['nullable', 'array'],
             'blood_unit_ids.*' => ['integer', 'exists:blood_units,id'],
         ]);
@@ -292,6 +292,25 @@ class InventoryController extends Controller
         ]);
 
         return redirect()->route('inventory.index')->with('success', "Blood unit {$bloodUnit->unit_code} marked as Expired.");
+    }
+
+    /**
+     * Mark an eligible blood unit as Transfused.
+     */
+    public function markTransfused(Request $request, BloodUnit $bloodUnit): RedirectResponse
+    {
+        Gate::authorize('adjust', $bloodUnit);
+
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $this->inventoryService->markUnitTransfused($bloodUnit, $request->user(), [
+            'reason' => $validated['reason'] ?? 'Blood unit administered for transfusion.',
+        ]);
+
+        return redirect()->route('inventory.units.show', $bloodUnit->id)
+            ->with('success', "Blood unit {$bloodUnit->unit_code} marked as Transfused.");
     }
 
     /**

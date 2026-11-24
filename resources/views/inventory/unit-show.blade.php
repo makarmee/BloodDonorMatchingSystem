@@ -12,6 +12,7 @@
                             'Available' => 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-800/70',
                             'Reserved' => 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-950/60 dark:text-sky-300 dark:ring-sky-800/70',
                             'Dispatched' => 'bg-purple-50 text-purple-700 ring-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:ring-purple-800/70',
+                            'Transfused' => 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-800/70',
                             'Expired' => 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-800/70',
                             'Discarded' => 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:ring-rose-800/70',
                             'Quarantined' => 'bg-amber-50 text-amber-800 ring-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-800/70',
@@ -172,6 +173,43 @@
                                     <span>{{ __('Mark as Expired') }}</span>
                                 </button>
                             </form>
+                        @endif
+
+                        @if (in_array($unit->unit_status, ['Dispatched', 'Available']))
+                            <form
+                                method="POST"
+                                action="{{ route('inventory.units.transfuse', $unit->id) }}"
+                                onsubmit="return confirm('{{ __('Are you sure you want to mark blood unit :code as Transfused? This indicates the unit has been administered.', ['code' => $unit->unit_code]) }}');"
+                                class="space-y-2"
+                            >
+                                @csrf
+                                <input
+                                    type="text"
+                                    name="reason"
+                                    placeholder="{{ __('Transfusion details / patient notes (optional)...') }}"
+                                    class="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs focus:border-crimson-500 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                                <button
+                                    type="submit"
+                                    class="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300 cursor-pointer"
+                                >
+                                    <x-icons.icon name="check-circle" class="size-4" />
+                                    <span>{{ __('Mark as Transfused') }}</span>
+                                </button>
+                            </form>
+                        @endif
+
+                        @if ($unit->unit_status === 'Quarantined' && $unit->donation?->screening_status === 'Passed' && $unit->donation?->collection_status === 'Completed')
+                            <div class="rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                                <p class="font-medium">{{ __('Screening tests completed and passed.') }}</p>
+                                <a
+                                    href="{{ route('screening.show', $unit->donation->donation_code) }}"
+                                    class="mt-1.5 inline-flex items-center gap-1 font-semibold text-emerald-700 hover:text-emerald-900 dark:text-emerald-300 dark:hover:text-emerald-100 underline"
+                                >
+                                    <span>{{ __('Release Unit to Inventory') }}</span>
+                                    <x-icons.icon name="arrow-right" class="size-3.5 rtl-flip" />
+                                </a>
+                            </div>
                         @endif
 
                         @if (in_array($unit->unit_status, ['Available', 'Reserved', 'Quarantined']))
