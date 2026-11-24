@@ -42,6 +42,7 @@
             'bloodRequestRecord' => $bloodRequestRecord,
             'bloodGroups' => $bloodGroups,
             'priorities' => $priorities,
+            'components' => $components ?? collect(),
         ])
     </div>
 </x-app-layout>

@@ -13,6 +13,7 @@
         'hospitalAddress' => old('hospital_address', $requestRecord['hospitalAddress'] ?? $prefillData['hospitalAddress'] ?? ''),
         'email' => old('email', $requestRecord['email'] ?? $prefillData['email'] ?? ''),
         'bloodGroup' => old('blood_group', $requestRecord['bloodGroup'] ?? ''),
+        'bloodComponentId' => old('blood_component_id', $bloodRequestRecord->blood_component_id ?? $requestRecord['bloodComponentId'] ?? ''),
         'requestedUnits' => old('requested_units', $requestRecord['requestedUnits'] ?? ''),
         'requiredDate' => old('required_date', $requestRecord['requiredDate'] ?? ''),
         'priority' => old('priority', $requestRecord['priority'] ?? ''),
@@ -22,6 +23,10 @@
 
     $bloodGroupOptions = collect($bloodGroups)
         ->mapWithKeys(fn (string $group): array => [$group => $group])
+        ->all();
+
+    $componentOptions = collect($components ?? [])
+        ->mapWithKeys(fn ($comp): array => [$comp->id => "{$comp->name} ({$comp->code})"])
         ->all();
 
     $priorityOptions = collect($priorities)
@@ -308,6 +313,21 @@
                         x-text="errors.bloodGroup"
                         class="mt-1.5 text-xs font-medium text-crimson-600 dark:text-crimson-400"
                     ></p>
+                </div>
+
+                <div>
+                    <x-ui.select
+                        id="request-blood-component"
+                        name="blood_component_id"
+                        :label="__('Blood Component')"
+                        :placeholder="__('Select component (optional)')"
+                        :options="$componentOptions"
+                        :value="$initialForm['bloodComponentId']"
+                        x-model="form.bloodComponentId"
+                    />
+                    <p class="mt-1 text-2xs text-slate-500 dark:text-slate-400">
+                        {{ __('Optional: leave unselected to determine during fulfillment.') }}
+                    </p>
                 </div>
 
                 <div>

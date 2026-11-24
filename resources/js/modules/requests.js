@@ -249,6 +249,7 @@ export function requestForm(initial = {}) {
         hospitalAddress: initial.form?.hospitalAddress ?? '',
         email: initial.form?.email ?? '',
         bloodGroup: initial.form?.bloodGroup ?? '',
+        bloodComponentId: initial.form?.bloodComponentId ?? '',
         requestedUnits: initial.form?.requestedUnits ?? '',
         requiredDate: initial.form?.requiredDate ?? '',
         priority: initial.form?.priority ?? '',

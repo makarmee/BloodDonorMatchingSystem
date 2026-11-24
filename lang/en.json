@@ -1762,5 +1762,11 @@
     "Mark as Transfused": "Mark as Transfused",
     "Are you sure you want to mark blood unit :code as Transfused? This indicates the unit has been administered.": "Are you sure you want to mark blood unit :code as Transfused? This indicates the unit has been administered.",
     "Transfusion details / patient notes (optional)...": "Transfusion details / patient notes (optional)...",
-    "Blood unit :code marked as Transfused.": "Blood unit :code marked as Transfused."
+    "Blood unit :code marked as Transfused.": "Blood unit :code marked as Transfused.",
+    "Fixed by Request": "Fixed by Request",
+    "Select component to dispatch": "Select component to dispatch",
+    "Select component to hold": "Select component to hold",
+    "Select component (optional)": "Select component (optional)",
+    "Any / Unspecified Component": "Any / Unspecified Component",
+    "Optional: leave unselected to determine during fulfillment.": "Optional: leave unselected to determine during fulfillment."
 }

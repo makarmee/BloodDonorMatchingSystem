@@ -655,6 +655,11 @@ class ScreeningService
             ->values()
             ->all();
 
+        $existingTestTypeIds = $records
+            ->pluck('test_type_id')
+            ->unique()
+            ->all();
+
         $passedTestCodes = [];
         $missingTestCodes = [];
 
@@ -663,7 +668,7 @@ class ScreeningService
 
             if (in_array($requirement->test_type_id, $passedTestIds, true)) {
                 $passedTestCodes[] = $code;
-            } else {
+            } elseif (! in_array($requirement->test_type_id, $existingTestTypeIds, true)) {
                 $missingTestCodes[] = $code;
             }
         }

@@ -244,7 +244,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Component') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['componentName'] ?? __('Whole Blood / RBC') }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['componentName'] ?? __('Any / Unspecified Component') }}</dd>
                             </div>
                         </dl>
 
@@ -415,6 +415,38 @@
                                             </select>
                                         </div>
 
+                                        @if ($bloodRequestRecord->blood_component_id)
+                                            <div>
+                                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ __('Blood Component') }}
+                                                </label>
+                                                <div class="mt-1.5 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+                                                    <span>{{ $bloodRequestRecord->bloodComponent ? __($bloodRequestRecord->bloodComponent->name) : __('Whole Blood') }} ({{ $bloodRequestRecord->bloodComponent?->code }})</span>
+                                                    <span class="rounded bg-slate-200/80 px-2 py-0.5 text-2xs font-semibold uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-400">{{ __('Fixed by Request') }}</span>
+                                                </div>
+                                                <input type="hidden" name="blood_component_id" value="{{ $bloodRequestRecord->blood_component_id }}" />
+                                            </div>
+                                        @else
+                                            <div>
+                                                <label for="dispatch-blood-component" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ __('Blood Component') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                                </label>
+                                                <select
+                                                    id="dispatch-blood-component"
+                                                    name="blood_component_id"
+                                                    required
+                                                    class="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                                >
+                                                    <option value="" disabled @selected(!old('blood_component_id'))>{{ __('Select component to dispatch') }}</option>
+                                                    @foreach ($components as $component)
+                                                        <option value="{{ $component->id }}" @selected((string) old('blood_component_id') === (string) $component->id)>
+                                                            {{ __($component->name) }} ({{ $component->code }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endif
+
                                         <div>
                                             <label for="dispatch-units" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                                 {{ __('Units to Dispatch') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
@@ -496,6 +528,37 @@
                                                 {{ __('Place Reserve Hold') }}
                                             </h4>
                                         </div>
+                                        @if ($bloodRequestRecord->blood_component_id)
+                                            <div>
+                                                <label class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ __('Blood Component') }}
+                                                </label>
+                                                <div class="mt-1 flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-800 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+                                                    <span>{{ $bloodRequestRecord->bloodComponent ? __($bloodRequestRecord->bloodComponent->name) : __('Whole Blood') }} ({{ $bloodRequestRecord->bloodComponent?->code }})</span>
+                                                    <span class="rounded bg-slate-200/80 px-1.5 py-0.5 text-2xs font-semibold uppercase text-slate-600 dark:bg-slate-800 dark:text-slate-400">{{ __('Fixed') }}</span>
+                                                </div>
+                                                <input type="hidden" name="blood_component_id" value="{{ $bloodRequestRecord->blood_component_id }}" />
+                                            </div>
+                                        @else
+                                            <div>
+                                                <label for="reserve-blood-component" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
+                                                    {{ __('Blood Component') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
+                                                </label>
+                                                <select
+                                                    id="reserve-blood-component"
+                                                    name="blood_component_id"
+                                                    required
+                                                    class="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                                >
+                                                    <option value="" disabled @selected(!old('blood_component_id'))>{{ __('Select component to hold') }}</option>
+                                                    @foreach ($components as $component)
+                                                        <option value="{{ $component->id }}" @selected((string) old('blood_component_id') === (string) $component->id)>
+                                                            {{ __($component->name) }} ({{ $component->code }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endif
                                         <div>
                                             <label for="reserve-quantity" class="block text-xs font-medium text-slate-700 dark:text-slate-200">
                                                 {{ __('Units to Hold') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>

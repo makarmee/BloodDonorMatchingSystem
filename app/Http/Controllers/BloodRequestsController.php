@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BloodComponent;
 use App\Models\BloodRequest;
 use App\Models\Hospital;
 use App\Models\InventoryStock;
@@ -149,6 +150,7 @@ class BloodRequestsController extends Controller
             'prefill' => $prefill,
             'hospital' => $hospital,
             'hospitals' => $hospitals,
+            'components' => BloodComponent::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -199,6 +201,7 @@ class BloodRequestsController extends Controller
             'bloodRequestRecord' => $bloodRequest,
             'bloodGroups' => $this->bloodGroupOptions(),
             'sampleInventory' => $stockLevels,
+            'components' => BloodComponent::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -230,6 +233,7 @@ class BloodRequestsController extends Controller
             'bloodRequestRecord' => $bloodRequest,
             'bloodGroups' => $this->bloodGroupOptions(),
             'priorities' => $this->priorityOptions(),
+            'components' => BloodComponent::query()->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
 
@@ -307,6 +311,7 @@ class BloodRequestsController extends Controller
             'requesterName' => $bloodRequest->requestedBy?->name ?? '—',
             'requesterEmail' => $bloodRequest->requestedBy?->email ?? '—',
             'bloodGroup' => $bloodRequest->blood_group,
+            'bloodComponentId' => $bloodRequest->blood_component_id,
             'componentName' => $bloodRequest->bloodComponent?->name,
             'componentCode' => $bloodRequest->bloodComponent?->code,
             'requestedUnits' => (int) $bloodRequest->requested_units,

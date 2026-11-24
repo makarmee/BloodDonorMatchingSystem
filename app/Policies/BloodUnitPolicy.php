@@ -40,6 +40,14 @@ class BloodUnitPolicy
     }
 
     /**
+     * Determine whether the user can mark an eligible blood unit as Transfused.
+     */
+    public function transfuse(User $user, BloodUnit $bloodUnit): bool
+    {
+        return $this->canAdjustInventory($user);
+    }
+
+    /**
      * Determine whether the user holds active `inventory.adjust` permission.
      */
     private function canAdjustInventory(User $user): bool

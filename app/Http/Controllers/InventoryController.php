@@ -299,7 +299,7 @@ class InventoryController extends Controller
      */
     public function markTransfused(Request $request, BloodUnit $bloodUnit): RedirectResponse
     {
-        Gate::authorize('adjust', $bloodUnit);
+        Gate::authorize('transfuse', $bloodUnit);
 
         $validated = $request->validate([
             'reason' => ['nullable', 'string', 'max:2000'],

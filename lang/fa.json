@@ -1762,5 +1762,11 @@
     "Mark as Transfused": "ثبت به عنوان تزریق‌شده",
     "Are you sure you want to mark blood unit :code as Transfused? This indicates the unit has been administered.": "آیا از ثبت واحد خونی :code به عنوان تزریق‌شده مطمئن هستید؟ این نشان‌دهنده تجویز این واحد به بیمار است.",
     "Transfusion details / patient notes (optional)...": "جزئیات تزریق / یادداشت‌های بیمار (اختیاری)...",
-    "Blood unit :code marked as Transfused.": "واحد خونی :code به عنوان تزریق‌شده ثبت شد."
+    "Blood unit :code marked as Transfused.": "واحد خونی :code به عنوان تزریق‌شده ثبت شد.",
+    "Fixed by Request": "ثابت بر اساس درخواست",
+    "Select component to dispatch": "انتخاب فرآورده برای ارسال",
+    "Select component to hold": "انتخاب فرآورده برای رزرو",
+    "Select component (optional)": "انتخاب فرآورده (اختیاری)",
+    "Any / Unspecified Component": "هر فرآورده / نامشخص",
+    "Optional: leave unselected to determine during fulfillment.": "اختیاری: جهت تعیین هنگام ارسال خالی بگذارید."
 }

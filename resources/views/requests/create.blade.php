@@ -35,6 +35,7 @@
             'prefill' => $prefill ?? [],
             'hospital' => $hospital ?? null,
             'hospitals' => $hospitals ?? collect(),
+            'components' => $components ?? collect(),
         ])
     </div>
 </x-app-layout>
