@@ -371,11 +371,11 @@ class PublicPortalController extends Controller
     public function publicContactInfo(): array
     {
         return [
-            'notice' => 'Demo Placeholder Details — Sample coordination channels only; no real-world phone numbers or live mailboxes are connected.',
-            'phone' => '[Demo Placeholder] +0 (000) 000-0100 — Donor Coordination Desk',
-            'email' => '[Demo Placeholder] support@demo-bdms.invalid',
-            'address' => '[Demo Placeholder] Central Blood Coordination Hub, Suite 100 (Preview Environment)',
-            'hours' => '[Demo Placeholder] Mon–Sat, 08:00 – 18:00 (Sample Operations Window)',
+            'notice' => '',
+            'phone' => '+93773072993 — Donor Coordination Desk',
+            'email' => 'support@bdms.com',
+            'address' => 'Central Blood Coordination Hub, Suite 100',
+            'hours' => 'Mon–Sat, 08:00 – 18:00',
         ];
     }
 

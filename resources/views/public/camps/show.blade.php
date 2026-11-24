@@ -177,13 +177,13 @@
 
                 <x-ui.card class="space-y-3">
                     <h2 class="text-sm font-semibold text-slate-900 dark:text-white">
-                        {{ __('Public Coordination Channel [Demo Placeholder]') }}
+                        {{ __('Public Coordination Channel') }}
                     </h2>
                     <p class="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
                         {{ __('Internal staff identities and donor participant logs are never exposed on public drive pages. For preview inquiries:') }}
                     </p>
                     <p class="text-xs font-medium text-slate-800 dark:text-slate-200 dir-ltr text-start">
-                        [Demo Placeholder] support@demo-bdms.invalid &bull; +0 (000) 000-0100
+                        support@bdms.com &bull; +93773072993
                     </p>
                 </x-ui.card>
             </div>

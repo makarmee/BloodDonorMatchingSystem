@@ -419,9 +419,9 @@
                     </h2>
                 </div>
 
-                <x-ui.alert variant="warning" :title="__('Demo Placeholder Notice')" :dismissible="false">
+                <!-- <x-ui.alert variant="warning" :title="__('Demo Placeholder Notice')" :dismissible="false">
                     {{ __($contactInfo['notice']) }}
-                </x-ui.alert>
+                </x-ui.alert> -->
 
                 <x-ui.card class="space-y-4">
                     <dl class="space-y-3.5 text-sm">
