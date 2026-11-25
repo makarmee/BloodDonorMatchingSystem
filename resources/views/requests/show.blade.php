@@ -244,7 +244,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs text-slate-500 dark:text-slate-400">{{ __('Component') }}</dt>
-                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ $bloodRequest['componentName'] ?? __('Any / Unspecified Component') }}</dd>
+                                <dd class="mt-0.5 font-medium text-slate-900 dark:text-white">{{ ! empty($bloodRequest['componentName']) ? __($bloodRequest['componentName']) : __('Any / Unspecified Component') }}</dd>
                             </div>
                         </dl>
 

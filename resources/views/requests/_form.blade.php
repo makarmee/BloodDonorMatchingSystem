@@ -26,7 +26,9 @@
         ->all();
 
     $componentOptions = collect($components ?? [])
-        ->mapWithKeys(fn ($comp): array => [$comp->id => "{$comp->name} ({$comp->code})"])
+        ->mapWithKeys(fn ($comp): array => [
+            $comp->id => $comp->code ? __($comp->name)." ({$comp->code})" : __($comp->name),
+        ])
         ->all();
 
     $priorityOptions = collect($priorities)

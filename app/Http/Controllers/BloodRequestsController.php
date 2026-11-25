@@ -201,7 +201,9 @@ class BloodRequestsController extends Controller
             'bloodRequestRecord' => $bloodRequest,
             'bloodGroups' => $this->bloodGroupOptions(),
             'sampleInventory' => $stockLevels,
-            'components' => BloodComponent::query()->where('is_active', true)->orderBy('name')->get(),
+            'components' => $bloodRequest->blood_component_id === null
+                ? BloodComponent::query()->where('is_active', true)->orderBy('name')->get()
+                : collect(),
         ]);
     }
 
