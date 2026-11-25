@@ -740,7 +740,7 @@ class DonationService
     {
         if (filter_var($value, FILTER_VALIDATE_INT) === false || (int) $value < 1) {
             throw ValidationException::withMessages([
-                'staff_id' => 'Selected staff member does not exist or is inactive.',
+                'staff_id' => __('Selected staff member does not exist or is inactive.'),
             ]);
         }
 
@@ -765,7 +765,7 @@ class DonationService
 
         if (! $staff instanceof Staff || ! $staff->isActive()) {
             throw ValidationException::withMessages([
-                'staff_id' => 'Selected staff member does not exist or is inactive.',
+                'staff_id' => __('Selected staff member does not exist or is inactive.'),
             ]);
         }
 

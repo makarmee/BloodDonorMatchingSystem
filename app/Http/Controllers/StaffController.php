@@ -235,7 +235,7 @@ class StaffController extends Controller
         if (! $deleted) {
             return redirect()
                 ->back()
-                ->with('error', 'Cannot delete a staff member referenced by existing donation records. Deactivate the staff profile instead.');
+                ->with('error', __('Cannot delete a staff member referenced by existing donation records. Deactivate the staff profile instead.'));
         }
 
         return redirect()

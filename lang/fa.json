@@ -1850,5 +1850,9 @@
     "Administration & Quality": "امور اداری و کنترل کیفیت",
     "Select active staff member": "انتخاب کارمند فعال",
     "Historical attribution:": "انتساب ثبت‌شده پیشین:",
-    "No active staff members are currently available in the Staff Directory.": "در حال حاضر هیچ کارمند فعالی در فهرست کارمندان موجود نیست."
+    "No active staff members are currently available in the Staff Directory.": "در حال حاضر هیچ کارمند فعالی در فهرست کارمندان موجود نیست.",
+    "Selected staff member does not exist.": "کارمند انتخاب‌شده وجود ندارد.",
+    "Selected staff member is inactive and cannot be assigned.": "کارمند انتخاب‌شده غیرفعال است و قابل انتساب نیست.",
+    "Selected staff member does not exist or is inactive.": "کارمند انتخاب‌شده وجود ندارد یا غیرفعال است.",
+    "Cannot delete a staff member referenced by existing donation records. Deactivate the staff profile instead.": "امکان حذف کارمندی که در سوابق اهدا ثبت شده است وجود ندارد. لطفاً پروفایل کارمند را غیرفعال کنید."
 }

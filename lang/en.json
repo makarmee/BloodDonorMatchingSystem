@@ -1850,5 +1850,9 @@
     "Administration & Quality": "Administration & Quality",
     "Select active staff member": "Select active staff member",
     "Historical attribution:": "Historical attribution:",
-    "No active staff members are currently available in the Staff Directory.": "No active staff members are currently available in the Staff Directory."
+    "No active staff members are currently available in the Staff Directory.": "No active staff members are currently available in the Staff Directory.",
+    "Selected staff member does not exist.": "Selected staff member does not exist.",
+    "Selected staff member is inactive and cannot be assigned.": "Selected staff member is inactive and cannot be assigned.",
+    "Selected staff member does not exist or is inactive.": "Selected staff member does not exist or is inactive.",
+    "Cannot delete a staff member referenced by existing donation records. Deactivate the staff profile instead.": "Cannot delete a staff member referenced by existing donation records. Deactivate the staff profile instead."
 }

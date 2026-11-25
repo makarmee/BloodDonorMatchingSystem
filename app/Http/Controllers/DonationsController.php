@@ -427,7 +427,7 @@ class DonationsController extends Controller
 
             if (! $selectedStaff instanceof Staff) {
                 throw ValidationException::withMessages([
-                    'staff_id' => 'Selected staff member does not exist.',
+                    'staff_id' => __('Selected staff member does not exist.'),
                 ]);
             }
 
@@ -435,7 +435,7 @@ class DonationsController extends Controller
 
             if (! $isUnchangedHistoricalAssignment && ! $selectedStaff->isActive()) {
                 throw ValidationException::withMessages([
-                    'staff_id' => 'Selected staff member is inactive and cannot be assigned.',
+                    'staff_id' => __('Selected staff member is inactive and cannot be assigned.'),
                 ]);
             }
 
