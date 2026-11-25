@@ -321,4 +321,37 @@ class BloodRequestsPageTest extends TestCase
         $this->get(route('requests.show', 'REQ-9999'))->assertNotFound();
         $this->get(route('requests.edit', 'REQ-9999'))->assertNotFound();
     }
+
+    public function test_request_form_date_input_supports_both_english_ltr_and_persian_rtl_modes(): void
+    {
+        // English (LTR) mode
+        $enResponse = $this->withSession(['locale' => 'en'])->get(route('requests.create'));
+        $enResponse->assertOk();
+        $enResponse->assertSee('dir="ltr"', false);
+        $enResponse->assertSee('id="request-required-date"', false);
+        $enResponse->assertSee('name="required_date"', false);
+        $enResponse->assertSee('type="date"', false);
+        $enResponse->assertSee('Required Date');
+
+        // Persian (RTL) mode on both create and edit forms
+        $faCreateResponse = $this->withSession(['locale' => 'fa'])->get(route('requests.create'));
+        $faCreateResponse->assertOk();
+        $faCreateResponse->assertSee('dir="rtl"', false);
+        $faCreateResponse->assertSee('id="request-required-date"', false);
+        $faCreateResponse->assertSee('name="required_date"', false);
+        $faCreateResponse->assertSee('type="date"', false);
+        $faCreateResponse->assertSee('تاریخ نیاز');
+
+        $faEditResponse = $this->withSession(['locale' => 'fa'])->get(route('requests.edit', 'REQ-1043'));
+        $faEditResponse->assertOk();
+        $faEditResponse->assertSee('dir="rtl"', false);
+        $faEditResponse->assertSee('id="request-required-date"', false);
+
+        // Verify scoped RTL CSS rule in resources/css/app.css does not alter global input[type="date"]
+        $css = file_get_contents(resource_path('css/app.css'));
+        $this->assertNotFalse($css);
+        $this->assertStringContainsString('[dir="rtl"] #request-required-date', $css);
+        $this->assertStringContainsString('direction: rtl;', $css);
+        $this->assertStringContainsString('text-align: right;', $css);
+    }
 }
