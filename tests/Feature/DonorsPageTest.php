@@ -253,4 +253,42 @@ class DonorsPageTest extends TestCase
         $this->get(route('donors.show', 'DNR-9999'))->assertNotFound();
         $this->get(route('donors.edit', 'DNR-9999'))->assertNotFound();
     }
+
+    public function test_donor_create_and_edit_date_inputs_support_english_ltr_and_persian_rtl_modes(): void
+    {
+        // English (LTR) mode: /donors/create and /donors/{donor}/edit
+        $enCreate = $this->withSession(['locale' => 'en'])->get(route('donors.create'));
+        $enCreate->assertOk();
+        $enCreate->assertSee('dir="ltr"', false);
+        $enCreate->assertSee('id="donor-dob"', false);
+        $enCreate->assertSee('name="date_of_birth"', false);
+        $enCreate->assertSee('type="date"', false);
+        $enCreate->assertSee('start-0 flex items-center ps-3', false);
+        $enCreate->assertSee('ps-10', false);
+        $enCreate->assertSee('Date of Birth');
+
+        $enEdit = $this->withSession(['locale' => 'en'])->get(route('donors.edit', 'DNR-1041'));
+        $enEdit->assertOk();
+        $enEdit->assertSee('dir="ltr"', false);
+        $enEdit->assertSee('id="donor-dob"', false);
+        $enEdit->assertSee('type="date"', false);
+
+        // Persian (RTL) mode: /donors/create and /donors/{donor}/edit
+        $faCreate = $this->withSession(['locale' => 'fa'])->get(route('donors.create'));
+        $faCreate->assertOk();
+        $faCreate->assertSee('dir="rtl"', false);
+        $faCreate->assertSee('id="donor-dob"', false);
+        $faCreate->assertSee('name="date_of_birth"', false);
+        $faCreate->assertSee('type="date"', false);
+        $faCreate->assertSee('start-0 flex items-center ps-3', false);
+        $faCreate->assertSee('ps-10', false);
+        $faCreate->assertSee('تاریخ تولد');
+
+        $faEdit = $this->withSession(['locale' => 'fa'])->get(route('donors.edit', 'DNR-1041'));
+        $faEdit->assertOk();
+        $faEdit->assertSee('dir="rtl"', false);
+        $faEdit->assertSee('id="donor-dob"', false);
+        $faEdit->assertSee('type="date"', false);
+        $faEdit->assertSee('تاریخ تولد');
+    }
 }

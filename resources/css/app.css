@@ -59,19 +59,18 @@
     [dir="rtl"] input[type="tel"],
     [dir="rtl"] input[type="email"],
     [dir="rtl"] input[type="url"],
-    [dir="rtl"] input[type="date"],
     [dir="rtl"] input[type="time"],
     [dir="rtl"] input[type="datetime-local"] {
         direction: ltr;
         text-align: left;
     }
 
-    [dir="rtl"] #request-required-date {
+    [dir="rtl"] input[type="date"] {
         direction: rtl;
         text-align: right;
     }
 
-    [dir="rtl"] #request-required-date::-webkit-datetime-edit-fields-wrapper {
+    [dir="rtl"] input[type="date"]::-webkit-datetime-edit-fields-wrapper {
         direction: ltr;
         unicode-bidi: isolate;
     }

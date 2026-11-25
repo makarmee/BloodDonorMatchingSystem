@@ -347,11 +347,23 @@ class BloodRequestsPageTest extends TestCase
         $faEditResponse->assertSee('dir="rtl"', false);
         $faEditResponse->assertSee('id="request-required-date"', false);
 
-        // Verify scoped RTL CSS rule in resources/css/app.css does not alter global input[type="date"]
+        // Verify global reusable RTL CSS rules in resources/css/app.css and compiled Vite bundle
         $css = file_get_contents(resource_path('css/app.css'));
         $this->assertNotFalse($css);
-        $this->assertStringContainsString('[dir="rtl"] #request-required-date', $css);
+        $this->assertStringContainsString('[dir="rtl"] input[type="date"]', $css);
         $this->assertStringContainsString('direction: rtl;', $css);
         $this->assertStringContainsString('text-align: right;', $css);
+        $this->assertStringContainsString('[dir="rtl"] input[type="date"]::-webkit-datetime-edit-fields-wrapper', $css);
+        $this->assertStringContainsString('unicode-bidi: isolate;', $css);
+        $this->assertStringNotContainsString('#request-required-date', $css);
+
+        $manifestPath = public_path('build/manifest.json');
+        $this->assertFileExists($manifestPath);
+        $manifest = json_decode((string) file_get_contents($manifestPath), true);
+        $cssFile = $manifest['resources/css/app.css']['file'] ?? null;
+        $this->assertNotNull($cssFile);
+        $builtCss = (string) file_get_contents(public_path('build/'.$cssFile));
+        $this->assertStringContainsString('[dir=rtl] input[type=date]{text-align:right;direction:rtl}', $builtCss);
+        $this->assertStringContainsString('[dir=rtl] input[type=date]::-webkit-datetime-edit-fields-wrapper{direction:ltr;unicode-bidi:isolate}', $builtCss);
     }
 }
