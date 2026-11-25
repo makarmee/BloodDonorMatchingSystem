@@ -170,18 +170,22 @@ export function screeningDirectory(initial = {}) {
 
 export function screeningForm(initial = {}) {
     const donationsList = Array.isArray(initial.donations) ? initial.donations : [];
+    const hasPersistedDonations = Boolean(initial.hasPersistedDonations);
 
     const initialForm = {
         donationId: initial.form?.donationId ?? '',
         testType: initial.form?.testType ?? '',
         testDate: initial.form?.testDate ?? '',
         screeningResult: initial.form?.screeningResult ?? '',
+        assayMethod: initial.form?.assayMethod ?? 'CLIA — Chemiluminescent Immunoassay',
+        isConfirmatory: Boolean(initial.form?.isConfirmatory),
         labStaff: initial.form?.labStaff ?? '',
         testNotes: initial.form?.testNotes ?? '',
     };
 
     return {
         donations: donationsList,
+        hasPersistedDonations,
         donationSearch: '',
         donationDropdownOpen: false,
         snapshot: { ...initialForm },
@@ -290,17 +294,23 @@ export function screeningForm(initial = {}) {
             return allValid;
         },
 
-        submitForm() {
+        handleSubmit(event) {
             if (!this.validateAll()) {
+                event?.preventDefault();
                 this.feedback = {
                     type: 'danger',
-                    title: 'Validation errors found',
-                    message: 'Please review the highlighted screening fields before previewing submission.',
+                    title: window.__ ? window.__('Validation errors found') : 'Validation errors found',
+                    message: window.__ ? window.__('Please review the highlighted screening fields before submitting.') : 'Please review the highlighted screening fields before submitting.',
                 };
                 window.scrollTo({ top: 0, behavior: 'smooth' });
-                return;
+                return false;
             }
 
+            if (this.hasPersistedDonations) {
+                return true;
+            }
+
+            event?.preventDefault();
             const linked = this.selectedDonation;
             const summaryTarget = linked
                 ? `${linked.id} (${linked.donorName}, ${linked.bloodGroup})`
@@ -313,6 +323,11 @@ export function screeningForm(initial = {}) {
             };
 
             window.scrollTo({ top: 0, behavior: 'smooth' });
+            return false;
+        },
+
+        submitForm() {
+            return this.handleSubmit();
         },
 
         resetForm() {

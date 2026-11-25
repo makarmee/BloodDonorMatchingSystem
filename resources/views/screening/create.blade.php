@@ -14,6 +14,12 @@
         'Passed' => __('Passed'),
         'Failed' => __('Failed'),
     ];
+
+    $availableAssayMethods = $assayMethods ?? \App\Models\ScreeningRecord::ASSAY_METHODS;
+    $assayMethodOptions = collect($availableAssayMethods)
+        ->mapWithKeys(fn (string $method): array => [$method => __($method)])
+        ->all();
+    $persistedMode = (bool) ($hasPersistedDonations ?? false);
 @endphp
 
 <x-app-layout :title="__('Record Screening Test')" :page-title="__('Record Screening')" active-role="staff">
@@ -49,17 +55,47 @@
         class="mx-auto max-w-4xl space-y-6"
         x-data="screeningForm({
             donations: @js($donations),
-            form: { donationId: @js(old('donation_id', request()->query('donation', ''))) }
+            hasPersistedDonations: @js($persistedMode),
+            form: {
+                donationId: @js(old('donation_id', request()->query('donation', ''))),
+                testType: @js(old('test_type', '')),
+                testDate: @js(old('test_date', $persistedMode ? now()->toDateString() : '')),
+                screeningResult: @js(old('screening_result', '')),
+                assayMethod: @js(old('assay_method', $defaultAssayMethod ?? \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD)),
+                isConfirmatory: @js((bool) old('is_confirmatory', false)),
+                labStaff: @js(old('lab_staff', $persistedMode ? (auth()->user()?->name ?? '') : '')),
+                testNotes: @js(old('test_notes', ''))
+            }
         })"
     >
         {{-- Explicit Screening Policy Notice --}}
-        <x-ui.alert variant="warning" :title="__('Manual Laboratory Verification Required')">
-            {!! __('Screening results are never automatically marked :passed. Select an explicit status (:pending, :passed, or :failed). Sample preview submissions do not represent real clinical clearance.', [
-                'passed' => '<strong>' . __('Passed') . '</strong>',
-                'pending' => '<strong>' . __('Pending') . '</strong>',
-                'failed' => '<strong>' . __('Failed') . '</strong>'
-            ]) !!}
-        </x-ui.alert>
+        @if ($persistedMode)
+            <x-ui.alert variant="warning" :title="__('Manual Laboratory Verification Required')">
+                {!! __('Screening results are never automatically marked :passed. Select an explicit status (:pending, :passed, or :failed). Recorded results are persisted to the laboratory screening log immediately.', [
+                    'passed' => '<strong>' . __('Passed') . '</strong>',
+                    'pending' => '<strong>' . __('Pending') . '</strong>',
+                    'failed' => '<strong>' . __('Failed') . '</strong>'
+                ]) !!}
+            </x-ui.alert>
+        @else
+            <x-ui.alert variant="warning" :title="__('Manual Laboratory Verification Required')">
+                {!! __('Screening results are never automatically marked :passed. Select an explicit status (:pending, :passed, or :failed). Sample preview submissions do not represent real clinical clearance.', [
+                    'passed' => '<strong>' . __('Passed') . '</strong>',
+                    'pending' => '<strong>' . __('Pending') . '</strong>',
+                    'failed' => '<strong>' . __('Failed') . '</strong>'
+                ]) !!}
+            </x-ui.alert>
+        @endif
+
+        @if ($errors->any())
+            <x-ui.alert variant="danger" :title="__('Unable to Save Screening Record')">
+                <ul class="list-disc list-inside space-y-1 text-sm">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </x-ui.alert>
+        @endif
 
         {{-- Reactive Preview Feedback Banner --}}
         <div
@@ -102,7 +138,8 @@
             </button>
         </div>
 
-        <form @submit.prevent="submitForm()" novalidate class="space-y-6">
+        <form method="POST" action="{{ route('screening.records.store') }}" @submit="handleSubmit($event)" novalidate class="space-y-6">
+            @csrf
             {{-- Section 1: Donation Selection & Auto Donor Summary --}}
             <x-ui.card>
                 <x-slot:header>
@@ -330,6 +367,31 @@
                                 x-text="errors.labStaff"
                                 class="mt-1.5 text-xs font-medium text-crimson-600 dark:text-crimson-400"
                             ></p>
+                        </div>
+
+                        <div>
+                            <x-ui.select
+                                id="screening-assay-method"
+                                name="assay_method"
+                                :label="__('Assay Method')"
+                                :options="$assayMethodOptions"
+                                required
+                                x-model="form.assayMethod"
+                            />
+                        </div>
+
+                        <div class="flex items-center pt-2 md:pt-7">
+                            <label for="screening-is-confirmatory" class="inline-flex items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 cursor-pointer">
+                                <input
+                                    id="screening-is-confirmatory"
+                                    name="is_confirmatory"
+                                    type="checkbox"
+                                    value="1"
+                                    x-model="form.isConfirmatory"
+                                    class="size-4 rounded border-slate-300 text-crimson-600 focus:ring-crimson-500 dark:border-slate-700 dark:bg-slate-900"
+                                />
+                                <span>{{ __('Confirmatory / Repeat Assay') }}</span>
+                            </label>
                         </div>
                     </div>
 

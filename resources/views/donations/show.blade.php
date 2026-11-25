@@ -362,13 +362,21 @@
                                         <x-icons.icon name="check-circle" class="size-3.5" />
                                         <span>{{ __('Ready for Inventory Release') }}</span>
                                     </a>
-                                @elseif ($pUnit->unit_status === 'Quarantined')
+                                @elseif ($pUnit->unit_status === 'Quarantined' && $donationModel->screening_status !== 'Failed')
                                     <a
                                         href="{{ route('screening.show', $donationModel->donation_code) }}"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 transition dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                                     >
                                         <x-icons.icon name="shield-check" class="size-3.5" />
                                         <span>{{ __('Complete Screening Panel') }}</span>
+                                    </a>
+                                @elseif ($donationModel->screening_status === 'Failed')
+                                    <a
+                                        href="{{ route('screening.show', $donationModel->donation_code) }}"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-2xs hover:bg-rose-100 transition dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300"
+                                    >
+                                        <x-icons.icon name="exclamation-triangle" class="size-3.5" />
+                                        <span>{{ __('View Failed Screening') }}</span>
                                     </a>
                                 @endif
                             </div>

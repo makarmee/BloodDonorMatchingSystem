@@ -4,10 +4,13 @@ namespace App\Services;
 
 use App\Models\BloodComponent;
 use App\Models\BloodUnit;
+use App\Models\ComponentScreeningRequirement;
 use App\Models\Donation;
 use App\Models\InventoryAllocation;
 use App\Models\InventoryStock;
 use App\Models\InventoryTransaction;
+use App\Models\ScreeningRecord;
+use App\Models\ScreeningTestType;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -588,10 +591,94 @@ class InventoryService
         $now = CarbonImmutable::now();
 
         $admittedUnit = DB::transaction(function () use ($unit, $actor, $context, $storageLocation, $now): BloodUnit {
+            // Global lock order: donations -> screening_records -> inventory_stocks -> blood_units.
+            $lockedDonation = $unit->donation_id !== null
+                ? Donation::query()->whereKey($unit->donation_id)->lockForUpdate()->first()
+                : null;
+
+            if ($lockedDonation instanceof Donation) {
+                $this->authorizeAction($actor, 'releaseToInventory', $lockedDonation);
+
+                if ($lockedDonation->collection_status !== 'Completed') {
+                    throw ValidationException::withMessages([
+                        'collection_status' => 'Donation collection must be Completed before screening admission.',
+                    ]);
+                }
+
+                if ($lockedDonation->released_to_inventory_at !== null) {
+                    throw ValidationException::withMessages([
+                        'released_to_inventory_at' => 'Donation units have already been released to inventory.',
+                    ]);
+                }
+
+                if ($lockedDonation->screening_status === 'Failed') {
+                    throw ValidationException::withMessages([
+                        'screening_status' => 'Donation screening status is Failed and permanently barred from release.',
+                    ]);
+                }
+
+                $requirements = ComponentScreeningRequirement::query()
+                    ->where('blood_component_id', $lockedDonation->blood_component_id)
+                    ->mandatory()
+                    ->with('testType')
+                    ->get()
+                    ->filter(
+                        static fn (ComponentScreeningRequirement $req): bool => $req->testType instanceof ScreeningTestType && $req->testType->is_active
+                    );
+
+                if ($requirements->isEmpty()) {
+                    throw ValidationException::withMessages([
+                        'component_screening_requirements' => 'No active mandatory component screening requirements are configured.',
+                    ]);
+                }
+
+                $records = ScreeningRecord::query()
+                    ->where('donation_id', $lockedDonation->id)
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($records->contains(static fn (ScreeningRecord $rec): bool => $rec->screening_result === 'Failed')) {
+                    throw ValidationException::withMessages([
+                        'screening_status' => 'Failed screening tests present; unit cannot be admitted.',
+                    ]);
+                }
+
+                if ($records->contains(static fn (ScreeningRecord $rec): bool => $rec->screening_result === 'Pending')) {
+                    throw ValidationException::withMessages([
+                        'screening_status' => 'Pending screening tests must be completed before admission.',
+                    ]);
+                }
+
+                $passedTestIds = $records
+                    ->where('screening_result', 'Passed')
+                    ->pluck('test_type_id')
+                    ->unique()
+                    ->all();
+
+                $missingMandatory = $requirements->contains(
+                    static fn (ComponentScreeningRequirement $req): bool => ! in_array($req->test_type_id, $passedTestIds, true)
+                );
+
+                if ($missingMandatory) {
+                    throw ValidationException::withMessages([
+                        'screening_status' => 'Missing required passed screening tests for inventory admission.',
+                    ]);
+                }
+            }
+
+            $bucket = $this->resolveFreshUnitBucketKey($unit);
+            $lockedStock = $this->ensureAndLockInventoryStock(
+                $bucket['blood_group'],
+                $bucket['blood_component_id']
+            );
+
             $lockedUnit = BloodUnit::query()
                 ->whereKey($unit->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $this->ensureUnitMatchesStock($lockedUnit, $lockedStock);
 
             if ($lockedUnit->unit_status !== 'Quarantined') {
                 throw ValidationException::withMessages([
@@ -599,20 +686,12 @@ class InventoryService
                 ]);
             }
 
-            $donation = Donation::query()
-                ->whereKey($lockedUnit->donation_id)
-                ->first();
-
-            if ($donation instanceof Donation && $donation->screening_status !== 'Passed') {
-                throw ValidationException::withMessages([
-                    'screening_status' => "Cannot admit blood unit: associated donation screening status is '{$donation->screening_status}' (must be 'Passed').",
-                ]);
+            if ($lockedDonation instanceof Donation) {
+                $lockedDonation->screening_status = 'Passed';
+                $lockedDonation->released_to_inventory_at = $now;
+                $lockedDonation->approved_by_user_id = $actor->getKey();
+                $lockedDonation->save();
             }
-
-            $lockedStock = $this->ensureAndLockInventoryStock(
-                $lockedUnit->blood_group,
-                $lockedUnit->blood_component_id
-            );
 
             $this->admitLockedBucketUnits(
                 lockedStock: $lockedStock,

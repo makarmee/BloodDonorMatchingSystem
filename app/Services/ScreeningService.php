@@ -611,15 +611,15 @@ class ScreeningService
         $blockingReasons = [];
 
         if ($donation->collection_status !== 'Completed') {
-            $blockingReasons[] = 'Donation collection must be Completed before screening release.';
+            $blockingReasons[] = __('Donation collection must be Completed before screening release.');
         }
 
         if ($donation->released_to_inventory_at !== null) {
-            $blockingReasons[] = 'Donation units have already been released to inventory.';
+            $blockingReasons[] = __('Donation units have already been released to inventory.');
         }
 
         if ($donation->screening_status === 'Failed') {
-            $blockingReasons[] = 'Donation screening status is Failed and permanently barred from release.';
+            $blockingReasons[] = __('Donation screening status is Failed and permanently barred from release.');
         }
 
         $activeRequirements = $requirements->filter(
@@ -627,7 +627,7 @@ class ScreeningService
         );
 
         if ($activeRequirements->isEmpty()) {
-            $blockingReasons[] = 'No active mandatory component screening requirements are configured.';
+            $blockingReasons[] = __('No active mandatory component screening requirements are configured.');
         }
 
         $requiredTestCodes = $activeRequirements
@@ -674,21 +674,27 @@ class ScreeningService
         }
 
         if ($failedTestCodes !== []) {
-            $blockingReasons[] = 'Failed screening tests present: '.implode(', ', $failedTestCodes).'.';
+            $blockingReasons[] = __('Failed screening tests present: :codes.', [
+                'codes' => implode(', ', $failedTestCodes),
+            ]);
         }
 
         if ($pendingTestCodes !== []) {
-            $blockingReasons[] = 'Pending screening tests must be completed: '.implode(', ', $pendingTestCodes).'.';
+            $blockingReasons[] = __('Pending screening tests must be completed: :codes.', [
+                'codes' => implode(', ', $pendingTestCodes),
+            ]);
         }
 
         if ($missingTestCodes !== []) {
-            $blockingReasons[] = 'Missing required screening tests: '.implode(', ', $missingTestCodes).'.';
+            $blockingReasons[] = __('Missing required screening tests: :codes.', [
+                'codes' => implode(', ', $missingTestCodes),
+            ]);
         }
 
         if ($primaryUnits->isEmpty()) {
-            $blockingReasons[] = 'No primary quarantined blood unit exists for this donation.';
+            $blockingReasons[] = __('No primary quarantined blood unit exists for this donation.');
         } elseif ($primaryUnits->contains(static fn (BloodUnit $unit): bool => $unit->unit_status !== 'Quarantined')) {
-            $blockingReasons[] = 'Primary blood unit is not in Quarantined status.';
+            $blockingReasons[] = __('Primary blood unit is not in Quarantined status.');
         }
 
         return [

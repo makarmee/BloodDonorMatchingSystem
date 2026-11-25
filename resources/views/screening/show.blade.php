@@ -70,22 +70,24 @@
                     <span>{{ __('Back to Screening') }}</span>
                 </x-ui.button>
 
-                @if ($pendingRecord && isset($donationModel) && $donationModel)
-                    <x-ui.button
-                        variant="primary"
-                        size="md"
-                        type="button"
-                        @click="$dispatch('open-record-modal', {
-                            recordId: @js($pendingRecord['recordId'] ?? ''),
-                            testTypeId: @js($pendingRecord['testTypeId'] ?? ''),
-                            testTypeName: @js(__($pendingRecord['testType'] ?? '')),
-                            screeningCode: @js($pendingRecord['id'] ?? $sample['donationId']),
-                            assayMethod: @js(in_array($pendingRecord['assayMethod'] ?? '', $availableMethods, true) ? $pendingRecord['assayMethod'] : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD)
-                        })"
-                    >
-                        <x-icons.icon name="beaker" class="size-4" />
-                        <span>{{ __('Record Result') }}</span>
-                    </x-ui.button>
+                @if ($pendingRecord && isset($donationModel) && $donationModel && $donationModel->released_to_inventory_at === null && $donationModel->collection_status === 'Completed')
+                    @can('recordResult', \App\Models\ScreeningRecord::class)
+                        <x-ui.button
+                            variant="primary"
+                            size="md"
+                            type="button"
+                            @click="$dispatch('open-record-modal', {
+                                recordId: @js($pendingRecord['recordId'] ?? ''),
+                                testTypeId: @js($pendingRecord['testTypeId'] ?? ''),
+                                testTypeName: @js(__($pendingRecord['testType'] ?? '')),
+                                screeningCode: @js($pendingRecord['id'] ?? $sample['donationId']),
+                                assayMethod: @js(in_array($pendingRecord['assayMethod'] ?? '', $availableMethods, true) ? $pendingRecord['assayMethod'] : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD)
+                            })"
+                        >
+                            <x-icons.icon name="beaker" class="size-4" />
+                            <span>{{ __('Record Result') }}</span>
+                        </x-ui.button>
+                    @endcan
                 @endif
 
                 @if (isset($donationModel) && $donationModel)
@@ -104,10 +106,14 @@
                     @endcan
                 @endif
 
-                <x-ui.button variant="outline" size="md" :href="route('screening.create', ['donation' => $sample['donationId']])">
-                    <x-icons.icon name="plus" class="size-4" />
-                    <span>{{ __('Record Screening Test') }}</span>
-                </x-ui.button>
+                @can('recordResult', \App\Models\ScreeningRecord::class)
+                    @if (! isset($donationModel) || ! $donationModel || ($donationModel->released_to_inventory_at === null && $donationModel->collection_status === 'Completed'))
+                        <x-ui.button variant="outline" size="md" :href="route('screening.create', ['donation' => $sample['donationId']])">
+                            <x-icons.icon name="plus" class="size-4" />
+                            <span>{{ __('Record Screening Test') }}</span>
+                        </x-ui.button>
+                    @endif
+                @endcan
             </div>
         </div>
     </x-slot:header>
@@ -139,10 +145,24 @@
             <x-ui.alert variant="danger" :title="session('error')" />
         @endif
 
-        @if (isset($readiness) && $readiness)
-            @if ($readiness['is_ready_for_release'])
+        @if (isset($readiness) && $readiness && isset($donationModel) && $donationModel)
+            @if ($donationModel->released_to_inventory_at !== null)
+                <x-ui.alert variant="success" :title="__('Released to Available Inventory')">
+                    {{ __('All mandatory laboratory screening assays passed and the primary blood unit was released to inventory on :date.', [
+                        'date' => $donationModel->released_to_inventory_at->format('M d, Y H:i'),
+                    ]) }}
+                </x-ui.alert>
+            @elseif ($readiness['is_ready_for_release'])
                 <x-ui.alert variant="success" :title="__('Inventory Release Eligible')">
                     {{ __('All mandatory laboratory screening assays are completed and passed. This donation\'s unit is eligible for release to active inventory.') }}
+                </x-ui.alert>
+            @elseif ($donationModel->screening_status === 'Failed')
+                <x-ui.alert variant="danger" :title="__('Screening Failed — Permanently Disqualified from Release')">
+                    <ul class="list-disc list-inside space-y-1">
+                        @foreach ($readiness['blocking_reasons'] as $reason)
+                            <li>{{ $reason }}</li>
+                        @endforeach
+                    </ul>
                 </x-ui.alert>
             @elseif (! empty($readiness['blocking_reasons']))
                 <x-ui.alert variant="warning" :title="__('Inventory Release Blocked')">
@@ -420,7 +440,7 @@
                                             </td>
 
                                             <td class="px-5 py-3.5 text-end whitespace-nowrap">
-                                                @if ($recordItem['screeningResult'] === 'Pending' && isset($donationModel) && $donationModel)
+                                                @if ($recordItem['screeningResult'] === 'Pending' && isset($donationModel) && $donationModel && $donationModel->released_to_inventory_at === null && $donationModel->collection_status === 'Completed' && auth()->user()?->can('recordResult', \App\Models\ScreeningRecord::class))
                                                     <x-ui.button
                                                         variant="outline"
                                                         size="sm"
@@ -482,8 +502,9 @@
         </div>
 
         @if (isset($donationModel) && $donationModel)
-            {{-- Release to Inventory Modal --}}
-            <x-ui.modal name="release-inventory-modal" :title="__('Release Quarantined Unit to Inventory')" max-width="md">
+            @if (isset($readiness) && $readiness['is_ready_for_release'] && auth()->user()?->can('releaseToInventory', $donationModel))
+                {{-- Release to Inventory Modal --}}
+                <x-ui.modal name="release-inventory-modal" :title="__('Release Quarantined Unit to Inventory')" max-width="md">
                 <form method="POST" action="{{ route('screening.donations.release', $donationModel) }}" class="space-y-4">
                     @csrf
                     <p class="text-sm text-slate-600 dark:text-slate-300">
@@ -533,8 +554,9 @@
                     </div>
                 </form>
             </x-ui.modal>
+            @endif
 
-            @if ($pendingRecord)
+            @if ($pendingRecord && $donationModel->released_to_inventory_at === null && $donationModel->collection_status === 'Completed' && auth()->user()?->can('recordResult', \App\Models\ScreeningRecord::class))
                 {{-- Record Assay Result Modal --}}
                 <x-ui.modal name="record-result-modal" :title="__('Record Laboratory Assay Result')" max-width="md">
                     <form method="POST" action="{{ route('screening.records.store') }}" class="space-y-4">

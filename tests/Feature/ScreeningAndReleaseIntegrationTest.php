@@ -12,12 +12,15 @@ use App\Models\Role;
 use App\Models\ScreeningRecord;
 use App\Models\User;
 use App\Services\DonationService;
+use App\Services\InventoryService;
 use App\Services\ScreeningService;
 use Database\Seeders\BloodComponentSeeder;
 use Database\Seeders\ComponentScreeningRequirementSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\ScreeningTestTypeSeeder;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class ScreeningAndReleaseIntegrationTest extends TestCase
@@ -512,5 +515,176 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
         $response->assertSee('DON-358906');
         $response->assertSee('پنل معاینات و نتایج آزمایش‌ها');
         $response->assertSee('مشخصات اهداکننده');
+        $response->assertSee('آزمایش‌های غربالگری در انتظار باید تکمیل شوند');
+    }
+
+    public function test_screening_create_page_submits_persisted_records_and_enforces_record_result_authorization(): void
+    {
+        $donor = Donor::factory()->eligible()->create(['blood_group' => 'A+']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+
+        // Persisted donations render real POST form with assay_method and confirmatory option
+        $createResponse = $this->actingAs($this->labOfficer)->get(route('screening.create', ['donation' => $donation->donation_code]));
+        $createResponse->assertOk();
+        $createResponse->assertViewHas('hasPersistedDonations', true);
+        $createResponse->assertSee('method="POST"', false);
+        $createResponse->assertSee('action="'.route('screening.records.store').'"', false);
+        $createResponse->assertSee('name="assay_method"', false);
+        $createResponse->assertSee('name="is_confirmatory"', false);
+
+        // Staff lacking screening.record receives 403 immediately even with nonexistent donation_id
+        $this->actingAs($this->staff)
+            ->post(route('screening.records.store'), [
+                'donation_id' => 'DON-NONEXISTENT-403',
+                'test_type' => 'HIV',
+                'screening_result' => 'Passed',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($this->staff)
+            ->post(route('screening.donations.release', $donation))
+            ->assertForbidden();
+
+        // Lab officer submits real screening record via screening.records.store
+        $storeResponse = $this->actingAs($this->labOfficer)->post(route('screening.records.store'), [
+            'donation_id' => $donation->donation_code,
+            'test_type' => 'HIV',
+            'test_date' => now()->toDateString(),
+            'screening_result' => 'Passed',
+            'assay_method' => 'NAT — Nucleic Acid Testing',
+            'lab_staff' => 'Dr. Priya Nair',
+            'test_notes' => 'Submitted from screening.create form.',
+        ]);
+
+        $storeResponse->assertRedirect(route('screening.show', $donation));
+        $this->assertDatabaseHas('screening_records', [
+            'donation_id' => $donation->id,
+            'screening_result' => 'Passed',
+            'assay_method' => 'NAT — Nucleic Acid Testing',
+        ]);
+    }
+
+    public function test_screening_show_displays_accurate_states_and_guards_actions_for_failed_released_and_staff(): void
+    {
+        $donor = Donor::factory()->eligible()->create(['blood_group' => 'O+']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+
+        // Staff user can inspect screening.show but must not see Record Result or Release forms/modals
+        $staffShow = $this->actingAs($this->staff)->get(route('screening.show', $donation));
+        $staffShow->assertOk();
+        $staffShow->assertDontSee(route('screening.records.store'), false);
+        $staffShow->assertDontSee(route('screening.donations.release', $donation), false);
+        $staffShow->assertDontSee('release-inventory-modal', false);
+
+        // Pass all tests and release to inventory
+        foreach (ScreeningRecord::where('donation_id', $donation->id)->get() as $record) {
+            $this->screeningService->recordScreeningResult($donation, $this->labOfficer, [
+                'screening_record_id' => $record->id,
+                'screening_result' => 'Passed',
+            ]);
+        }
+        $this->screeningService->releaseToInventory($donation, $this->labOfficer);
+
+        // Released state must display Released banner, never Inventory Release Blocked or Record Result modal
+        $releasedShow = $this->actingAs($this->labOfficer)->get(route('screening.show', $donation));
+        $releasedShow->assertOk();
+        $releasedShow->assertSee('Released to Available Inventory');
+        $releasedShow->assertDontSee('Inventory Release Blocked');
+        $releasedShow->assertDontSee('release-inventory-modal', false);
+
+        // Failed donation + confirmatory Passed remains permanently disqualified
+        $donor2 = Donor::factory()->eligible()->create(['blood_group' => 'B+']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor2)->create();
+        $failedDonation = $this->donationService->registerDonation($donor2, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $this->screeningService->initializePendingPanel($failedDonation, $this->staff);
+
+        $records = ScreeningRecord::where('donation_id', $failedDonation->id)->orderBy('id')->get();
+        $first = $records->first();
+        $this->screeningService->recordScreeningResult($failedDonation, $this->labOfficer, [
+            'screening_record_id' => $first->id,
+            'screening_result' => 'Failed',
+        ]);
+        foreach ($records->slice(1) as $remaining) {
+            $this->screeningService->recordScreeningResult($failedDonation, $this->labOfficer, [
+                'screening_record_id' => $remaining->id,
+                'screening_result' => 'Passed',
+            ]);
+        }
+        // Even a confirmatory Passed test on the same failed test type cannot unlock release
+        $this->screeningService->recordScreeningResult($failedDonation, $this->labOfficer, [
+            'test_type_id' => $first->test_type_id,
+            'screening_result' => 'Passed',
+            'is_confirmatory' => true,
+        ]);
+
+        $failedShow = $this->actingAs($this->labOfficer)->get(route('screening.show', $failedDonation));
+        $failedShow->assertOk();
+        $failedShow->assertSee('Screening Failed — Permanently Disqualified from Release');
+        $failedShow->assertDontSee('release-inventory-modal', false);
+
+        $readiness = $this->screeningService->evaluateReleaseReadiness($failedDonation->fresh());
+        $this->assertFalse($readiness['is_ready_for_release']);
+    }
+
+    public function test_admit_screened_unit_cannot_bypass_mandatory_screening_or_release_permission(): void
+    {
+        $donor = Donor::factory()->eligible()->create(['blood_group' => 'AB-']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+        $unit = BloodUnit::where('donation_id', $donation->id)->firstOrFail();
+
+        $inventoryService = app(InventoryService::class);
+
+        // Staff holding inventory.adjust (but NOT screening.release_inventory) must be denied
+        try {
+            $inventoryService->admitScreenedUnit($unit, $this->staff);
+            $this->fail('Expected AuthorizationException when staff attempts admitScreenedUnit without screening.release_inventory.');
+        } catch (AuthorizationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        // Even an admin/lab officer cannot bypass pending mandatory screening records via admitScreenedUnit
+        $admin = User::factory()->create();
+        $admin->roles()->attach(Role::where('slug', 'admin')->firstOrFail());
+
+        try {
+            $inventoryService->admitScreenedUnit($unit, $admin);
+            $this->fail('Expected ValidationException when admitting unit with pending screening records.');
+        } catch (ValidationException) {
+            $this->addToAssertionCount(1);
+        }
+
+        $this->assertSame('Quarantined', $unit->fresh()->unit_status);
+        $this->assertNull($donation->fresh()->released_to_inventory_at);
     }
 }

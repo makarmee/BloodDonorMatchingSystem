@@ -60,13 +60,23 @@
         </section>
 
         {{-- Clinical Rule Disclaimer --}}
-        <x-ui.alert variant="info" :title="__('Laboratory Screening Policy (Preview Data Only)')">
-            {!! __('Screening results (:pending, :passed, and :failed) must be selected explicitly per sample and are never marked Passed automatically. Sample records shown here are frontend preview fixtures and do not represent real clinical clearance.', [
-                'pending' => '<strong>' . __('Pending') . '</strong>',
-                'passed' => '<strong>' . __('Passed') . '</strong>',
-                'failed' => '<strong>' . __('Failed') . '</strong>'
-            ]) !!}
-        </x-ui.alert>
+        @if ($isSamplePreview ?? false)
+            <x-ui.alert variant="info" :title="__('Laboratory Screening Policy (Preview Data Only)')">
+                {!! __('Screening results (:pending, :passed, and :failed) must be selected explicitly per sample and are never marked Passed automatically. Sample records shown here are frontend preview fixtures and do not represent real clinical clearance.', [
+                    'pending' => '<strong>' . __('Pending') . '</strong>',
+                    'passed' => '<strong>' . __('Passed') . '</strong>',
+                    'failed' => '<strong>' . __('Failed') . '</strong>'
+                ]) !!}
+            </x-ui.alert>
+        @else
+            <x-ui.alert variant="info" :title="__('Laboratory Screening Policy')">
+                {!! __('Screening results (:pending, :passed, and :failed) must be recorded explicitly per mandatory assay before quarantined blood units can be released into available inventory.', [
+                    'pending' => '<strong>' . __('Pending') . '</strong>',
+                    'passed' => '<strong>' . __('Passed') . '</strong>',
+                    'failed' => '<strong>' . __('Failed') . '</strong>'
+                ]) !!}
+            </x-ui.alert>
+        @endif
 
         {{-- Screening Table Card --}}
         <x-ui.card :padding="false">

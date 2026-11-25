@@ -11,6 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -108,6 +109,7 @@ class ScreeningController extends Controller
             'summary' => $summary,
             'bloodGroups' => $this->bloodGroupOptions(),
             'testTypes' => $this->testTypeOptions(),
+            'isSamplePreview' => $totalCount === 0,
         ]);
     }
 
@@ -140,7 +142,9 @@ class ScreeningController extends Controller
             ])
             ->all();
 
-        if (empty($donations)) {
+        $hasPersistedDonations = ! empty($donations);
+
+        if (! $hasPersistedDonations) {
             $donations = array_values($this->sampleDonationsById());
         }
 
@@ -156,7 +160,10 @@ class ScreeningController extends Controller
 
         return view('screening.create', [
             'donations' => $donations,
+            'hasPersistedDonations' => $hasPersistedDonations,
             'testTypes' => $testTypes,
+            'assayMethods' => ScreeningRecord::ASSAY_METHODS,
+            'defaultAssayMethod' => ScreeningRecord::DEFAULT_ASSAY_METHOD,
             'labStaffSuggestions' => $this->labStaffSuggestions(),
         ]);
     }
@@ -175,6 +182,7 @@ class ScreeningController extends Controller
                 'donor',
                 'bloodComponent',
                 'primaryBloodUnit',
+                'approvedBy',
                 'center',
                 'camp',
                 'screeningRecords' => fn ($query) => $query->with(['testType', 'performedBy'])->orderBy('id'),
@@ -273,6 +281,7 @@ class ScreeningController extends Controller
     public function storeRecord(Request $request): RedirectResponse
     {
         $actor = $this->authorizeScreeningAccess($request);
+        Gate::forUser($actor)->authorize('recordResult', ScreeningRecord::class);
 
         $validated = $request->validate([
             'donation_id' => ['required', 'string'],
@@ -320,7 +329,10 @@ class ScreeningController extends Controller
 
         return redirect()
             ->route('screening.show', $donation)
-            ->with('success', "Screening result recorded as {$record->screening_result} for {$donation->donation_code}.");
+            ->with('success', __('Screening result recorded as :result for :code.', [
+                'result' => __($record->screening_result),
+                'code' => $donation->donation_code,
+            ]));
     }
 
     /**
@@ -329,6 +341,7 @@ class ScreeningController extends Controller
     public function releaseToInventory(Request $request, Donation $donation): RedirectResponse
     {
         $actor = $this->authorizeScreeningAccess($request);
+        Gate::forUser($actor)->authorize('releaseToInventory', $donation);
 
         $validated = $request->validate([
             'screening_notes' => ['nullable', 'string', 'max:1000'],
@@ -340,7 +353,9 @@ class ScreeningController extends Controller
 
             return redirect()
                 ->route('donations.show', $released)
-                ->with('success', "Donation {$released->donation_code} and quarantined blood unit released into available inventory.");
+                ->with('success', __('Donation :code and quarantined blood unit released into available inventory.', [
+                    'code' => $released->donation_code,
+                ]));
         } catch (ValidationException $e) {
             return redirect()
                 ->back()
