@@ -78,7 +78,7 @@ class ScreeningPageTest extends TestCase
 
         // Route links
         $response->assertSee(route('screening.create'));
-        $response->assertSee(route('screening.show', 'SCR-7105'));
+        $response->assertSee(route('screening.show', 'DON-4405'));
         $response->assertSee(route('donations.show', 'DON-4405'));
         $response->assertSee(route('donors.show', 'DNR-1041'));
     }
@@ -132,11 +132,12 @@ class ScreeningPageTest extends TestCase
 
     public function test_screening_details_page_displays_donor_donation_test_notes_and_timestamps(): void
     {
-        $response = $this->get(route('screening.show', 'SCR-7102'));
+        $response = $this->get(route('screening.show', 'DON-4403'));
 
         $response->assertOk();
         $response->assertViewIs('screening.show');
         $response->assertViewHas('sample');
+        $response->assertViewHas('records');
 
         $response->assertSee('SCR-7102');
         $response->assertSee('DON-4403');
@@ -175,6 +176,7 @@ class ScreeningPageTest extends TestCase
 
     public function test_unknown_screening_route_returns_not_found(): void
     {
-        $this->get(route('screening.show', 'SCR-9999'))->assertNotFound();
+        $this->get(route('screening.show', 'DON-9999'))->assertNotFound();
+        $this->get(route('screening.show', 'NONEXISTENT-CODE'))->assertNotFound();
     }
 }

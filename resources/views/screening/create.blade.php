@@ -47,7 +47,10 @@
 
     <div
         class="mx-auto max-w-4xl space-y-6"
-        x-data="screeningForm({ donations: @js($donations) })"
+        x-data="screeningForm({
+            donations: @js($donations),
+            form: { donationId: @js(old('donation_id', request()->query('donation', ''))) }
+        })"
     >
         {{-- Explicit Screening Policy Notice --}}
         <x-ui.alert variant="warning" :title="__('Manual Laboratory Verification Required')">

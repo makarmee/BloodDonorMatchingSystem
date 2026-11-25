@@ -98,37 +98,9 @@ class ScreeningController extends Controller
                 $query->where('test_date', '<=', (string) $request->query('date_to'));
             }
 
-            $samples = $query->get()->map(function (ScreeningRecord $record): array {
-                $donation = $record->donation;
-                $donor = $donation?->donor;
-
-                return [
-                    'id' => $record->screening_code,
-                    'donationId' => $donation?->donation_code ?? '—',
-                    'donorId' => $donor?->donor_code ?? '—',
-                    'donorName' => $donor?->full_name ?? '—',
-                    'donorEmail' => $donor?->email ?? '',
-                    'donorPhone' => $donor?->phone ?? '',
-                    'bloodGroup' => $donation?->blood_group ?? 'O+',
-                    'collectionDate' => $donation?->donation_date?->format('Y-m-d') ?? '',
-                    'collectionDateFormatted' => $donation?->donation_date?->format('M d, Y') ?? '',
-                    'donationType' => $donation?->bloodComponent?->name ?? 'Whole Blood',
-                    'quantityMl' => (int) ($donation?->quantity_ml ?? 450),
-                    'collectionLocation' => $donation?->collection_location_name ?? 'Main Center',
-                    'collectionStatus' => $donation?->collection_status ?? 'Completed',
-                    'testDate' => $record->test_date?->format('Y-m-d'),
-                    'testDateFormatted' => $record->test_date?->format('M d, Y') ?? 'Awaiting test',
-                    'testType' => $record->testType?->name ?? 'HIV',
-                    'screeningResult' => $record->screening_result,
-                    'labStaff' => $record->lab_staff_name ?? $record->performedBy?->name ?? 'Laboratory Staff',
-                    'assayMethod' => $record->assay_method ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
-                    'specimenTube' => $record->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
-                    'testNotes' => $record->test_notes ?? '',
-                    'collectedAt' => $record->collected_at?->format('M d, Y • H:i') ?? '—',
-                    'loggedAt' => $record->logged_at?->format('M d, Y • H:i') ?? '—',
-                    'resultRecordedAt' => $record->result_recorded_at?->format('M d, Y • H:i') ?? 'Pending verification',
-                ];
-            })->all();
+            $samples = $query->get()
+                ->map(fn (ScreeningRecord $record): array => $this->formatScreeningRecord($record))
+                ->all();
         }
 
         return view('screening.index', [
@@ -190,63 +162,104 @@ class ScreeningController extends Controller
     }
 
     /**
-     * Display detailed screening results, linked donation details, donor data, and audit timestamps.
+     * Display a donation's complete screening panel, linked donation/donor details, and release readiness.
      */
-    public function show(Request $request, ScreeningRecord $screening): View
+    public function show(Request $request, Donation $donation): View
     {
         $this->authorizeScreeningAccess($request);
 
-        if ($screening->exists) {
-            $screening->load(['donation.donor', 'donation.bloodComponent', 'donation.primaryBloodUnit', 'donation.screeningRecords.testType', 'testType', 'performedBy']);
+        $isPersistedDonation = $donation->donor_id !== null || array_key_exists('created_at', $donation->getAttributes());
 
-            $donation = $screening->donation;
-            $donor = $donation?->donor;
+        if ($isPersistedDonation) {
+            $donation->load([
+                'donor',
+                'bloodComponent',
+                'primaryBloodUnit',
+                'center',
+                'camp',
+                'screeningRecords' => fn ($query) => $query->with(['testType', 'performedBy'])->orderBy('id'),
+            ]);
+
+            $donor = $donation->donor;
+            $screeningModels = $donation->screeningRecords;
+            $records = $screeningModels
+                ->map(fn (ScreeningRecord $record): array => $this->formatScreeningRecord($record, $donation))
+                ->values()
+                ->all();
+
+            $primaryScreeningModel = $screeningModels->firstWhere('screening_result', 'Pending')
+                ?? $screeningModels->first();
+
+            $firstPendingOrFirst = $primaryScreeningModel
+                ? $this->formatScreeningRecord($primaryScreeningModel, $donation)
+                : null;
+
+            $location = $donation->collection_location_name
+                ?? $donation->center?->name
+                ?? $donation->camp?->name
+                ?? 'Main Center';
 
             $sample = [
-                'id' => $screening->screening_code,
-                'donationId' => $donation?->donation_code ?? '—',
+                'recordId' => $firstPendingOrFirst['recordId'] ?? null,
+                'id' => $firstPendingOrFirst['id'] ?? $donation->donation_code,
+                'donationId' => $donation->donation_code,
                 'donorId' => $donor?->donor_code ?? '—',
                 'donorName' => $donor?->full_name ?? '—',
                 'donorEmail' => $donor?->email ?? '',
                 'donorPhone' => $donor?->phone ?? '',
-                'bloodGroup' => $donation?->blood_group ?? 'O+',
-                'collectionDate' => $donation?->donation_date?->format('Y-m-d') ?? '',
-                'collectionDateFormatted' => $donation?->donation_date?->format('M d, Y') ?? '',
-                'donationType' => $donation?->bloodComponent?->name ?? 'Whole Blood',
-                'quantityMl' => (int) ($donation?->quantity_ml ?? 450),
-                'collectionLocation' => $donation?->collection_location_name ?? 'Main Center',
-                'collectionStatus' => $donation?->collection_status ?? 'Completed',
-                'testDate' => $screening->test_date?->format('Y-m-d'),
-                'testDateFormatted' => $screening->test_date?->format('M d, Y') ?? 'Awaiting test',
-                'testType' => $screening->testType?->name ?? 'HIV',
-                'screeningResult' => $screening->screening_result,
-                'labStaff' => $screening->lab_staff_name ?? $screening->performedBy?->name ?? 'Laboratory Staff',
-                'assayMethod' => $screening->assay_method ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
-                'specimenTube' => $screening->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
-                'testNotes' => $screening->test_notes ?? '',
-                'collectedAt' => $screening->collected_at?->format('M d, Y • H:i') ?? '—',
-                'loggedAt' => $screening->logged_at?->format('M d, Y • H:i') ?? '—',
-                'resultRecordedAt' => $screening->result_recorded_at?->format('M d, Y • H:i') ?? 'Pending verification',
+                'bloodGroup' => $donation->blood_group ?? 'O+',
+                'collectionDate' => $donation->donation_date?->format('Y-m-d') ?? '',
+                'collectionDateFormatted' => $donation->donation_date?->format('M d, Y') ?? '',
+                'donationType' => $donation->bloodComponent?->name ?? 'Whole Blood',
+                'quantityMl' => (int) ($donation->quantity_ml ?? 450),
+                'collectionLocation' => $location,
+                'collectionStatus' => $donation->collection_status ?? 'Completed',
+                'overallScreeningStatus' => $donation->screening_status ?? 'Pending',
+                'primaryUnitCode' => $donation->primaryBloodUnit?->unit_code,
+                'primaryUnitStatus' => $donation->primaryBloodUnit?->unit_status,
+                'testTypeId' => $firstPendingOrFirst['testTypeId'] ?? null,
+                'testDate' => $firstPendingOrFirst['testDate'] ?? null,
+                'testDateFormatted' => $firstPendingOrFirst['testDateFormatted'] ?? 'Awaiting test',
+                'testType' => $firstPendingOrFirst['testType'] ?? 'Pending Initialization',
+                'screeningResult' => $firstPendingOrFirst['screeningResult'] ?? ($donation->screening_status ?? 'Pending'),
+                'labStaff' => $firstPendingOrFirst['labStaff'] ?? ($donation->staff_member_name ?? 'Laboratory Staff'),
+                'assayMethod' => $firstPendingOrFirst['assayMethod'] ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
+                'specimenTube' => $firstPendingOrFirst['specimenTube'] ?? ($donation->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
+                'testNotes' => $firstPendingOrFirst['testNotes'] ?? '',
+                'collectedAt' => $firstPendingOrFirst['collectedAt'] ?? ($donation->collected_at?->format('M d, Y • H:i') ?? '—'),
+                'loggedAt' => $firstPendingOrFirst['loggedAt'] ?? '—',
+                'resultRecordedAt' => $firstPendingOrFirst['resultRecordedAt'] ?? 'Pending verification',
             ];
 
-            $readiness = $donation ? $this->screeningService->evaluateReleaseReadiness($donation) : null;
-            $sisterRecords = $donation?->screeningRecords ?? collect();
+            $readiness = $this->screeningService->evaluateReleaseReadiness($donation);
 
             return view('screening.show', [
                 'sample' => $sample,
-                'screeningRecord' => $screening,
+                'records' => $records,
+                'screeningRecord' => $primaryScreeningModel,
                 'donationModel' => $donation,
                 'readiness' => $readiness,
-                'sisterRecords' => $sisterRecords,
+                'sisterRecords' => $screeningModels,
                 'assayMethods' => ScreeningRecord::ASSAY_METHODS,
             ]);
         }
 
-        $sample = $this->findScreeningOrFail($screening->screening_code);
+        $sampleRecords = array_values(array_filter(
+            self::sampleScreeningList(),
+            fn (array $entry): bool => strcasecmp($entry['donationId'], (string) $donation->donation_code) === 0
+        ));
+
+        if ($sampleRecords === []) {
+            abort(404);
+        }
+
+        $primarySample = $sampleRecords[0];
+        $primarySample['overallScreeningStatus'] = $primarySample['screeningResult'];
 
         return view('screening.show', [
-            'sample' => $sample,
-            'screeningRecord' => $screening,
+            'sample' => $primarySample,
+            'records' => $sampleRecords,
+            'screeningRecord' => null,
             'donationModel' => null,
             'readiness' => null,
             'sisterRecords' => collect(),
@@ -306,7 +319,7 @@ class ScreeningController extends Controller
         $record = $this->screeningService->recordScreeningResult($donation, $actor, $attributes);
 
         return redirect()
-            ->route('screening.show', $record)
+            ->route('screening.show', $donation)
             ->with('success', "Screening result recorded as {$record->screening_result} for {$donation->donation_code}.");
     }
 
@@ -356,19 +369,50 @@ class ScreeningController extends Controller
     }
 
     /**
-     * Locate a sample screening record by code or abort with 404.
+     * Format a ScreeningRecord model and its parent donation context for UI rendering.
      *
      * @return array<string, mixed>
      */
-    private function findScreeningOrFail(string $screeningId): array
+    private function formatScreeningRecord(ScreeningRecord $record, ?Donation $donation = null): array
     {
-        foreach (self::sampleScreeningList() as $record) {
-            if (strcasecmp($record['id'], $screeningId) === 0) {
-                return $record;
-            }
-        }
+        $donation ??= $record->donation;
+        $donor = $donation?->donor;
 
-        abort(404);
+        $location = $donation?->collection_location_name
+            ?? $donation?->center?->name
+            ?? $donation?->camp?->name
+            ?? 'Main Center';
+
+        return [
+            'recordId' => $record->id,
+            'id' => $record->screening_code,
+            'donationId' => $donation?->donation_code ?? '—',
+            'donorId' => $donor?->donor_code ?? '—',
+            'donorName' => $donor?->full_name ?? '—',
+            'donorEmail' => $donor?->email ?? '',
+            'donorPhone' => $donor?->phone ?? '',
+            'bloodGroup' => $donation?->blood_group ?? 'O+',
+            'collectionDate' => $donation?->donation_date?->format('Y-m-d') ?? '',
+            'collectionDateFormatted' => $donation?->donation_date?->format('M d, Y') ?? '',
+            'donationType' => $donation?->bloodComponent?->name ?? 'Whole Blood',
+            'quantityMl' => (int) ($donation?->quantity_ml ?? 450),
+            'collectionLocation' => $location,
+            'collectionStatus' => $donation?->collection_status ?? 'Completed',
+            'testTypeId' => $record->test_type_id,
+            'testDate' => $record->test_date?->format('Y-m-d'),
+            'testDateFormatted' => $record->test_date?->format('M d, Y') ?? 'Awaiting test',
+            'testType' => $record->testType?->name ?? 'HIV',
+            'testTypeCode' => $record->testType?->code ?? '',
+            'screeningResult' => $record->screening_result,
+            'isConfirmatory' => (bool) $record->is_confirmatory,
+            'labStaff' => $record->lab_staff_name ?? $record->performedBy?->name ?? 'Laboratory Staff',
+            'assayMethod' => $record->assay_method ?? ScreeningRecord::DEFAULT_ASSAY_METHOD,
+            'specimenTube' => $record->specimen_tube_code ?? ($donation?->primaryBloodUnit?->unit_code ?? 'S-PENDING'),
+            'testNotes' => $record->test_notes ?? '',
+            'collectedAt' => $record->collected_at?->format('M d, Y • H:i') ?? $donation?->collected_at?->format('M d, Y • H:i') ?? '—',
+            'loggedAt' => $record->logged_at?->format('M d, Y • H:i') ?? '—',
+            'resultRecordedAt' => $record->result_recorded_at?->format('M d, Y • H:i') ?? 'Pending verification',
+        ];
     }
 
     /**

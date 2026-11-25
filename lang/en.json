@@ -1768,5 +1768,15 @@
     "Select component to hold": "Select component to hold",
     "Select component (optional)": "Select component (optional)",
     "Any / Unspecified Component": "Any / Unspecified Component",
-    "Optional: leave unselected to determine during fulfillment.": "Optional: leave unselected to determine during fulfillment."
+    "Optional: leave unselected to determine during fulfillment.": "Optional: leave unselected to determine during fulfillment.",
+    "Screening Panel": "Screening Panel",
+    "Tests": "Tests",
+    "Overall donation screening gate status": "Overall donation screening gate status",
+    "Primary Unit": "Primary Unit",
+    "Screening Panel & Test Results": "Screening Panel & Test Results",
+    "All mandatory and supplemental laboratory tests recorded for this donation.": "All mandatory and supplemental laboratory tests recorded for this donation.",
+    "Confirmatory": "Confirmatory",
+    "No laboratory screening records have been logged for this donation yet.": "No laboratory screening records have been logged for this donation yet.",
+    "Pending Initialization": "Pending Initialization",
+    "Pending verification": "Pending verification"
 }

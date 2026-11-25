@@ -1768,5 +1768,15 @@
     "Select component to hold": "انتخاب فرآورده برای رزرو",
     "Select component (optional)": "انتخاب فرآورده (اختیاری)",
     "Any / Unspecified Component": "هر فرآورده / نامشخص",
-    "Optional: leave unselected to determine during fulfillment.": "اختیاری: جهت تعیین هنگام ارسال خالی بگذارید."
+    "Optional: leave unselected to determine during fulfillment.": "اختیاری: جهت تعیین هنگام ارسال خالی بگذارید.",
+    "Screening Panel": "پنل معاینات",
+    "Tests": "آزمایش",
+    "Overall donation screening gate status": "وضعیت کلی دروازه معاینات اهدا",
+    "Primary Unit": "واحد اصلی",
+    "Screening Panel & Test Results": "پنل معاینات و نتایج آزمایش‌ها",
+    "All mandatory and supplemental laboratory tests recorded for this donation.": "تمامی آزمایش‌های اجباری و تکمیلی ثبت‌شده برای این اهدا.",
+    "Confirmatory": "تأییدی",
+    "No laboratory screening records have been logged for this donation yet.": "هنوز هیچ سابقه آزمایش معایناتی برای این اهدا ثبت نشده است.",
+    "Pending Initialization": "در انتظار راه‌اندازی",
+    "Pending verification": "در انتظار راستی‌آزمایی"
 }

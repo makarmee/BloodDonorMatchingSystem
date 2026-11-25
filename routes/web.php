@@ -73,7 +73,7 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/screening/records', [ScreeningController::class, 'storeRecord'])->name('screening.records.store');
         Route::post('/screening', [ScreeningController::class, 'storeRecord'])->name('screening.store');
         Route::post('/screening/donations/{donation}/release', [ScreeningController::class, 'releaseToInventory'])->name('screening.donations.release');
-        Route::get('/screening/{screening}', [ScreeningController::class, 'show'])->name('screening.show');
+        Route::get('/screening/{donation}', [ScreeningController::class, 'show'])->name('screening.show');
 
         Route::get('/requests', [BloodRequestsController::class, 'index'])->name('requests.index');
         Route::get('/requests/create', [BloodRequestsController::class, 'create'])->name('requests.create');

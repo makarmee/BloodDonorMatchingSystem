@@ -1,5 +1,8 @@
 @php
-    $resultVariant = match ($sample['screeningResult']) {
+    $recordsList = collect($records ?? [$sample]);
+    $overallStatus = $sample['overallScreeningStatus'] ?? $sample['screeningResult'] ?? 'Pending';
+
+    $resultVariant = match ($overallStatus) {
         'Passed' => 'success',
         'Failed' => 'danger',
         default => 'warning',
@@ -10,9 +13,28 @@
         'Scheduled' => 'info',
         default => 'danger',
     };
+
+    $passedCount = $recordsList->where('screeningResult', 'Passed')->count();
+    $pendingCount = $recordsList->where('screeningResult', 'Pending')->count();
+    $failedCount = $recordsList->where('screeningResult', 'Failed')->count();
+    $totalCount = $recordsList->count();
+
+    $pendingRecord = $recordsList->firstWhere('screeningResult', 'Pending');
+    $availableMethods = $assayMethods ?? \App\Models\ScreeningRecord::ASSAY_METHODS;
+    $initialMethodCandidate = $pendingRecord['assayMethod'] ?? ($sample['assayMethod'] ?? '');
+    $initialAssayMethod = old(
+        'assay_method',
+        in_array($initialMethodCandidate, $availableMethods, true)
+            ? $initialMethodCandidate
+            : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD
+    );
+    $initialRecordId = old('screening_record_id', $pendingRecord['recordId'] ?? ($screeningRecord?->id ?? ''));
+    $initialTestTypeId = old('test_type_id', $pendingRecord['testTypeId'] ?? ($screeningRecord?->test_type_id ?? ''));
+    $initialTestTypeName = __($pendingRecord['testType'] ?? ($sample['testType'] ?? ''));
+    $initialScreeningCode = $pendingRecord['id'] ?? ($sample['id'] ?? $sample['donationId']);
 @endphp
 
-<x-app-layout :title="__('Lab Screening') . ' · ' . $sample['id']" :page-title="__('Screening Details')" active-role="staff">
+<x-app-layout :title="__('Lab Screening') . ' · ' . $sample['donationId']" :page-title="__('Screening Details')" active-role="staff">
     <x-slot:header>
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -21,24 +43,24 @@
                         {{ __('Lab Screening') }}
                     </a>
                     <x-icons.icon name="chevron-right" class="size-3.5 rtl-flip" />
-                    <span class="font-mono text-slate-700 dark:text-slate-200 dir-ltr">{{ $sample['id'] }}</span>
+                    <span class="font-mono text-slate-700 dark:text-slate-200 dir-ltr">{{ $sample['donationId'] }}</span>
                 </div>
 
                 <div class="mt-2 flex flex-wrap items-center gap-2.5">
                     <h1 class="font-mono text-2xl font-bold tracking-tight text-slate-900 dark:text-white dir-ltr">
-                        {{ $sample['id'] }}
+                        {{ $sample['donationId'] }}
                     </h1>
                     <x-bdms.blood-group-badge :group="$sample['bloodGroup']" size="md" />
-                    <x-ui.badge variant="neutral">
-                        {{ __($sample['testType']) }}
-                    </x-ui.badge>
                     <x-ui.badge :variant="$resultVariant" :dot="true">
-                        {{ __('Result') }}: {{ __($sample['screeningResult']) }}
+                        {{ __('Screening Status') }}: {{ __($overallStatus) }}
+                    </x-ui.badge>
+                    <x-ui.badge :variant="$collectionVariant" :dot="true">
+                        {{ __($sample['collectionStatus']) }}
                     </x-ui.badge>
                 </div>
 
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    {{ __('Specimen') }} <span class="font-mono dir-ltr">{{ $sample['specimenTube'] }}</span> &middot; {{ __('Linked to Donation') }} <span class="font-mono dir-ltr">{{ $sample['donationId'] }}</span> &middot; {{ __('Assigned to :staff', ['staff' => $sample['labStaff']]) }}
+                    {{ __('Donor') }}: {{ __($sample['donorName']) }} (<span class="font-mono dir-ltr">{{ $sample['donorId'] }}</span>) &middot; {{ __($sample['donationType']) }} &middot; {{ $sample['quantityMl'] }} {{ __('ml') }}
                 </p>
             </div>
 
@@ -48,12 +70,18 @@
                     <span>{{ __('Back to Screening') }}</span>
                 </x-ui.button>
 
-                @if ($sample['screeningResult'] === 'Pending' && isset($donationModel) && $donationModel)
+                @if ($pendingRecord && isset($donationModel) && $donationModel)
                     <x-ui.button
                         variant="primary"
                         size="md"
                         type="button"
-                        @click="$dispatch('open-modal', 'record-result-modal')"
+                        @click="$dispatch('open-record-modal', {
+                            recordId: @js($pendingRecord['recordId'] ?? ''),
+                            testTypeId: @js($pendingRecord['testTypeId'] ?? ''),
+                            testTypeName: @js(__($pendingRecord['testType'] ?? '')),
+                            screeningCode: @js($pendingRecord['id'] ?? $sample['donationId']),
+                            assayMethod: @js(in_array($pendingRecord['assayMethod'] ?? '', $availableMethods, true) ? $pendingRecord['assayMethod'] : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD)
+                        })"
                     >
                         <x-icons.icon name="beaker" class="size-4" />
                         <span>{{ __('Record Result') }}</span>
@@ -76,7 +104,7 @@
                     @endcan
                 @endif
 
-                <x-ui.button variant="outline" size="md" :href="route('screening.create')">
+                <x-ui.button variant="outline" size="md" :href="route('screening.create', ['donation' => $sample['donationId']])">
                     <x-icons.icon name="plus" class="size-4" />
                     <span>{{ __('Record Screening Test') }}</span>
                 </x-ui.button>
@@ -84,7 +112,25 @@
         </div>
     </x-slot:header>
 
-    <div class="space-y-6">
+    <div
+        class="space-y-6"
+        x-data="{
+            activeRecordId: @js($initialRecordId),
+            activeTestTypeId: @js($initialTestTypeId),
+            activeTestTypeName: @js($initialTestTypeName),
+            activeScreeningCode: @js($initialScreeningCode),
+            activeAssayMethod: @js($initialAssayMethod),
+            openRecordModal(detail) {
+                this.activeRecordId = detail.recordId ?? '';
+                this.activeTestTypeId = detail.testTypeId ?? '';
+                this.activeTestTypeName = detail.testTypeName ?? '';
+                this.activeScreeningCode = detail.screeningCode ?? '';
+                this.activeAssayMethod = detail.assayMethod ?? @js(\App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD);
+                this.$dispatch('open-modal', 'record-result-modal');
+            }
+        }"
+        @open-record-modal.window="openRecordModal($event.detail)"
+    >
         @if (session('success'))
             <x-ui.alert variant="success" :title="session('success')" />
         @endif
@@ -118,28 +164,28 @@
         <section aria-label="Screening summary metrics" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    {{ __('Test Panel') }}
+                    {{ __('Screening Panel') }}
                 </p>
                 <p class="mt-3 text-lg font-bold text-slate-900 dark:text-white">
-                    {{ __($sample['testType']) }}
+                    {{ $totalCount }} {{ __('Tests') }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ __('Specimen') }}: <span class="dir-ltr">{{ $sample['specimenTube'] }}</span>
+                    {{ __('Passed') }}: {{ $passedCount }} &middot; {{ __('Pending') }}: {{ $pendingCount }} &middot; {{ __('Failed') }}: {{ $failedCount }}
                 </p>
             </x-ui.card>
 
             <x-ui.card>
                 <p class="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">
-                    {{ __('Screening Result') }}
+                    {{ __('Screening Status') }}
                 </p>
                 <div class="mt-3 flex items-center justify-between gap-2">
                     <x-ui.badge :variant="$resultVariant" :dot="true">
-                        {{ __($sample['screeningResult']) }}
+                        {{ __($overallStatus) }}
                     </x-ui.badge>
                     <x-icons.icon name="shield-check" class="size-5 text-slate-400 dark:text-slate-500" />
                 </div>
                 <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                    {{ __('Explicitly recorded assay status') }}
+                    {{ __('Overall donation screening gate status') }}
                 </p>
             </x-ui.card>
 
@@ -151,7 +197,7 @@
                     {{ __($sample['testDateFormatted']) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {{ __('Collected') }}: {{ $sample['collectionDateFormatted'] }}
+                    {{ __('Collected') }}: {{ $sample['collectionDateFormatted'] ?: __('Not set') }}
                 </p>
             </x-ui.card>
 
@@ -162,9 +208,14 @@
                 <div class="mt-3 flex items-center justify-between">
                     <x-bdms.blood-group-badge :group="$sample['bloodGroup']" size="lg" />
                     <span class="font-mono text-xs font-medium text-slate-500 dark:text-slate-400 dir-ltr">
-                        {{ $sample['donorId'] }}
+                        {{ $sample['primaryUnitCode'] ?? $sample['donorId'] }}
                     </span>
                 </div>
+                @if (! empty($sample['primaryUnitStatus']))
+                    <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                        {{ __('Primary Unit') }}: {{ __($sample['primaryUnitStatus']) }}
+                    </p>
+                @endif
             </x-ui.card>
         </section>
 
@@ -249,6 +300,17 @@
                             <dd class="text-slate-700 dark:text-slate-200">{{ $sample['collectionDateFormatted'] }}</dd>
                         </div>
 
+                        @if (! empty($sample['primaryUnitCode']) && isset($donationModel) && $donationModel->primaryBloodUnit)
+                            <div class="flex items-center justify-between gap-4 py-2.5">
+                                <dt class="text-slate-500 dark:text-slate-400">{{ __('Primary Unit') }}</dt>
+                                <dd class="font-mono text-xs font-semibold text-crimson-600 dark:text-crimson-400 dir-ltr text-start">
+                                    <a href="{{ route('inventory.units.show', $donationModel->primaryBloodUnit->id) }}" class="hover:underline">
+                                        {{ $sample['primaryUnitCode'] }}
+                                    </a>
+                                </dd>
+                            </div>
+                        @endif
+
                         <div class="flex items-center justify-between gap-4 py-2.5 last:pb-0">
                             <dt class="text-slate-500 dark:text-slate-400">{{ __('Location') }}</dt>
                             <dd class="text-end text-slate-700 dark:text-slate-200">{{ __($sample['collectionLocation']) }}</dd>
@@ -264,48 +326,132 @@
                 </x-ui.card>
             </div>
 
-            {{-- Right Column: Test Details, Notes & Audit Timestamps --}}
+            {{-- Right Column: All Screening Panel Records & Audit Timestamps --}}
             <div class="space-y-6 lg:col-span-2">
-                <x-ui.card>
+                <x-ui.card :padding="false">
                     <x-slot:header>
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <div>
                                 <h2 class="text-base font-semibold text-slate-900 dark:text-white">
-                                    {{ __('Test Information & Screening Result') }}
+                                    {{ __('Screening Panel & Test Results') }}
                                 </h2>
                                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                                    {{ __('Assay methodology, specimen reference, responsible staff, and laboratory notes.') }}
+                                    {{ __('All mandatory and supplemental laboratory tests recorded for this donation.') }}
                                 </p>
                             </div>
 
                             <x-ui.badge :variant="$resultVariant" :dot="true">
-                                {{ __($sample['screeningResult']) }}
+                                {{ __($overallStatus) }}
                             </x-ui.badge>
                         </div>
                     </x-slot:header>
 
-                    <div class="space-y-5 text-sm">
-                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Assay Method') }}</p>
-                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($sample['assayMethod']) }}</p>
-                            </div>
+                    @if ($recordsList->isNotEmpty())
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
+                                <thead class="bg-slate-50 text-xs font-semibold tracking-wider text-slate-500 uppercase dark:bg-slate-900/50 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="px-5 py-3 text-start">{{ __('Screening ID') }}</th>
+                                        <th scope="col" class="px-5 py-3 text-start">{{ __('Test Type') }}</th>
+                                        <th scope="col" class="px-5 py-3 text-start">{{ __('Screening Result') }}</th>
+                                        <th scope="col" class="px-5 py-3 text-start">{{ __('Assay Method') }}</th>
+                                        <th scope="col" class="px-5 py-3 text-start">{{ __('Test Date') }}</th>
+                                        <th scope="col" class="px-5 py-3 text-end">{{ __('Actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white dark:divide-slate-800 dark:bg-slate-900">
+                                    @foreach ($recordsList as $recordItem)
+                                        @php
+                                            $itemVariant = match ($recordItem['screeningResult']) {
+                                                'Passed' => 'success',
+                                                'Failed' => 'danger',
+                                                default => 'warning',
+                                            };
+                                            $itemMethod = in_array($recordItem['assayMethod'] ?? '', $availableMethods, true)
+                                                ? $recordItem['assayMethod']
+                                                : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD;
+                                        @endphp
+                                        <tr class="align-top transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
+                                            <td class="px-5 py-3.5 whitespace-nowrap">
+                                                <span class="font-mono text-xs font-semibold text-slate-800 dark:text-slate-200 dir-ltr">
+                                                    {{ $recordItem['id'] }}
+                                                </span>
+                                                <p class="mt-1 font-mono text-2xs text-slate-500 dark:text-slate-400 dir-ltr">
+                                                    {{ $recordItem['specimenTube'] }}
+                                                </p>
+                                            </td>
 
-                            <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
-                                <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Laboratory Staff') }}</p>
-                                <p class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($sample['labStaff']) }}</p>
-                            </div>
-                        </div>
+                                            <td class="px-5 py-3.5">
+                                                <div class="font-semibold text-slate-900 dark:text-white">
+                                                    {{ __($recordItem['testType']) }}
+                                                </div>
+                                                @if (! empty($recordItem['isConfirmatory']))
+                                                    <span class="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-2xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                                        {{ __('Confirmatory') }}
+                                                    </span>
+                                                @endif
+                                            </td>
 
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                            <p class="text-xs font-semibold tracking-wide text-slate-500 uppercase dark:text-slate-400">
-                                {{ __('Test Notes') }}
-                            </p>
-                            <p class="mt-1.5 leading-relaxed text-slate-800 dark:text-slate-200">
-                                {{ $sample['testNotes'] ? __($sample['testNotes']) : __('No laboratory remarks recorded.') }}
+                                            <td class="px-5 py-3.5 whitespace-nowrap">
+                                                <x-ui.badge :variant="$itemVariant" :dot="true">
+                                                    {{ __($recordItem['screeningResult']) }}
+                                                </x-ui.badge>
+                                                <p class="mt-1 text-2xs text-slate-500 dark:text-slate-400">
+                                                    {{ __($recordItem['labStaff']) }}
+                                                </p>
+                                            </td>
+
+                                            <td class="px-5 py-3.5">
+                                                <p class="text-xs font-medium text-slate-800 dark:text-slate-200">
+                                                    {{ __($recordItem['assayMethod']) }}
+                                                </p>
+                                                @if (! empty($recordItem['testNotes']))
+                                                    <p class="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                                                        {{ __($recordItem['testNotes']) }}
+                                                    </p>
+                                                @endif
+                                            </td>
+
+                                            <td class="px-5 py-3.5 whitespace-nowrap text-xs text-slate-700 dark:text-slate-300">
+                                                <div class="font-medium">{{ __($recordItem['testDateFormatted']) }}</div>
+                                                <div class="mt-1 text-2xs text-slate-500 dark:text-slate-400">
+                                                    {{ __($recordItem['resultRecordedAt']) }}
+                                                </div>
+                                            </td>
+
+                                            <td class="px-5 py-3.5 text-end whitespace-nowrap">
+                                                @if ($recordItem['screeningResult'] === 'Pending' && isset($donationModel) && $donationModel)
+                                                    <x-ui.button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        type="button"
+                                                        @click="openRecordModal({
+                                                            recordId: @js($recordItem['recordId'] ?? ''),
+                                                            testTypeId: @js($recordItem['testTypeId'] ?? ''),
+                                                            testTypeName: @js(__($recordItem['testType'])),
+                                                            screeningCode: @js($recordItem['id']),
+                                                            assayMethod: @js($itemMethod)
+                                                        })"
+                                                    >
+                                                        <x-icons.icon name="beaker" class="size-3.5" />
+                                                        <span>{{ __('Record Result') }}</span>
+                                                    </x-ui.button>
+                                                @else
+                                                    <span class="text-xs text-slate-400 dark:text-slate-500">&mdash;</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @else
+                        <div class="px-6 py-10 text-center">
+                            <p class="text-sm text-slate-500 dark:text-slate-400">
+                                {{ __('No laboratory screening records have been logged for this donation yet.') }}
                             </p>
                         </div>
-                    </div>
+                    @endif
                 </x-ui.card>
 
                 <x-ui.card>
@@ -328,7 +474,7 @@
 
                         <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ __('Result Recorded') }}</dt>
-                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">{{ $sample['resultRecordedAt'] }}</dd>
+                            <dd class="mt-1 font-medium text-slate-900 dark:text-white">{{ __($sample['resultRecordedAt']) }}</dd>
                         </div>
                     </dl>
                 </x-ui.card>
@@ -388,21 +534,19 @@
                 </form>
             </x-ui.modal>
 
-            @if ($sample['screeningResult'] === 'Pending')
+            @if ($pendingRecord)
                 {{-- Record Assay Result Modal --}}
                 <x-ui.modal name="record-result-modal" :title="__('Record Laboratory Assay Result')" max-width="md">
                     <form method="POST" action="{{ route('screening.records.store') }}" class="space-y-4">
                         @csrf
                         <input type="hidden" name="donation_id" value="{{ $donationModel->donation_code }}" />
-                        @if (isset($screeningRecord) && $screeningRecord->exists)
-                            <input type="hidden" name="screening_record_id" value="{{ $screeningRecord->id }}" />
-                            <input type="hidden" name="test_type_id" value="{{ $screeningRecord->test_type_id }}" />
-                        @else
-                            <input type="hidden" name="test_type" value="{{ $sample['testType'] }}" />
-                        @endif
+                        <input type="hidden" name="screening_record_id" value="{{ $initialRecordId }}" x-model="activeRecordId" />
+                        <input type="hidden" name="test_type_id" value="{{ $initialTestTypeId }}" x-model="activeTestTypeId" />
 
                         <p class="text-sm text-slate-600 dark:text-slate-300">
-                            {!! __('Record clinical findings for :test assay on specimen :id.', ['test' => '<strong>' . $sample['testType'] . '</strong>', 'id' => '<strong class="dir-ltr">' . $sample['id'] . '</strong>']) !!}
+                            <span>{{ __('Test Type') }}: <strong x-text="activeTestTypeName">{{ $initialTestTypeName }}</strong></span>
+                            &middot;
+                            <span>{{ __('Screening ID') }}: <strong class="font-mono dir-ltr" x-text="activeScreeningCode">{{ $initialScreeningCode }}</strong></span>
                         </p>
 
                         <div>
@@ -425,18 +569,15 @@
                             <label for="modal-assay-method" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                 {{ __('Assay Method') }}
                             </label>
-                            @php
-                                $availableMethods = $assayMethods ?? \App\Models\ScreeningRecord::ASSAY_METHODS;
-                                $selectedMethod = old('assay_method', in_array($sample['assayMethod'] ?? '', $availableMethods, true) ? $sample['assayMethod'] : \App\Models\ScreeningRecord::DEFAULT_ASSAY_METHOD);
-                            @endphp
                             <select
                                 id="modal-assay-method"
                                 name="assay_method"
+                                x-model="activeAssayMethod"
                                 required
                                 class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs transition focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 focus:outline-none dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
                             >
                                 @foreach ($availableMethods as $method)
-                                    <option value="{{ $method }}" @selected($selectedMethod === $method)>
+                                    <option value="{{ $method }}" @selected($initialAssayMethod === $method)>
                                         {{ __($method) }}
                                     </option>
                                 @endforeach

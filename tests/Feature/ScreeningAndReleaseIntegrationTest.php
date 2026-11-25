@@ -105,7 +105,7 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
             'test_notes' => 'Negative / Non-reactive verified.',
         ]);
 
-        $response->assertRedirect(route('screening.show', $pendingRecord));
+        $response->assertRedirect(route('screening.show', $donation));
         $pendingRecord->refresh();
 
         $this->assertSame('Passed', $pendingRecord->screening_result);
@@ -137,7 +137,7 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
             'test_notes' => 'Confirmed reactive signal on viral marker.',
         ]);
 
-        $response->assertRedirect(route('screening.show', $pendingRecord));
+        $response->assertRedirect(route('screening.show', $donation));
         $pendingRecord->refresh();
         $donation->refresh();
         $quarantinedUnit->refresh();
@@ -295,11 +295,11 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
                 'test_notes' => "Tested with {$method}.",
             ]);
 
-            $response->assertRedirect(route('screening.show', $pendingRecord));
+            $response->assertRedirect(route('screening.show', $donation));
             $this->assertSame($method, $pendingRecord->fresh()->assay_method);
 
             // Verify it displays correctly on show page
-            $showResponse = $this->actingAs($this->labOfficer)->get(route('screening.show', $pendingRecord));
+            $showResponse = $this->actingAs($this->labOfficer)->get(route('screening.show', $donation));
             $showResponse->assertOk();
             $showResponse->assertSee($method);
         }
@@ -348,9 +348,8 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
         ]);
 
         $this->screeningService->initializePendingPanel($donation, $this->staff);
-        $pendingRecord = ScreeningRecord::where('donation_id', $donation->id)->firstOrFail();
 
-        $response = $this->actingAs($this->labOfficer)->get(route('screening.show', $pendingRecord));
+        $response = $this->actingAs($this->labOfficer)->get(route('screening.show', $donation));
         $response->assertOk();
 
         // Must render a select element for assay_method
@@ -366,5 +365,152 @@ class ScreeningAndReleaseIntegrationTest extends TestCase
         // Must NOT include an "Other" option
         $response->assertDontSee('<option value="Other"', false);
         $response->assertDontSee('>Other<', false);
+    }
+
+    public function test_screening_details_route_resolves_donation_code_and_displays_all_screening_records(): void
+    {
+        $donor = Donor::factory()->eligible()->create(['full_name' => 'Test Panel Donor']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $donation->update(['donation_code' => 'DON-358904']);
+
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+
+        $records = ScreeningRecord::with('testType')
+            ->where('donation_id', $donation->id)
+            ->orderBy('id')
+            ->get();
+
+        $this->assertCount(5, $records);
+
+        // Pass the first two records with distinct assay methods and notes, leave remaining pending
+        $this->screeningService->recordScreeningResult($donation, $this->labOfficer, [
+            'screening_record_id' => $records[0]->id,
+            'screening_result' => 'Passed',
+            'assay_method' => 'NAT — Nucleic Acid Testing',
+            'test_notes' => 'Primary assay negative.',
+        ]);
+
+        $this->screeningService->recordScreeningResult($donation, $this->labOfficer, [
+            'screening_record_id' => $records[1]->id,
+            'screening_result' => 'Passed',
+            'assay_method' => 'ECLIA — Electrochemiluminescence Immunoassay',
+            'test_notes' => 'Secondary assay negative.',
+        ]);
+
+        $response = $this->actingAs($this->labOfficer)->get('/screening/DON-358904');
+
+        $response->assertOk();
+        $response->assertViewIs('screening.show');
+        $response->assertSee('DON-358904');
+        $response->assertSee('Test Panel Donor');
+
+        foreach ($records as $record) {
+            $response->assertSee($record->screening_code);
+            $response->assertSee($record->testType->name);
+        }
+
+        $response->assertSee('NAT — Nucleic Acid Testing');
+        $response->assertSee('Primary assay negative.');
+        $response->assertSee('ECLIA — Electrochemiluminescence Immunoassay');
+        $response->assertSee('Secondary assay negative.');
+        $response->assertSee('Pending');
+        $response->assertSee('Passed');
+
+        // Verify screening index links to Donation Code rather than SCR code
+        $indexResponse = $this->actingAs($this->labOfficer)->get(route('screening.index'));
+        $indexResponse->assertOk();
+        $indexResponse->assertSee(route('screening.show', 'DON-358904'));
+    }
+
+    public function test_screening_details_route_returns_404_for_invalid_donation_code(): void
+    {
+        $this->actingAs($this->labOfficer)
+            ->get('/screening/DON-999999')
+            ->assertNotFound();
+
+        $this->actingAs($this->labOfficer)
+            ->get('/screening/INVALID-DONATION-CODE')
+            ->assertNotFound();
+    }
+
+    public function test_unauthorized_users_cannot_access_screening_details_by_donation_code(): void
+    {
+        $donor = Donor::factory()->eligible()->create();
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $donation->update(['donation_code' => 'DON-358905']);
+
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+
+        // Guest redirects to login
+        $this->get('/screening/DON-358905')->assertRedirect(route('login'));
+
+        // Regular user without role/permission gets 403
+        $this->actingAs($this->regularUser)
+            ->get('/screening/DON-358905')
+            ->assertForbidden();
+
+        // Donor user gets 403
+        $donorUser = User::factory()->create(['is_active' => true]);
+        $donorUser->roles()->attach(Role::where('slug', 'donor')->firstOrFail());
+        $this->actingAs($donorUser)
+            ->get('/screening/DON-358905')
+            ->assertForbidden();
+
+        // Hospital user gets 403
+        $hospitalUser = User::factory()->create(['is_active' => true]);
+        $hospitalUser->roles()->attach(Role::where('slug', 'hospital')->firstOrFail());
+        $this->actingAs($hospitalUser)
+            ->get('/screening/DON-358905')
+            ->assertForbidden();
+
+        // Inactive lab officer gets 403 / blocked by active middleware
+        $inactiveLabOfficer = User::factory()->create(['is_active' => false]);
+        $inactiveLabOfficer->roles()->attach(Role::where('slug', 'lab_officer')->firstOrFail());
+        $this->actingAs($inactiveLabOfficer)
+            ->get('/screening/DON-358905')
+            ->assertStatus(403);
+    }
+
+    public function test_screening_details_page_renders_clean_persian_rtl_layout(): void
+    {
+        $donor = Donor::factory()->eligible()->create(['full_name' => 'احمد رضایی']);
+        DonorEligibilityRecord::factory()->eligible()->for($donor)->create();
+        $component = BloodComponent::where('code', 'WB')->firstOrFail();
+
+        $donation = $this->donationService->registerDonation($donor, $this->staff, [
+            'blood_component_id' => $component->id,
+            'quantity_ml' => 450,
+            'collection_status' => 'Completed',
+            'collection_location_name' => 'Main Center',
+        ]);
+        $donation->update(['donation_code' => 'DON-358906']);
+
+        $this->screeningService->initializePendingPanel($donation, $this->staff);
+
+        $response = $this->actingAs($this->labOfficer)
+            ->withSession(['locale' => 'fa'])
+            ->get('/screening/DON-358906');
+
+        $response->assertOk();
+        $response->assertSee('dir="rtl"', false);
+        $response->assertSee('DON-358906');
+        $response->assertSee('پنل معاینات و نتایج آزمایش‌ها');
+        $response->assertSee('مشخصات اهداکننده');
     }
 }

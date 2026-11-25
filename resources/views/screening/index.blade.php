@@ -221,7 +221,7 @@
                             >
                                 <td class="px-6 py-4 font-mono text-xs font-semibold whitespace-nowrap text-slate-800 dark:text-slate-200 dir-ltr text-start">
                                     <a
-                                        href="{{ route('screening.show', $sample['id']) }}"
+                                        href="{{ route('screening.show', $sample['donationId']) }}"
                                         class="hover:text-crimson-600 dark:hover:text-crimson-400"
                                     >
                                         {{ $sample['id'] }}
@@ -278,7 +278,7 @@
                                 </td>
 
                                 <td class="px-6 py-4 text-end whitespace-nowrap">
-                                    <x-ui.button variant="ghost" size="sm" :href="route('screening.show', $sample['id'])">
+                                    <x-ui.button variant="ghost" size="sm" :href="route('screening.show', $sample['donationId'])">
                                         <x-icons.icon name="eye" class="size-4" />
                                         <span>{{ __('View') }}</span>
                                     </x-ui.button>
