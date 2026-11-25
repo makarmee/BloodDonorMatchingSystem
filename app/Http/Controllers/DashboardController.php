@@ -13,6 +13,7 @@ use App\Models\DonorAppointment;
 use App\Models\Hospital;
 use App\Models\InventoryStock;
 use App\Models\ScreeningRecord;
+use App\Models\Staff;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -556,11 +557,17 @@ class DashboardController extends Controller
             ->orderBy('name')
             ->get(['id', 'code', 'name', 'default_volume_ml']);
 
+        $staffMembers = Staff::query()
+            ->active()
+            ->orderBy('full_name')
+            ->get(['id', 'employee_id', 'full_name', 'professional_role']);
+
         return [
             'donors' => $donors,
             'centers' => $centers,
             'camps' => $camps,
             'components' => $components,
+            'staffMembers' => $staffMembers,
         ];
     }
 }

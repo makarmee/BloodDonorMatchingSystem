@@ -9,6 +9,7 @@ use App\Models\DonationCamp;
 use App\Models\DonationCenter;
 use App\Models\Donor;
 use App\Models\DonorAppointment;
+use App\Models\Staff;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -47,6 +48,7 @@ class DonationService
      *     camp_id?: int|string|null,
      *     appointment_id?: int|string|null,
      *     collection_location_name?: string|null,
+     *     staff_id?: int|string|null,
      *     staff_member_name?: string|null,
      *     collection_notes?: string|null,
      *     storage_location?: string|null
@@ -84,6 +86,7 @@ class DonationService
                 $validated['appointment_id'],
                 $lockedDonor
             );
+            $resolvedStaff = $this->resolveActiveStaff($validated['staff_id']);
 
             $collectionStatus = $validated['collection_status'];
             $collectedAt = $collectionStatus === 'Completed'
@@ -98,7 +101,8 @@ class DonationService
                 'center_id' => $location['center_id'],
                 'collection_location_name' => $location['collection_location_name'],
                 'recorded_by_user_id' => $actor->getKey(),
-                'staff_member_name' => $validated['staff_member_name'],
+                'staff_id' => $resolvedStaff?->id,
+                'staff_member_name' => $resolvedStaff?->full_name ?? $validated['staff_member_name'],
                 'blood_group' => $bloodGroup,
                 'blood_component_id' => $component->id,
                 'donation_date' => $validated['donation_date'],
@@ -134,6 +138,7 @@ class DonationService
             'center',
             'camp',
             'appointment',
+            'staff',
         ]) ?? $persistedDonation;
     }
 
@@ -534,9 +539,15 @@ class DonationService
         $donationDate = $this->inputNormalizer->parseRequiredOrDefaultDate($attributes['donation_date'] ?? null, 'donation_date');
         $collectedAt = $this->inputNormalizer->parseOptionalDateTime($attributes['collected_at'] ?? null, 'collected_at');
 
-        $staffMemberName = array_key_exists('staff_member_name', $attributes)
-            ? $this->inputNormalizer->normalizeRequiredText($attributes['staff_member_name'], 150, 'staff_member_name', 'Phlebotomist or staff member name is required.')
-            : $this->inputNormalizer->normalizeRequiredText($actor->name, 150, 'staff_member_name', 'Phlebotomist or staff member name is required.');
+        $staffId = isset($attributes['staff_id']) && $attributes['staff_id'] !== ''
+            ? $this->parsePositiveStaffId($attributes['staff_id'])
+            : null;
+
+        $staffMemberName = $staffId !== null
+            ? 'Staff'
+            : (array_key_exists('staff_member_name', $attributes)
+                ? $this->inputNormalizer->normalizeRequiredText($attributes['staff_member_name'], 150, 'staff_member_name', 'Phlebotomist or staff member name is required.')
+                : $this->inputNormalizer->normalizeRequiredText($actor->name, 150, 'staff_member_name', 'Phlebotomist or staff member name is required.'));
 
         $locationName = $this->inputNormalizer->normalizeOptionalText($attributes['collection_location_name'] ?? null, 191, 'collection_location_name');
 
@@ -558,6 +569,7 @@ class DonationService
             'camp_id' => $campId,
             'appointment_id' => $appointmentId,
             'collection_location_name' => $locationName,
+            'staff_id' => $staffId,
             'staff_member_name' => $staffMemberName,
             'collection_notes' => $this->inputNormalizer->normalizeOptionalText($attributes['collection_notes'] ?? null, null, 'collection_notes'),
             'storage_location' => $this->inputNormalizer->normalizeOptionalText($attributes['storage_location'] ?? null, 120, 'storage_location'),
@@ -717,5 +729,46 @@ class DonationService
         }
 
         return $intValue;
+    }
+
+    /**
+     * Parse an explicit integer staff ID.
+     *
+     * @throws ValidationException
+     */
+    private function parsePositiveStaffId(mixed $value): int
+    {
+        if (filter_var($value, FILTER_VALIDATE_INT) === false || (int) $value < 1) {
+            throw ValidationException::withMessages([
+                'staff_id' => 'Selected staff member does not exist or is inactive.',
+            ]);
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * Resolve and lock an active Staff record when a staff ID is provided.
+     *
+     * @throws ValidationException
+     */
+    private function resolveActiveStaff(?int $staffId): ?Staff
+    {
+        if ($staffId === null) {
+            return null;
+        }
+
+        $staff = Staff::query()
+            ->whereKey($staffId)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $staff instanceof Staff || ! $staff->isActive()) {
+            throw ValidationException::withMessages([
+                'staff_id' => 'Selected staff member does not exist or is inactive.',
+            ]);
+        }
+
+        return $staff;
     }
 }

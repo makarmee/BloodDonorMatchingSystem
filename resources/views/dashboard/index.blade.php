@@ -196,6 +196,11 @@
             $modalCenters = $donationFormData['centers'] ?? [];
             $modalCamps = $donationFormData['camps'] ?? [];
             $modalComponents = $donationFormData['components'] ?? [];
+            $modalStaffMembers = $donationFormData['staffMembers'] ?? collect();
+
+            if ($modalStaffMembers instanceof \Illuminate\Support\Collection ? $modalStaffMembers->isEmpty() : empty($modalStaffMembers)) {
+                $modalStaffMembers = \App\Models\Staff::query()->active()->orderBy('full_name')->get(['id', 'employee_id', 'full_name', 'professional_role']);
+            }
 
             if (empty($modalDonors)) {
                 $modalDonors = \App\Models\Donor::query()->active()->with('currentEligibilityRecord')->orderBy('full_name')->limit(50)->get()->map(fn ($d) => [
@@ -242,6 +247,7 @@
                     quantityMl: {{ (int) $firstComponentVolume }},
                     collectionStatus: 'Completed',
                     storageLocation: 'Main Cold Room Rack 1',
+                    staffId: '',
                     staffMember: '{{ addslashes(auth()->user()?->name ?? 'Blood Bank Staff') }}',
                     collectionNotes: ''
                 },
@@ -531,14 +537,31 @@
                             <label for="dashboard-donation-staff" class="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                 {{ __('Staff Member') }} <span class="text-crimson-600 dark:text-crimson-400">*</span>
                             </label>
-                            <input
-                                type="text"
-                                id="dashboard-donation-staff"
-                                name="staff_member"
-                                x-model="form.staffMember"
-                                required
-                                class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
-                            />
+                            @if (collect($modalStaffMembers)->isNotEmpty())
+                                <select
+                                    id="dashboard-donation-staff"
+                                    name="staff_id"
+                                    x-model="form.staffId"
+                                    required
+                                    class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                >
+                                    <option value="">{{ __('Select active staff member') }}</option>
+                                    @foreach ($modalStaffMembers as $staffMember)
+                                        <option value="{{ $staffMember->id }}">
+                                            {{ $staffMember->full_name }} ({{ $staffMember->employee_id }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @else
+                                <input
+                                    type="text"
+                                    id="dashboard-donation-staff"
+                                    name="staff_member"
+                                    x-model="form.staffMember"
+                                    required
+                                    class="mt-1 block w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs focus:border-crimson-500 focus:ring-2 focus:ring-crimson-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
+                                />
+                            @endif
                         </div>
                     </div>
 

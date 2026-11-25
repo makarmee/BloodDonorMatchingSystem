@@ -198,6 +198,8 @@ class VisualPersianTranslationAuditTest extends TestCase
         $routes = [
             'dashboard',
             'hospitals.index',
+            'staff.index',
+            'staff.create',
             'inventory.index',
             'inventory.reconcile',
             'donors.index',

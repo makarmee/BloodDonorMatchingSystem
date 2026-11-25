@@ -7,12 +7,14 @@ use App\Models\Donation;
 use App\Models\DonationCamp;
 use App\Models\DonationCenter;
 use App\Models\Donor;
+use App\Models\Staff;
 use App\Models\User;
 use App\Services\DonationService;
 use App\Services\ScreeningService;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -63,7 +65,7 @@ class DonationsController extends Controller
             ];
 
             $query = Donation::query()
-                ->with(['donor', 'bloodComponent', 'primaryBloodUnit', 'center', 'camp'])
+                ->with(['donor', 'bloodComponent', 'primaryBloodUnit', 'center', 'camp', 'staff'])
                 ->orderByDesc('donation_date')
                 ->orderByDesc('id');
 
@@ -73,6 +75,10 @@ class DonationsController extends Controller
                     $builder->where('donation_code', 'like', "%{$term}%")
                         ->orWhere('collection_location_name', 'like', "%{$term}%")
                         ->orWhere('staff_member_name', 'like', "%{$term}%")
+                        ->orWhereHas('staff', function (Builder $s) use ($term): void {
+                            $s->where('full_name', 'like', "%{$term}%")
+                                ->orWhere('employee_id', 'like', "%{$term}%");
+                        })
                         ->orWhereHas('donor', function (Builder $d) use ($term): void {
                             $d->where('full_name', 'like', "%{$term}%")
                                 ->orWhere('donor_code', 'like', "%{$term}%");
@@ -124,7 +130,8 @@ class DonationsController extends Controller
                     'quantityMl' => (int) $donation->quantity_ml,
                     'donationType' => $donation->bloodComponent?->name ?? 'Whole Blood',
                     'collectionLocation' => $location,
-                    'staffMember' => $donation->staff_member_name ?? $donation->recordedBy?->name ?? 'Phlebotomy Staff',
+                    'staffId' => $donation->staff_id,
+                    'staffMember' => $donation->staff?->full_name ?? $donation->staff_member_name ?? $donation->recordedBy?->name ?? 'Phlebotomy Staff',
                     'screeningStatus' => $donation->screening_status,
                     'screeningNotes' => $donation->screening_notes ?? '',
                     'collectionStatus' => $donation->collection_status,
@@ -169,7 +176,7 @@ class DonationsController extends Controller
             'donors' => $donors,
             'bloodGroups' => $this->bloodGroupOptions(),
             'locations' => $this->collectionLocations(),
-            'staffMembers' => $this->staffMemberSuggestions(),
+            'staffMembers' => $this->activeStaffOptions(),
         ]);
     }
 
@@ -195,6 +202,7 @@ class DonationsController extends Controller
             'camp_id' => ['nullable', 'integer', 'exists:donation_camps,id'],
             'quantity_ml' => ['required', 'integer', 'min:100', 'max:1000'],
             'collection_location' => ['nullable', 'string', 'max:150'],
+            'staff_id' => $this->staffIdRules($request),
             'staff_member' => ['nullable', 'string', 'max:150'],
             'collection_status' => ['required', 'string', Rule::in(['Scheduled', 'Completed'])],
             'collection_notes' => ['nullable', 'string', 'max:1000'],
@@ -256,6 +264,7 @@ class DonationsController extends Controller
             'center_id' => $centerId,
             'camp_id' => $campId,
             'collection_location_name' => $locationName ?? 'Main Center',
+            'staff_id' => $validated['staff_id'] ?? null,
             'staff_member_name' => $validated['staff_member'] ?? $actor->name,
             'collection_notes' => $validated['collection_notes'] ?? null,
             'storage_location' => $validated['storage_location'] ?? null,
@@ -289,7 +298,7 @@ class DonationsController extends Controller
     {
         $this->authorizeDonationManagement($request);
 
-        $donation->load(['donor', 'bloodComponent', 'primaryBloodUnit', 'screeningRecords.testType', 'center', 'camp']);
+        $donation->load(['donor', 'bloodComponent', 'primaryBloodUnit', 'screeningRecords.testType', 'center', 'camp', 'staff']);
 
         $location = $donation->collection_location_name
             ?? $donation->center?->name
@@ -311,7 +320,11 @@ class DonationsController extends Controller
             'quantityMl' => (int) ($donation->quantity_ml ?? ($sample['quantityMl'] ?? 450)),
             'donationType' => $donation->bloodComponent?->name ?? ($sample['donationType'] ?? 'Whole Blood'),
             'collectionLocation' => $location,
-            'staffMember' => $donation->staff_member_name ?? $donation->recordedBy?->name ?? ($sample['staffMember'] ?? 'Phlebotomy Staff'),
+            'staffId' => $donation->staff_id,
+            'staffEmployeeId' => $donation->staff?->employee_id,
+            'staffRole' => $donation->staff?->professional_role,
+            'staffStatus' => $donation->staff?->status,
+            'staffMember' => $donation->staff?->full_name ?? $donation->staff_member_name ?? $donation->recordedBy?->name ?? ($sample['staffMember'] ?? 'Phlebotomy Staff'),
             'screeningStatus' => $donation->screening_status ?? ($sample['screeningStatus'] ?? 'Pending'),
             'screeningNotes' => $donation->screening_notes ?? ($sample['screeningNotes'] ?? ''),
             'collectionStatus' => $donation->collection_status ?? ($sample['collectionStatus'] ?? 'Completed'),
@@ -331,7 +344,7 @@ class DonationsController extends Controller
     {
         $this->authorizeDonationManagement($request);
 
-        $donation->load(['donor', 'bloodComponent']);
+        $donation->load(['donor', 'bloodComponent', 'staff']);
 
         $location = $donation->collection_location_name
             ?? $donation->center?->name
@@ -349,7 +362,8 @@ class DonationsController extends Controller
             'donationType' => $donation->bloodComponent?->name ?? ($sample['donationType'] ?? 'Whole Blood'),
             'quantityMl' => (int) ($donation->quantity_ml ?? ($sample['quantityMl'] ?? 450)),
             'collectionLocation' => $location,
-            'staffMember' => $donation->staff_member_name ?? ($sample['staffMember'] ?? ''),
+            'staffId' => $donation->staff_id,
+            'staffMember' => $donation->staff?->full_name ?? $donation->staff_member_name ?? ($sample['staffMember'] ?? ''),
             'screeningStatus' => $donation->screening_status ?? ($sample['screeningStatus'] ?? 'Pending'),
             'screeningNotes' => $donation->screening_notes ?? ($sample['screeningNotes'] ?? ''),
             'collectionStatus' => $donation->collection_status ?? ($sample['collectionStatus'] ?? 'Scheduled'),
@@ -374,13 +388,18 @@ class DonationsController extends Controller
             $donors = array_values($this->sampleDonorsById());
         }
 
+        $staffMembers = $this->activeStaffOptions();
+        if ($donation->staff && ! $staffMembers->contains('id', $donation->staff->id)) {
+            $staffMembers->push($donation->staff);
+        }
+
         return view('donations.edit', [
             'donation' => $donationRecord,
             'donationModel' => $donation,
             'donors' => $donors,
             'bloodGroups' => $this->bloodGroupOptions(),
             'locations' => $this->collectionLocations(),
-            'staffMembers' => $this->staffMemberSuggestions(),
+            'staffMembers' => $staffMembers,
         ]);
     }
 
@@ -393,6 +412,7 @@ class DonationsController extends Controller
 
         $validated = $request->validate([
             'collection_location' => ['nullable', 'string', 'max:150'],
+            'staff_id' => $this->staffIdRules($request),
             'staff_member' => ['nullable', 'string', 'max:150'],
             'collection_notes' => ['nullable', 'string', 'max:1000'],
             'screening_notes' => ['nullable', 'string', 'max:1000'],
@@ -401,9 +421,30 @@ class DonationsController extends Controller
         if (array_key_exists('collection_location', $validated)) {
             $donation->collection_location_name = $validated['collection_location'];
         }
-        if (array_key_exists('staff_member', $validated)) {
+
+        if ($request->filled('staff_id')) {
+            $selectedStaff = Staff::query()->find((int) $validated['staff_id']);
+
+            if (! $selectedStaff instanceof Staff) {
+                throw ValidationException::withMessages([
+                    'staff_id' => 'Selected staff member does not exist.',
+                ]);
+            }
+
+            $isUnchangedHistoricalAssignment = $donation->staff_id !== null && (int) $donation->staff_id === (int) $selectedStaff->id;
+
+            if (! $isUnchangedHistoricalAssignment && ! $selectedStaff->isActive()) {
+                throw ValidationException::withMessages([
+                    'staff_id' => 'Selected staff member is inactive and cannot be assigned.',
+                ]);
+            }
+
+            $donation->staff_id = $selectedStaff->id;
+            $donation->staff_member_name = $selectedStaff->full_name;
+        } elseif (array_key_exists('staff_member', $validated) && $validated['staff_member'] !== null) {
             $donation->staff_member_name = $validated['staff_member'];
         }
+
         if (array_key_exists('collection_notes', $validated)) {
             $donation->collection_notes = $validated['collection_notes'];
         }
@@ -507,18 +548,32 @@ class DonationsController extends Controller
     }
 
     /**
-     * Suggested phlebotomy and laboratory staff members.
+     * Build validation rules for donation staff attribution.
      *
-     * @return array<int, string>
+     * @return array<int, mixed>
      */
-    public function staffMemberSuggestions(): array
+    private function staffIdRules(Request $request): array
     {
         return [
-            'Nurse Hannah Reed',
-            'Dr. Maya Lin',
-            'Dr. Tariq Nassar',
-            'Nurse Clara Diaz',
+            Rule::requiredIf(
+                fn (): bool => ! $request->filled('staff_member') && Staff::query()->active()->exists()
+            ),
+            'nullable',
+            'integer',
         ];
+    }
+
+    /**
+     * Retrieve active database staff members ordered alphabetically for donation selection.
+     *
+     * @return Collection<int, Staff>
+     */
+    private function activeStaffOptions(): Collection
+    {
+        return Staff::query()
+            ->active()
+            ->orderBy('full_name')
+            ->get(['id', 'employee_id', 'full_name', 'professional_role', 'status']);
     }
 
     /**

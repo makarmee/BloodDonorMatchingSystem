@@ -26,6 +26,7 @@ class RolePermissionSeeder extends Seeder
                 'requests.fulfill',
                 'requests.override_compatibility',
                 'hospitals.verify',
+                'staff.manage',
             ],
         ],
         'staff' => [
@@ -104,6 +105,11 @@ class RolePermissionSeeder extends Seeder
             'name' => 'Verify Partner Hospitals',
             'module' => 'hospitals',
             'description' => 'Verify, approve, or suspend partner hospital facility accounts.',
+        ],
+        'staff.manage' => [
+            'name' => 'Manage Staff Directory',
+            'module' => 'staff',
+            'description' => 'Create, view, update, and activate or deactivate medical and operational staff profiles.',
         ],
     ];
 

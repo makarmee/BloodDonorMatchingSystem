@@ -108,7 +108,7 @@ class DonationsPageTest extends TestCase
             'name="donation_type"',
             'name="quantity_ml"',
             'name="collection_location"',
-            'name="staff_member"',
+            'name="staff_id"',
             'name="screening_status"',
             'name="screening_notes"',
             'name="collection_status"',
@@ -178,7 +178,8 @@ class DonationsPageTest extends TestCase
         $response->assertSee('Platelets');
         $response->assertSee('250');
         $response->assertSee('Central Medical Plaza');
-        $response->assertSee('Nurse Hannah Reed');
+        $response->assertSee('name="staff_id"', false);
+        $response->assertSee('Dr. Tariq Nassar');
         $response->assertSee('Save Changes');
     }
 

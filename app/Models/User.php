@@ -65,6 +65,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Optional linked medical/operational staff profile.
+     */
+    public function staffMember(): HasOne
+    {
+        return $this->hasOne(Staff::class, 'user_id');
+    }
+
+    /**
      * Donor medical profiles last updated by this user.
      */
     public function updatedMedicalProfiles(): HasMany

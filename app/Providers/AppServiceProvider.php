@@ -7,11 +7,13 @@ use App\Models\Donation;
 use App\Models\Donor;
 use App\Models\Hospital;
 use App\Models\ScreeningRecord;
+use App\Models\Staff;
 use App\Policies\BloodRequestPolicy;
 use App\Policies\DonationPolicy;
 use App\Policies\DonorPolicy;
 use App\Policies\HospitalPolicy;
 use App\Policies\ScreeningRecordPolicy;
+use App\Policies\StaffPolicy;
 use Closure;
 use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\Blade;
@@ -48,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(Donor::class, DonorPolicy::class);
         Gate::policy(Hospital::class, HospitalPolicy::class);
         Gate::policy(ScreeningRecord::class, ScreeningRecordPolicy::class);
+        Gate::policy(Staff::class, StaffPolicy::class);
 
         if (! Builder::hasMacro('createWithChecks')) {
             /**

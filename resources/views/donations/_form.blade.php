@@ -8,12 +8,26 @@
         'donationType' => old('donation_type', $donationRecord['donationType'] ?? ''),
         'quantityMl' => old('quantity_ml', $donationRecord['quantityMl'] ?? ''),
         'collectionLocation' => old('collection_location', $donationRecord['collectionLocation'] ?? ''),
-        'staffMember' => old('staff_member', $donationRecord['staffMember'] ?? ''),
+        'staffId' => (string) old('staff_id', $donationRecord['staffId'] ?? ''),
+        'legacyStaffMember' => $donationRecord['staffMember'] ?? '',
         'screeningStatus' => old('screening_status', $donationRecord['screeningStatus'] ?? ''),
         'screeningNotes' => old('screening_notes', $donationRecord['screeningNotes'] ?? ''),
         'collectionStatus' => old('collection_status', $donationRecord['collectionStatus'] ?? ''),
         'collectionNotes' => old('collection_notes', $donationRecord['collectionNotes'] ?? ''),
     ];
+
+    $staffOptions = collect($staffMembers ?? [])
+        ->mapWithKeys(function ($member): array {
+            $label = "{$member->full_name} ({$member->employee_id})";
+            if (! $member->isActive()) {
+                $label .= ' — ' . __('Inactive');
+            }
+
+            return [(string) $member->id => $label];
+        })
+        ->all();
+
+    $hasLegacyStaffAttribution = $isEdit && $initialForm['staffId'] === '' && $initialForm['legacyStaffMember'] !== '';
 
     $donorOptions = collect($donors)
         ->mapWithKeys(fn (array $item): array => [
@@ -48,6 +62,7 @@
     x-data="donationForm({
         mode: @js($isEdit ? 'edit' : 'create'),
         donationId: @js($donationRecord['id'] ?? null),
+        hasLegacyStaff: @js($hasLegacyStaffAttribution),
         donors: @js($donors),
         form: @js($initialForm)
     })"
@@ -356,28 +371,41 @@
                 </div>
 
                 <div class="md:col-span-2">
-                    <x-ui.input
+                    <x-ui.select
                         id="donation-staff"
-                        name="staff_member"
+                        name="staff_id"
                         :label="__('Staff Member')"
-                        placeholder="e.g. Nurse Hannah Reed"
-                        icon="user"
-                        list="donation-staff-options"
-                        :value="$initialForm['staffMember']"
-                        required
-                        x-model="form.staffMember"
-                        @blur="validateField('staffMember')"
-                        x-bind:class="errors.staffMember ? 'ring-2 ring-crimson-500/25' : ''"
+                        :placeholder="__('Select active staff member')"
+                        :options="$staffOptions"
+                        :value="$initialForm['staffId']"
+                        :required="! $hasLegacyStaffAttribution"
+                        x-model="form.staffId"
+                        @change="validateField('staffId')"
+                        x-bind:class="errors.staffId ? 'ring-2 ring-crimson-500/25' : ''"
                     />
-                    <datalist id="donation-staff-options">
-                        @foreach ($staffMembers as $staffMember)
-                            <option value="{{ $staffMember }}"></option>
-                        @endforeach
-                    </datalist>
+
+                    @if ($hasLegacyStaffAttribution)
+                        <input
+                            type="hidden"
+                            name="staff_member"
+                            value="{{ $initialForm['legacyStaffMember'] }}"
+                            :disabled="form.staffId !== ''"
+                        />
+                        <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            {{ __('Historical attribution:') }} <span class="font-medium text-slate-700 dark:text-slate-200">{{ $initialForm['legacyStaffMember'] }}</span>
+                        </p>
+                    @endif
+
+                    @if ($staffOptions === [] && ! $hasLegacyStaffAttribution)
+                        <p class="mt-1.5 text-xs text-amber-600 dark:text-amber-400">
+                            {{ __('No active staff members are currently available in the Staff Directory.') }}
+                        </p>
+                    @endif
+
                     <p
-                        x-show="errors.staffMember"
+                        x-show="errors.staffId"
                         x-cloak
-                        x-text="errors.staffMember"
+                        x-text="errors.staffId"
                         class="mt-1.5 text-xs font-medium text-crimson-600 dark:text-crimson-400"
                     ></p>
                 </div>

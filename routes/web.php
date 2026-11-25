@@ -15,6 +15,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\LocaleController;
 use App\Http\Controllers\PublicPortalController;
 use App\Http\Controllers\ScreeningController;
+use App\Http\Controllers\StaffController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', HomeController::class)->name('home');
@@ -50,6 +51,15 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/hospitals/{hospital}', [HospitalVerificationController::class, 'show'])->name('hospitals.show');
         Route::post('/hospitals/{hospital}/verify', [HospitalVerificationController::class, 'verify'])->name('hospitals.verify');
         Route::post('/hospitals/{hospital}/suspend', [HospitalVerificationController::class, 'suspend'])->name('hospitals.suspend');
+
+        Route::get('/staff', [StaffController::class, 'index'])->name('staff.index');
+        Route::get('/staff/create', [StaffController::class, 'create'])->name('staff.create');
+        Route::post('/staff', [StaffController::class, 'store'])->name('staff.store');
+        Route::get('/staff/{staff}', [StaffController::class, 'show'])->name('staff.show');
+        Route::get('/staff/{staff}/edit', [StaffController::class, 'edit'])->name('staff.edit');
+        Route::match(['put', 'patch'], '/staff/{staff}', [StaffController::class, 'update'])->name('staff.update');
+        Route::post('/staff/{staff}/toggle-status', [StaffController::class, 'toggleStatus'])->name('staff.toggle-status');
+        Route::delete('/staff/{staff}', [StaffController::class, 'destroy'])->name('staff.destroy');
 
         Route::get('/donors', [DonorsController::class, 'index'])->name('donors.index');
         Route::get('/donors/create', [DonorsController::class, 'create'])->name('donors.create');

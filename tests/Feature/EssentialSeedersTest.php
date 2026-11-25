@@ -29,7 +29,7 @@ class EssentialSeedersTest extends TestCase
         $this->assertSame(0, Donor::query()->count());
 
         $this->assertSame(5, Role::query()->count());
-        $this->assertSame(8, Permission::query()->count());
+        $this->assertSame(9, Permission::query()->count());
 
         $rolePermissions = Role::query()
             ->with('permissions:id,slug')
@@ -47,6 +47,7 @@ class EssentialSeedersTest extends TestCase
             'screening.manage',
             'screening.record',
             'screening.release_inventory',
+            'staff.manage',
         ], $rolePermissions['admin']);
 
         $this->assertEqualsCanonicalizing([
@@ -136,8 +137,8 @@ class EssentialSeedersTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $this->assertSame(5, Role::query()->count());
-        $this->assertSame(8, Permission::query()->count());
-        $this->assertSame(15, DB::table('permission_role')->count());
+        $this->assertSame(9, Permission::query()->count());
+        $this->assertSame(16, DB::table('permission_role')->count());
         $this->assertSame(5, BloodComponent::query()->count());
         $this->assertSame(5, ScreeningTestType::query()->count());
         $this->assertSame(25, ComponentScreeningRequirement::query()->count());

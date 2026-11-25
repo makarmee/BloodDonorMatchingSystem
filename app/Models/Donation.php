@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'center_id',
     'collection_location_name',
     'recorded_by_user_id',
+    'staff_id',
     'staff_member_name',
     'blood_group',
     'blood_component_id',
@@ -123,6 +124,14 @@ class Donation extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id');
+    }
+
+    /**
+     * Assigned medical or operational staff member who attended this donation.
+     */
+    public function staff(): BelongsTo
+    {
+        return $this->belongsTo(Staff::class, 'staff_id');
     }
 
     /**

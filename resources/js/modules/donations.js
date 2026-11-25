@@ -169,7 +169,7 @@ export function donationForm(initial = {}) {
         donationType: initial.form?.donationType ?? '',
         quantityMl: initial.form?.quantityMl ?? '',
         collectionLocation: initial.form?.collectionLocation ?? '',
-        staffMember: initial.form?.staffMember ?? '',
+        staffId: String(initial.form?.staffId ?? ''),
         screeningStatus: initial.form?.screeningStatus ?? '',
         screeningNotes: initial.form?.screeningNotes ?? '',
         collectionStatus: initial.form?.collectionStatus ?? '',
@@ -179,6 +179,7 @@ export function donationForm(initial = {}) {
     return {
         mode: initial.mode === 'edit' ? 'edit' : 'create',
         donationId: initial.donationId ?? null,
+        hasLegacyStaff: Boolean(initial.hasLegacyStaff),
         donors: donorsList,
         donorSearch: '',
         donorDropdownOpen: false,
@@ -254,11 +255,9 @@ export function donationForm(initial = {}) {
                 } else if (value.length < 3) {
                     error = 'Collection location must be at least 3 characters.';
                 }
-            } else if (field === 'staffMember') {
-                if (value === '') {
-                    error = 'Attending staff member is required.';
-                } else if (value.length < 2) {
-                    error = 'Enter the responsible staff member name.';
+            } else if (field === 'staffId') {
+                if (value === '' && !(this.mode === 'edit' && this.hasLegacyStaff)) {
+                    error = 'Select an active attending staff member.';
                 }
             } else if (field === 'screeningStatus') {
                 if (!VALID_SCREENING_STATUSES.includes(value)) {
@@ -296,7 +295,7 @@ export function donationForm(initial = {}) {
                 'donationType',
                 'quantityMl',
                 'collectionLocation',
-                'staffMember',
+                'staffId',
                 'screeningStatus',
                 'screeningNotes',
                 'collectionStatus',

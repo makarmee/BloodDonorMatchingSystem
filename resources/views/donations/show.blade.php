@@ -413,6 +413,17 @@
                             <div class="rounded-xl border border-slate-200/80 p-3.5 dark:border-slate-800">
                                 <p class="text-xs text-slate-500 dark:text-slate-400">{{ __('Attending Staff') }}</p>
                                 <p class="mt-1 font-semibold text-slate-900 dark:text-white">{{ $donation['staffMember'] }}</p>
+                                @if (! empty($donation['staffEmployeeId']))
+                                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                                        <span class="font-mono dir-ltr">{{ $donation['staffEmployeeId'] }}</span>
+                                        @if (! empty($donation['staffRole']))
+                                            &middot; {{ __($donation['staffRole']) }}
+                                        @endif
+                                        @if (($donation['staffStatus'] ?? null) === 'Inactive')
+                                            &middot; <span class="text-amber-600 dark:text-amber-400">{{ __('Inactive') }}</span>
+                                        @endif
+                                    </p>
+                                @endif
                             </div>
                         </div>
 
