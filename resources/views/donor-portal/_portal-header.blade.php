@@ -9,6 +9,12 @@
             'active' => request()->routeIs('donor-portal.dashboard'),
         ],
         [
+            'label' => __('My Profile'),
+            'icon' => 'user',
+            'href' => route('donor-portal.profile.show', $donorQuery),
+            'active' => request()->routeIs('donor-portal.profile.*'),
+        ],
+        [
             'label' => __('My Appointments'),
             'icon' => 'calendar',
             'href' => route('donor-portal.appointments.index', $donorQuery),
@@ -37,7 +43,7 @@
         <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div class="flex flex-wrap items-center gap-3">
                 <div class="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-crimson-600 text-sm font-bold text-white shadow-xs">
-                    {{ strtoupper(substr($donorProfile['name'], 0, 2)) }}
+                    {{ mb_strtoupper(mb_substr($donorProfile['name'], 0, 2, 'UTF-8'), 'UTF-8') }}
                 </div>
 
                 <div>

@@ -229,6 +229,7 @@ class VisualPersianTranslationAuditTest extends TestCase
     {
         $donorRoutes = [
             'donor-portal.dashboard',
+            'donor-portal.profile.show',
             'donor-portal.appointments.index',
             'donor-portal.appointments.create',
             'donor-portal.eligibility',

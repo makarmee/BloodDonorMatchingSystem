@@ -200,6 +200,10 @@ return [
         'collection_status' => 'وضعیت خون‌گیری',
         'collection_notes' => 'یادداشت‌های خون‌گیری',
         'screening_notes' => 'یادداشت‌های غربالگری',
+        'gender' => 'جنسیت',
+        'date_of_birth' => 'تاریخ تولد',
+        'emergency_contact' => 'تماس اضطراری',
+        'availability_status' => 'وضعیت در دسترس بودن',
     ],
 
 ];

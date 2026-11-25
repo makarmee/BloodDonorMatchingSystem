@@ -14,10 +14,14 @@ use App\Models\ScreeningRecord;
 use App\Models\User;
 use App\Services\ReferenceCodeGenerator;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
 
 class DonorPortalController extends Controller
 {
@@ -55,10 +59,12 @@ class DonorPortalController extends Controller
             $donorId = $donor['id'];
         }
 
+        $todayIso = $this->resolveTodayIso($donor);
+
         $upcomingAppointments = array_values(array_filter(
             $appointments,
             fn (array $apt): bool => in_array($apt['status'], ['Pending', 'Confirmed'], true)
-                && $apt['date'] >= self::TODAY_ISO
+                && $apt['date'] >= $todayIso
         ));
 
         $upcomingCamps = array_values(array_filter(
@@ -77,8 +83,120 @@ class DonorPortalController extends Controller
             'upcomingAppointments' => $upcomingAppointments,
             'upcomingCamps' => array_slice($upcomingCamps, 0, 4),
             'lastDonationDisplay' => $lastDonationDisplay,
-            'todayIso' => self::TODAY_ISO,
+            'todayIso' => $todayIso,
         ]);
+    }
+
+    /**
+     * Display the authenticated donor's profile details and permitted self-service contact form.
+     */
+    public function profile(Request $request): View
+    {
+        $donor = $this->resolveDonor($request);
+
+        if ($donor instanceof Donor) {
+            Gate::forUser($request->user())->authorize('viewOwnProfile', $donor);
+            $donor->loadMissing('currentEligibilityRecord');
+
+            $profile = $this->buildProfileSummaryFromModel($donor);
+            $profileDetails = [
+                'donorCode' => $donor->donor_code,
+                'fullName' => $donor->full_name,
+                'email' => $donor->email,
+                'phone' => $donor->phone ?? '',
+                'gender' => $donor->gender ?? '',
+                'dateOfBirth' => $donor->date_of_birth?->format('Y-m-d') ?? '',
+                'bloodGroup' => $donor->blood_group ?? __('Pending verification'),
+                'address' => $donor->address ?? '',
+                'emergencyContact' => $donor->emergency_contact ?? '',
+                'availabilityStatus' => $donor->availability_status ?? 'Available',
+                'accountStatus' => $donor->account_status ?? 'Active',
+                'eligibilityStatus' => $donor->currentEligibilityRecord?->eligibility_status ?? $donor->eligibility_status ?? 'Pending Review',
+                'registeredAt' => $donor->registered_at?->format('M d, Y') ?? '—',
+                'profileCompleted' => (bool) $donor->profile_completed,
+                'totalDonations' => $profile['totalDonations'],
+            ];
+            $isPersistedDonor = true;
+        } else {
+            $profile = $this->buildProfileSummary($donor);
+            $profileDetails = [
+                'donorCode' => (string) ($donor['id'] ?? ''),
+                'fullName' => (string) ($donor['name'] ?? ''),
+                'email' => (string) ($donor['email'] ?? ''),
+                'phone' => (string) ($donor['phone'] ?? ''),
+                'gender' => (string) ($donor['gender'] ?? ''),
+                'dateOfBirth' => (string) ($donor['dateOfBirth'] ?? ''),
+                'bloodGroup' => (string) ($donor['bloodGroup'] ?? ''),
+                'address' => (string) ($donor['address'] ?? ''),
+                'emergencyContact' => (string) ($donor['emergencyContact'] ?? ''),
+                'availabilityStatus' => (string) ($donor['availabilityStatus'] ?? 'Available'),
+                'accountStatus' => (string) ($donor['accountStatus'] ?? 'Active'),
+                'eligibilityStatus' => (string) ($donor['eligibilityStatus'] ?? 'Unknown'),
+                'registeredAt' => (string) ($profile['registrationDate'] ?? '—'),
+                'profileCompleted' => true,
+                'totalDonations' => (int) ($profile['totalDonations'] ?? 0),
+            ];
+            $isPersistedDonor = false;
+        }
+
+        return view('donor-portal.profile', [
+            'donorProfile' => $profile,
+            'profileDetails' => $profileDetails,
+            'isPersistedDonor' => $isPersistedDonor,
+            'genders' => Donor::GENDERS,
+            'availabilityOptions' => ['Available', 'Temporarily Unavailable'],
+        ]);
+    }
+
+    /**
+     * Update permitted personal and contact fields for the authenticated donor only.
+     */
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        $donor = $this->resolveDonor($request);
+
+        if (! $donor instanceof Donor) {
+            abort(403, 'A linked donor profile is required to update profile details.');
+        }
+
+        /** @var User $actor */
+        $actor = $request->user();
+        Gate::forUser($actor)->authorize('updateOwnProfile', $donor);
+
+        $minDob = CarbonImmutable::today()->subYears(110)->toDateString();
+        $maxDob = CarbonImmutable::today()->subYears(16)->toDateString();
+
+        $validated = $request->validate([
+            'full_name' => ['required', 'string', 'min:2', 'max:150'],
+            'phone' => ['required', 'string', 'min:7', 'max:32', 'regex:/^[0-9+\-\s().]{7,32}$/'],
+            'gender' => ['nullable', 'string', Rule::in(Donor::GENDERS)],
+            'date_of_birth' => ['nullable', 'date', "after_or_equal:{$minDob}", "before_or_equal:{$maxDob}"],
+            'address' => ['nullable', 'string', 'max:1000'],
+            'emergency_contact' => ['nullable', 'string', 'max:150'],
+            'availability_status' => ['required', 'string', Rule::in(['Available', 'Temporarily Unavailable'])],
+        ]);
+
+        DB::transaction(function () use ($donor, $actor, $validated): void {
+            // Restrict updates strictly to personal/contact fields; never mutate clinical, eligibility, or account status fields.
+            $donor->full_name = trim($validated['full_name']);
+            $donor->phone = trim($validated['phone']);
+            $donor->gender = $validated['gender'] ?: null;
+            $donor->date_of_birth = $validated['date_of_birth'] ?: null;
+            $donor->address = isset($validated['address']) && trim((string) $validated['address']) !== '' ? trim((string) $validated['address']) : null;
+            $donor->emergency_contact = isset($validated['emergency_contact']) && trim((string) $validated['emergency_contact']) !== '' ? trim((string) $validated['emergency_contact']) : null;
+            $donor->availability_status = $validated['availability_status'];
+            $donor->profile_completed = $donor->hasCompletedRequiredProfile();
+            $donor->save();
+
+            if ($actor->name !== $donor->full_name) {
+                $actor->name = $donor->full_name;
+                $actor->save();
+            }
+        });
+
+        return redirect()
+            ->route('donor-portal.profile.show')
+            ->with('success', __('Your donor profile has been updated.'));
     }
 
     /**
@@ -100,7 +218,7 @@ class DonorPortalController extends Controller
             'donorProfile' => $profile,
             'appointments' => $appointments,
             'statuses' => ['Pending', 'Confirmed', 'Completed', 'Cancelled'],
-            'todayIso' => self::TODAY_ISO,
+            'todayIso' => $this->resolveTodayIso($donor),
         ]);
     }
 
@@ -145,7 +263,7 @@ class DonorPortalController extends Controller
             'donationTypes' => ['Whole Blood', 'Platelets', 'Plasma', 'Double Red Cells'],
             'timeSlotTemplates' => $this->sampleTimeSlots(),
             'preselectedCampId' => $validPreselectedCampId,
-            'todayIso' => self::TODAY_ISO,
+            'todayIso' => $this->resolveTodayIso($donor),
         ]);
     }
 
@@ -354,6 +472,8 @@ class DonorPortalController extends Controller
             abort(403, 'Unauthorized access to donor portal.');
         }
 
+        $hasPersistedDonors = Donor::query()->count() > 0;
+
         if ($request->filled('donor')) {
             $requestedCode = (string) $request->query('donor');
 
@@ -365,9 +485,12 @@ class DonorPortalController extends Controller
                 abort(403, 'Unauthorized access to another donor profile.');
             }
 
-            $dbDonor = Donor::where('donor_code', $requestedCode)->first();
-            if ($dbDonor) {
-                return $dbDonor;
+            if (! $user->donor && $hasPersistedDonors) {
+                abort(403, 'No donor profile linked to this user account.');
+            }
+
+            if ($user->donor && strcasecmp($user->donor->donor_code, $requestedCode) === 0) {
+                return $user->donor;
             }
 
             foreach ($this->donorsController->sampleDonors() as $sample) {
@@ -383,12 +506,12 @@ class DonorPortalController extends Controller
             return $user->donor;
         }
 
-        // When real donors exist in DB, a user without a linked donor profile is denied access
-        if (Donor::query()->count() > 0) {
+        // When real donors exist in DB, a user without a linked donor profile is denied access.
+        if ($hasPersistedDonors) {
             abort(403, 'No donor profile linked to this user account.');
         }
 
-        // Test compatibility for unseeded tests (e.g. DonorPortalPageTest)
+        // Test compatibility for unseeded tests (e.g. DonorPortalPageTest).
         $defaultSample = collect($this->donorsController->sampleDonors())->firstWhere('id', self::DEFAULT_DONOR_ID);
         if ($defaultSample) {
             return $defaultSample;
@@ -398,27 +521,42 @@ class DonorPortalController extends Controller
     }
 
     /**
+     * Resolve today's ISO date dynamically for persisted donors while preserving sample test fixtures.
+     *
+     * @param  array<string, mixed>|Donor  $donor
+     */
+    private function resolveTodayIso(Donor|array $donor): string
+    {
+        return $donor instanceof Donor ? now()->toDateString() : self::TODAY_ISO;
+    }
+
+    /**
      * Build compact donor profile payload from Eloquent Donor model.
      *
      * @return array<string, mixed>
      */
     private function buildProfileSummaryFromModel(Donor $donor): array
     {
+        $completedDonationsCount = max(
+            (int) $donor->total_completed_donations,
+            $donor->donations()->where('collection_status', 'Completed')->count()
+        );
+
         return [
             'id' => $donor->donor_code,
             'name' => $donor->full_name,
-            'bloodGroup' => $donor->blood_group,
+            'bloodGroup' => $donor->blood_group ?? '—',
             'maskedEmail' => $this->maskEmail((string) $donor->email),
             'maskedPhone' => $this->maskPhone((string) $donor->phone),
             'registrationDate' => $donor->registered_at?->format('M d, Y') ?? 'Registered Donor',
             'accountStatus' => (string) ($donor->account_status ?? 'Active'),
-            'totalDonations' => (int) ($donor->total_completed_donations ?? $donor->donations()->where('collection_status', 'Completed')->count()),
+            'totalDonations' => $completedDonationsCount,
             'lastDonationDate' => $donor->last_donation_date?->format('M d, Y') ?? 'Never',
         ];
     }
 
     /**
-     * Resolve eligibility summary from authoritative current DonorEligibilityRecord.
+     * Resolve eligibility summary from authoritative current DonorEligibilityRecord without inventing dates.
      *
      * @return array<string, mixed>
      */
@@ -426,13 +564,19 @@ class DonorPortalController extends Controller
     {
         $currentRecord = DonorEligibilityRecord::where('donor_id', $donor->id)
             ->current()
-            ->with('reviewedBy')
             ->first();
 
         $status = $currentRecord?->eligibility_status ?? ($donor->eligibility_status ?? 'Unknown');
-        $reviewedAt = $currentRecord?->reviewed_at?->format('M d, Y') ?? ($currentRecord?->created_at?->format('M d, Y') ?? 'Nov 08, 2026');
-        $nextDate = $currentRecord?->next_eligible_date?->format('M d, Y') ?? ($donor->next_eligible_date?->format('M d, Y') ?? null);
-        $source = $currentRecord?->clearance_source ?? 'Authoritative Medical Assessment';
+        $reviewedAt = $currentRecord?->reviewed_at?->format('M d, Y') ?? $currentRecord?->created_at?->format('M d, Y');
+        $nextDate = $currentRecord?->next_eligible_date?->format('M d, Y') ?? $donor->next_eligible_date?->format('M d, Y');
+        $source = $currentRecord instanceof DonorEligibilityRecord
+            ? 'Authorized Medical Assessment'
+            : 'BDMS Donor Registration Record';
+
+        $completedDonationsCount = max(
+            (int) $donor->total_completed_donations,
+            $donor->donations()->where('collection_status', 'Completed')->count()
+        );
 
         return $this->normalizeEligibilitySummary([
             'id' => $donor->donor_code,
@@ -440,11 +584,12 @@ class DonorPortalController extends Controller
             'eligibilityStatus' => $status,
             'lastDonationDate' => $donor->last_donation_date?->format('M d, Y') ?? 'Never',
             'accountStatus' => $donor->account_status ?? 'Active',
-            'totalDonations' => $donor->total_completed_donations ?? 0,
+            'totalDonations' => $completedDonationsCount,
         ], [
             'lastReviewedDate' => $reviewedAt,
             'nextEligibleDate' => $nextDate,
             'clearanceSource' => $source,
+            'isPersisted' => true,
         ]);
     }
 
@@ -1068,8 +1213,14 @@ class DonorPortalController extends Controller
         $status = is_string($rawStatus) && in_array($rawStatus, $allowedStatuses, true)
             ? $rawStatus
             : 'Unknown';
+        $isPersisted = (bool) ($metadata['isPersisted'] ?? false);
 
-        $defaultReasons = [
+        $defaultReasons = $isPersisted ? [
+            'Eligible' => 'Your current donor eligibility status is cleared for scheduled collection subject to day-of clinical checks.',
+            'Not Eligible' => 'Your donor profile currently reflects a clinical deferral; consult blood bank medical staff for follow-up evaluation.',
+            'Pending Review' => 'Your donor profile is awaiting medical officer review before collection clearance can be confirmed.',
+            'Unknown' => 'Eligibility information is currently unavailable. Confirmation by authorized medical staff is required.',
+        ] : [
             'Eligible' => 'Sample record indicates verified administrative and prior clinical clearance for scheduled collection.',
             'Not Eligible' => 'Sample record indicates a current clinical deferral; follow-up medical evaluation is required.',
             'Pending Review' => 'Sample record is awaiting medical officer review before collection clearance can be issued.',
@@ -1084,12 +1235,17 @@ class DonorPortalController extends Controller
             $reason = $defaultReasons['Unknown'];
         }
 
+        $nextEligibleDate = $status === 'Not Eligible'
+            ? ($metadata['nextEligibleDate'] ?? ($isPersisted ? null : 'Dec 23, 2026'))
+            : null;
+
         return [
             'id' => $donor['id'] ?? null,
             'name' => $donor['name'] ?? 'Donor',
             'status' => $status,
+            'isPersisted' => $isPersisted,
             'lastReviewedDate' => $metadata['lastReviewedDate'] ?? null,
-            'nextEligibleDate' => $status === 'Not Eligible' ? ($metadata['nextEligibleDate'] ?? 'Dec 23, 2026') : null,
+            'nextEligibleDate' => $nextEligibleDate,
             'reason' => $reason,
             'clearanceSource' => $metadata['clearanceSource'] ?? ($status === 'Unknown' ? 'No medical clearance record available' : 'Synchronized BDMS Donor Record'),
             'medicalConfirmationRequired' => 'Final donation eligibility must be confirmed on-site by authorized blood bank medical staff (vital signs, hemoglobin check, and health screening).',

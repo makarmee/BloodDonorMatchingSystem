@@ -109,6 +109,8 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('role:donor')->group(function (): void {
             Route::get('/donor-portal', [DonorPortalController::class, 'dashboard'])->name('donor-portal.dashboard');
+            Route::get('/donor-portal/profile', [DonorPortalController::class, 'profile'])->name('donor-portal.profile.show');
+            Route::match(['put', 'patch'], '/donor-portal/profile', [DonorPortalController::class, 'updateProfile'])->name('donor-portal.profile.update');
             Route::get('/donor-portal/appointments', [DonorPortalController::class, 'appointments'])->name('donor-portal.appointments.index');
             Route::get('/donor-portal/appointments/create', [DonorPortalController::class, 'createAppointment'])->name('donor-portal.appointments.create');
             Route::post('/donor-portal/appointments', [DonorPortalController::class, 'storeAppointment'])->name('donor-portal.appointments.store');

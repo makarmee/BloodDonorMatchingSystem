@@ -72,6 +72,7 @@
             'sections' => [
                 'Donor Services' => [
                     ['label' => 'Overview', 'icon' => 'squares-2x2', 'route' => 'donor-portal.dashboard', 'match' => 'donor-portal.dashboard'],
+                    ['label' => 'My Profile', 'icon' => 'user', 'route' => 'donor-portal.profile.show', 'match' => 'donor-portal.profile.*'],
                     ['label' => 'My Appointments', 'icon' => 'calendar', 'route' => 'donor-portal.appointments.index', 'match' => 'donor-portal.appointments.*'],
                     ['label' => 'Donation History', 'icon' => 'heart-pulse', 'route' => 'donor-portal.history', 'match' => 'donor-portal.history'],
                     ['label' => 'Eligibility', 'icon' => 'shield-check', 'route' => 'donor-portal.eligibility', 'match' => 'donor-portal.eligibility'],

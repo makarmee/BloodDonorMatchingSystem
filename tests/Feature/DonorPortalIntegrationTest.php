@@ -2,14 +2,23 @@
 
 namespace Tests\Feature;
 
+use App\Models\BloodComponent;
+use App\Models\Donation;
 use App\Models\DonationCenter;
 use App\Models\Donor;
 use App\Models\DonorAppointment;
+use App\Models\DonorEligibilityRecord;
+use App\Models\DonorMedicalProfile;
 use App\Models\Role;
+use App\Models\ScreeningRecord;
+use App\Models\ScreeningTestType;
 use App\Models\User;
 use Database\Seeders\BloodComponentSeeder;
+use Database\Seeders\ComponentScreeningRequirementSeeder;
 use Database\Seeders\RolePermissionSeeder;
+use Database\Seeders\ScreeningTestTypeSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Tests\TestCase;
 
 class DonorPortalIntegrationTest extends TestCase
@@ -202,5 +211,248 @@ class DonorPortalIntegrationTest extends TestCase
         $eligibilityResponse->assertOk();
         $eligibilityResponse->assertViewIs('donor-portal.eligibility');
         $eligibilityResponse->assertSee('Sarah Jenkins');
+    }
+
+    public function test_guest_access_to_donor_portal_routes_redirects_to_login(): void
+    {
+        Auth::logout();
+
+        foreach ([
+            route('donor-portal.dashboard'),
+            route('donor-portal.profile.show'),
+            route('donor-portal.history'),
+            route('donor-portal.eligibility'),
+            route('donor-portal.appointments.index'),
+        ] as $url) {
+            $this->get($url)->assertRedirect(route('login'));
+        }
+
+        $this->patch(route('donor-portal.profile.update'), [
+            'full_name' => 'Guest Tamper',
+        ])->assertRedirect(route('login'));
+    }
+
+    public function test_donor_can_view_and_update_own_profile_while_protected_fields_remain_immutable(): void
+    {
+        $profileResponse = $this->get(route('donor-portal.profile.show'));
+        $profileResponse->assertOk();
+        $profileResponse->assertViewIs('donor-portal.profile');
+        $profileResponse->assertSee($this->donor->donor_code);
+        $profileResponse->assertSee('Sarah Jenkins');
+        $profileResponse->assertSee('A+');
+        $profileResponse->assertSee('My Profile');
+
+        $dob = now()->subYears(28)->toDateString();
+
+        // Attempt both valid personal updates and crafted protected fields
+        $updateResponse = $this->patch(route('donor-portal.profile.update'), [
+            'full_name' => 'Sarah M. Jenkins',
+            'phone' => '+1 (555) 901-7788',
+            'gender' => 'Female',
+            'date_of_birth' => $dob,
+            'address' => '742 Evergreen Terrace, Metro City',
+            'emergency_contact' => 'Mark Jenkins (+1 555-333-4444)',
+            'availability_status' => 'Temporarily Unavailable',
+            // Protected fields that must be completely ignored
+            'donor_code' => 'DNR-HACKED-999',
+            'user_id' => 99999,
+            'email' => 'hacked@example.com',
+            'blood_group' => 'AB-',
+            'eligibility_status' => 'Not Eligible',
+            'account_status' => 'Inactive',
+            'total_completed_donations' => 42,
+            'last_donation_date' => '2020-01-01',
+            'next_eligible_date' => '2030-01-01',
+            'registered_at' => '2010-01-01',
+        ]);
+
+        $updateResponse->assertRedirect(route('donor-portal.profile.show'));
+        $updateResponse->assertSessionHas('success');
+
+        $this->donor->refresh();
+        $this->donorUser->refresh();
+
+        $this->assertSame('Sarah M. Jenkins', $this->donor->full_name);
+        $this->assertSame('Sarah M. Jenkins', $this->donorUser->name);
+        $this->assertSame('+1 (555) 901-7788', $this->donor->phone);
+        $this->assertSame('Female', $this->donor->gender);
+        $this->assertSame($dob, $this->donor->date_of_birth?->toDateString());
+        $this->assertSame('742 Evergreen Terrace, Metro City', $this->donor->address);
+        $this->assertSame('Mark Jenkins (+1 555-333-4444)', $this->donor->emergency_contact);
+        $this->assertSame('Temporarily Unavailable', $this->donor->availability_status);
+        $this->assertTrue($this->donor->profile_completed);
+
+        // Protected fields remain unchanged
+        $this->assertNotSame('DNR-HACKED-999', $this->donor->donor_code);
+        $this->assertSame($this->donorUser->id, $this->donor->user_id);
+        $this->assertSame('sarah.jenkins@example.com', $this->donor->email);
+        $this->assertSame('A+', $this->donor->blood_group);
+        $this->assertSame('Eligible', $this->donor->eligibility_status);
+        $this->assertSame('Active', $this->donor->account_status);
+        $this->assertSame(0, $this->donor->total_completed_donations);
+        $this->assertNull($this->donor->last_donation_date);
+        $this->assertNull($this->donor->next_eligible_date);
+    }
+
+    public function test_unlinked_donor_cannot_bypass_via_donor_query_param_and_non_donor_cannot_access_portal(): void
+    {
+        $unlinkedUser = User::factory()->create();
+        $unlinkedUser->roles()->attach(Role::where('slug', 'donor')->firstOrFail());
+
+        // Even passing an existing donor_code in query string must be denied (403)
+        foreach ([
+            route('donor-portal.dashboard', ['donor' => $this->donor->donor_code]),
+            route('donor-portal.profile.show', ['donor' => $this->donor->donor_code]),
+            route('donor-portal.history', ['donor' => $this->donor->donor_code]),
+            route('donor-portal.eligibility', ['donor' => $this->donor->donor_code]),
+        ] as $tamperedUrl) {
+            $this->actingAs($unlinkedUser)->get($tamperedUrl)->assertForbidden();
+        }
+
+        $this->actingAs($unlinkedUser)
+            ->patch(route('donor-portal.profile.update', ['donor' => $this->donor->donor_code]), [
+                'full_name' => 'Tamper',
+                'phone' => '+15551112222',
+                'availability_status' => 'Available',
+            ])
+            ->assertForbidden();
+
+        // Linked donor tampering with ?donor= on profile, history, eligibility also gets 403
+        $otherUser = User::factory()->create();
+        $otherUser->roles()->attach(Role::where('slug', 'donor')->firstOrFail());
+        $otherDonor = Donor::factory()->create(['user_id' => $otherUser->id]);
+
+        foreach ([
+            route('donor-portal.profile.show', ['donor' => $otherDonor->donor_code]),
+            route('donor-portal.history', ['donor' => $otherDonor->donor_code]),
+            route('donor-portal.eligibility', ['donor' => $otherDonor->donor_code]),
+        ] as $otherUrl) {
+            $this->actingAs($this->donorUser)->get($otherUrl)->assertForbidden();
+        }
+
+        // Staff/Admin cannot enter role:donor portal, and donor cannot enter staff/admin routes
+        $staffUser = User::factory()->create();
+        $staffUser->roles()->attach(Role::where('slug', 'staff')->firstOrFail());
+        $this->actingAs($staffUser)->get(route('donor-portal.profile.show'))->assertForbidden();
+
+        foreach ([
+            route('staff.index'),
+            route('donors.index'),
+            route('donors.show', $this->donor),
+            route('donations.index'),
+            route('screening.index'),
+            route('inventory.index'),
+            route('requests.index'),
+            route('hospitals.index'),
+        ] as $staffUrl) {
+            $this->actingAs($this->donorUser)->get($staffUrl)->assertForbidden();
+        }
+    }
+
+    public function test_donation_history_isolates_records_and_redacts_internal_staff_notes_and_medical_profile(): void
+    {
+        $this->seed([
+            ScreeningTestTypeSeeder::class,
+            ComponentScreeningRequirementSeeder::class,
+        ]);
+
+        $component = BloodComponent::query()->where('code', 'WB')->firstOrFail();
+        $testType = ScreeningTestType::query()->firstOrFail();
+
+        DonorMedicalProfile::create([
+            'donor_id' => $this->donor->id,
+            'medical_notes' => 'CONFIDENTIAL MEDICAL NOTE 9876',
+            'deferral_notes' => 'INTERNAL DEFERRAL NOTE 5432',
+            'last_hemoglobin_g_dl' => 14.2,
+            'weight_kg' => 68.5,
+        ]);
+
+        DonorEligibilityRecord::factory()->eligible()->for($this->donor)->create([
+            'reason' => 'STAFF INTERNAL REASON 1122',
+            'clearance_source' => 'Internal Audit Source',
+        ]);
+
+        $ownDonation = Donation::factory()->create([
+            'donor_id' => $this->donor->id,
+            'blood_component_id' => $component->id,
+            'blood_group' => $this->donor->blood_group,
+            'collection_status' => 'Completed',
+            'screening_status' => 'Passed',
+            'staff_member_name' => 'Secret Phlebotomist Name',
+            'collection_notes' => 'PRIVATE BAG NOTE #XYZ-99',
+            'screening_notes' => 'INTERNAL LAB NOTE #LAB-88',
+        ]);
+
+        ScreeningRecord::factory()->passed()->create([
+            'donation_id' => $ownDonation->id,
+            'test_type_id' => $testType->id,
+            'lab_staff_name' => 'Dr. Confidential Officer',
+            'assay_method' => 'NAT — Nucleic Acid Testing',
+            'specimen_tube_code' => 'TUBE-SECRET-777',
+            'test_notes' => 'PRIVATE ASSAY COMMENT 654',
+        ]);
+
+        $otherDonor = Donor::factory()->create(['full_name' => 'Other Hidden Donor']);
+        $otherDonation = Donation::factory()->create([
+            'donor_id' => $otherDonor->id,
+            'blood_component_id' => $component->id,
+            'blood_group' => $otherDonor->blood_group,
+            'collection_status' => 'Completed',
+        ]);
+
+        $historyResponse = $this->get(route('donor-portal.history'));
+        $historyResponse->assertOk();
+        $historyResponse->assertSee($ownDonation->donation_code);
+        $historyResponse->assertDontSee($otherDonation->donation_code);
+        $historyResponse->assertDontSee('Other Hidden Donor');
+        $historyResponse->assertDontSee('Secret Phlebotomist Name');
+        $historyResponse->assertDontSee('PRIVATE BAG NOTE #XYZ-99');
+        $historyResponse->assertDontSee('INTERNAL LAB NOTE #LAB-88');
+        $historyResponse->assertDontSee('Dr. Confidential Officer');
+        $historyResponse->assertDontSee('TUBE-SECRET-777');
+        $historyResponse->assertDontSee('PRIVATE ASSAY COMMENT 654');
+        $historyResponse->assertDontSee('CONFIDENTIAL MEDICAL NOTE 9876');
+
+        // Dashboard shows real completed count and must not leak staff/medical notes
+        $dashResponse = $this->get(route('donor-portal.dashboard'));
+        $dashResponse->assertOk();
+        $dashResponse->assertSee($ownDonation->donation_code);
+        $dashResponse->assertDontSee($otherDonation->donation_code);
+        $dashResponse->assertDontSee('CONFIDENTIAL MEDICAL NOTE 9876');
+
+        // Eligibility must not leak internal deferral/medical notes or invent dates
+        $eligResponse = $this->get(route('donor-portal.eligibility'));
+        $eligResponse->assertOk();
+        $eligResponse->assertDontSee('INTERNAL DEFERRAL NOTE 5432');
+        $eligResponse->assertDontSee('CONFIDENTIAL MEDICAL NOTE 9876');
+    }
+
+    public function test_donor_portal_profile_renders_in_english_ltr_and_persian_rtl(): void
+    {
+        $enResponse = $this->withSession(['locale' => 'en'])->get(route('donor-portal.profile.show'));
+        $enResponse->assertOk();
+        $enResponse->assertSee('dir="ltr"', false);
+        $enResponse->assertSee('My Donor Profile');
+        $enResponse->assertSee('Save Profile Changes');
+
+        $faResponse = $this->withSession(['locale' => 'fa'])->get(route('donor-portal.profile.show'));
+        $faResponse->assertOk();
+        $faResponse->assertSee('dir="rtl"', false);
+        $faResponse->assertSee('پروفایل اهداکننده من');
+        $faResponse->assertSee('ذخیره تغییرات پروفایل');
+
+        // Persian validation message uses translated attributes
+        $invalidFa = $this->withSession(['locale' => 'fa'])
+            ->from(route('donor-portal.profile.show'))
+            ->patch(route('donor-portal.profile.update'), [
+                'full_name' => '',
+                'phone' => 'bad',
+                'availability_status' => 'Invalid',
+            ]);
+        $invalidFa->assertSessionHasErrors(['full_name', 'phone', 'availability_status']);
+        $errorsText = implode(' ', session('errors')->all());
+        $this->assertStringContainsString('نام کامل', $errorsText);
+        $this->assertStringContainsString('شماره تماس', $errorsText);
+        $this->assertStringContainsString('وضعیت در دسترس بودن', $errorsText);
     }
 }

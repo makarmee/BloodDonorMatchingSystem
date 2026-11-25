@@ -49,7 +49,11 @@
                                     {{ __('Current Eligibility Status') }}
                                 </h2>
                                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {{ __('Displayed strictly from verified BDMS sample data without automatic countdown calculation.') }}
+                                    @if ($eligibility['isPersisted'] ?? false)
+                                        {{ __('Displayed strictly from your latest verified BDMS eligibility evaluation without automatic calculation.') }}
+                                    @else
+                                        {{ __('Displayed strictly from verified BDMS sample data without automatic countdown calculation.') }}
+                                    @endif
                                 </p>
                             </div>
 
